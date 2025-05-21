@@ -3,34 +3,44 @@ import opengl
 import chroma
 
 import ./core
-import ./pool
 import ./params
-import ./seqs
 import ./slice2
+import ./tiles
+
+when defined(NVG_DEBUG_VERTS):
+  proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
+
+const
+  NVG_USE_GL2 = false
+  NVG_USE_GL3 = true
+  NVG_USE_GLES2 = false
+  NVG_USE_GLES3 = false
+  NVG_USE_UNIFORMBUFFER = false
+  NVG_STATS = false
+
+const NVG_FRAGMENT_BINDING = 0
+const TILE_TEX_WIDTH = 256
 
 type
   ShaderType = enum
-    FillGradientShader
-    FillImageShader
-    SimpleShader
-    ImageShader
-    BlurImageShader
+    FillSimple
+    FillSolid
+    FillGrad
+    # FillImage
+    # FillText
 
-  ShaderObj = object
+  ShaderProgramObj = object
     program: GLuint
     fsShader: GLuint
     vsShader: GLuint
+
     viewLoc: GLint
     texLoc: GLint
-    colorMapLoc: GLint
+    edgeTexLoc: GLint
+    typeLoc: GLint
+    nedgesLoc: GLint
+    offsetLoc: GLint
     fragmentLoc: GLint
-
-  TextureObj = object
-    id: Vid
-    tex: GLuint
-    size: IVec2
-    tp: TextureType
-    imageFlags: ImageFlags
 
   VertexUniformObj = object
     view: Vec2
@@ -38,8 +48,7 @@ type
 
   CallType = enum
     FillCall = 1
-    FillConvexCall
-    StrokeCall
+    ConvexFillCall
     TrianglesCall
 
   BlendObj = object
@@ -50,469 +59,64 @@ type
 
   CallObj = object
     callType: CallType
-    image: ImageId
-    colorMap: ImageId
-    clipContourOffset: uint32
-    clipContourCount: uint32
-    pathOffset: uint32
-    pathCount: uint32
+    shaderType: ShaderType
+    fillOffset: uint32
+    fillCount: uint32
     triangleOffset: uint32
     triangleCount: uint32
     uniformOffset: uint32
     blend: BlendObj
 
-  Contour2Obj = object
-    fillOffset: uint32
-    fillCount: uint32
-    strokeOffset: uint32
-    strokeCount: uint32
-
   FragmentUniformObj = object
-    extent: Vec2
-    blurDir: Vec2
+    paintMat: array[12, float32]
     innerColor: Color
     outerColor: Color
-    paintMat: Mat3
-    shaderType: uint32
-    texType: uint32
+    extent: Vec2
     radius: float32
     feather: float32
-    pad: array[12, uint8]
+    strokeMult: float32
+    strokeThr: float32
+    texType: uint32
+    fillType: uint32
 
   OpenglBackendContextObj = object
-    shader: ShaderObj
-    texturePool: Pool[TextureObj]
+    shaderProgram: ShaderProgramObj
     vertBuf: GLuint
     vertArr: GLuint
+
+    when NVG_USE_UNIFORMBUFFER:
+      fragmentBuf: GLuint
+    else:
+      fragmentBuf: GLint
+
+    fragmentSize: uint32
+    texEdges: GLuint
     vertexUniform: VertexUniformObj
+    tiles: Tiles
     calls: seq[CallObj]
-    contours: seq[Contour2Obj]
     verts: seq[Vec4]
+    edges: seq[Vec4]
     uniforms: seq[FragmentUniformObj]
 
-proc createGlShader(tp: GLenum, source: cstring): GLuint =
-  let s = glCreateShader(tp)
+proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
+  verts.add(vec4(bounds[2], bounds[3], 0, 0))
+  verts.add(vec4(bounds[2], bounds[1], 0, 0))
+  verts.add(vec4(bounds[0], bounds[3], 0, 0))
+  verts.add(vec4(bounds[0], bounds[1], 0, 0))
 
-  var
-    p = source
-    len = GLint(source.len)
-    status = default(GLint)
-
-  glShaderSource(s, GLsizei(1), cast[cstringArray](p.addr), len.addr)
-  glCompileShader(s)
-
-  glGetShaderiv(s, GL_COMPILE_STATUS, status.addr)
-  if status != GLint(GL_TRUE):
-    assert false
-
-  s
-
-proc createShader(vs, fs: cstring): ShaderObj =
+proc addQuad(verts: var seq[Vec4], bounds: array[4, float32], pad: float32) {.inline.} =
   let
-    program = glCreateProgram()
-    vsShader = createGlShader(GL_VERTEX_SHADER, vs)
-    fsShader = createGlShader(GL_FRAGMENT_SHADER, fs)
-
-  glAttachShader(program, vsShader)
-  glAttachShader(program, fsShader)
-
-  glBindAttribLocation(program, 0, "vertex")
-  glBindAttribLocation(program, 1, "tcoord")
-
-  glLinkProgram(program)
-
-  var status = default(GLint)
-
-  glGetProgramiv(program, GL_LINK_STATUS, status.addr)
-  if status != GLint(GL_TRUE):
-    assert false
-
-  ShaderObj(
-    program: program,
-    fsShader: fsShader,
-    vsShader: vsShader,
-    viewLoc: glGetUniformLocation(program, "viewSize"),
-    texLoc: glGetUniformLocation(program, "tex_smp"),
-    colorMapLoc: glGetUniformLocation(program, "colorMap_smp"),
-    fragmentLoc: glGetUniformLocation(program, "frag_arr"),
-  )
-
-proc bindTexture(ctx: ptr OpenglBackendContextObj, imageId: ImageId) =
-  if int(imageId) != 0:
-    let tex = ctx.texturePool[Vid(imageId)]
-    assert not tex.isNil
-
-    glBindTexture(GL_TEXTURE_2D, tex.tex)
-  else:
-    glBindTexture(GL_TEXTURE_2D, 0)
-
-proc applyUniforms(
-    ctx: ptr OpenglBackendContextObj,
-    uniform: ptr FragmentUniformObj,
-    imageId: ImageId,
-    colorMap: ImageId,
-) =
-  glUniform4fv(
-    ctx.shader.fragmentLoc,
-    GLsizei(sizeof(FragmentUniformObj) / sizeof(Vec4)),
-    cast[ptr GLfloat](uniform),
-  )
-
-  glActiveTexture(GL_TEXTURE1)
-  ctx.bindTexture(colorMap)
-
-  glActiveTexture(GL_TEXTURE0)
-  ctx.bindTexture(imageId)
-
-proc fillContours(ctx: ptr OpenglBackendContextObj, offset, count: uint32) {.inline.} =
-  var
-    i = offset
-    j = offset + count - 1
-
-  while i <= j:
-    glDrawArrays(
-      GL_TRIANGLE_FAN,
-      GLint(ctx.contours[i].fillOffset),
-      GLsizei(ctx.contours[i].fillCount),
-    )
-    inc i, 1
-
-proc strokeContours(
-    ctx: ptr OpenglBackendContextObj, offset, count: uint32
-) {.inline.} =
-  var
-    i = offset
-    j = offset + count - 1
-
-  while i <= j:
-    glDrawArrays(
-      GL_TRIANGLE_STRIP,
-      GLint(ctx.contours[i].strokeOffset),
-      GLsizei(ctx.contours[i].strokeCount),
-    )
-    inc i, 1
-
-template getAddr(body): auto =
-  when NimMajor > 1: body.addr else: body.unsafeAddr
-
-proc stencilClipPaths(ctx: ptr OpenglBackendContextObj, call: ptr CallObj) =
-  let simple = FragmentUniformObj(shaderType: uint32(SimpleShader))
-  ctx.applyUniforms(simple.getAddr, default(ImageId), default(ImageId))
-
-  const convex = false
-  if convex:
-    glStencilMask(0x80)
-    glStencilFunc(GL_ALWAYS, 0x80, 0xFF)
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE)
-
-    ctx.fillContours(call.clipContourOffset, call.clipContourCount)
-  else:
-    glStencilMask(0x7F)
-    glStencilFunc(GL_ALWAYS, 0x00, 0xFF)
-    glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR_WRAP)
-    glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_DECR_WRAP)
-    glDisable(GL_CULL_FACE)
-
-    ctx.fillContours(call.clipContourOffset, call.clipContourCount)
-
-    glEnable(GL_CULL_FACE)
-
-    # cover step
-    glStencilFunc(GL_NOTEQUAL, 0x80, 0x7F)
-    glStencilMask(0xFF)
-    glStencilOp(GL_ZERO, GL_ZERO, GL_REPLACE)
-    glDrawArrays(
-      GL_TRIANGLE_STRIP, GLint(call.triangleOffset), GLsizei(call.triangleCount)
-    )
-
-proc fill(ctx: ptr OpenglBackendContextObj, call: ptr CallObj) =
-  glEnable(GL_STENCIL_TEST)
-
-  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
-
-  if call.clipContourCount > 0:
-    ctx.stencilClipPaths(call)
-
-    glStencilFunc(GL_EQUAL, 0x80, 0x80)
-    glStencilMask(0x7F)
-  else:
-    glStencilFunc(GL_ALWAYS, 0x00, 0xFF)
-    glStencilMask(0xFF)
-
-  let
-    uniform1 = ctx.uniforms[call.uniformOffset].addr
-    uniform2 = ctx.uniforms[call.uniformOffset + 1].addr
-  ctx.applyUniforms(uniform1, call.image, call.colorMap)
-
-  glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR_WRAP)
-  glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_DECR_WRAP)
-  glDisable(GL_CULL_FACE)
-
-  ctx.fillContours(call.pathOffset, call.pathCount)
-  glEnable(GL_CULL_FACE)
-
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
-
-  ctx.applyUniforms(uniform2, call.image, call.colorMap)
-
-  glStencilFunc(GL_NOTEQUAL, 0x00, 0x7F)
-  glStencilMask(0xFF)
-  glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO)
-
-  glDrawArrays(
-    GL_TRIANGLE_STRIP, GLint(call.triangleOffset), GLsizei(call.triangleCount)
-  )
-  glDisable(GL_STENCIL_TEST)
-
-proc fillConvex(ctx: ptr OpenglBackendContextObj, call: ptr CallObj) =
-  if call.clipContourCount > 0:
-    glEnable(GL_STENCIL_TEST)
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
-
-    ctx.stencilClipPaths(call)
-
-    glStencilFunc(GL_EQUAL, 0x80, 0xFF)
-    glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO)
-
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
-
-  let uniform = ctx.uniforms[call.uniformOffset].addr
-  ctx.applyUniforms(uniform, call.image, call.colorMap)
-
-  ctx.fillContours(call.pathOffset, call.pathCount)
-
-  if call.clipContourCount > 0:
-    glDisable(GL_STENCIL_TEST)
-
-proc stroke(ctx: ptr OpenglBackendContextObj, call: ptr CallObj) =
-  if call.clipContourCount > 0:
-    glEnable(GL_STENCIL_TEST)
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
-
-    ctx.stencilClipPaths(call)
-
-    glStencilFunc(GL_EQUAL, 0x80, 0xFF)
-    glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO)
-
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
-
-  let uniform = ctx.uniforms[call.uniformOffset].addr
-  ctx.applyUniforms(uniform, call.image, call.colorMap)
-
-  ctx.strokeContours(call.pathOffset, call.pathCount)
-
-  if call.clipContourCount > 0:
-    glDisable(GL_STENCIL_TEST)
-
-proc triangles(ctx: ptr OpenglBackendContextObj, call: ptr CallObj) =
-  let uniform = ctx.uniforms[call.uniformOffset].addr
-  ctx.applyUniforms(uniform, call.image, call.colorMap)
-
-  glDrawArrays(GL_TRIANGLES, GLint(call.triangleOffset), GLsizei(call.triangleCount))
-
-proc toUniform(ctx: ptr OpenglBackendContextObj, paint: ptr Paint): FragmentUniformObj =
-  result = default(FragmentUniformObj)
-  result.innerColor = paint.innerColor
-  result.outerColor = paint.outerColor
-  result.extent = paint.extent
-
-  if int(paint.image) != 0:
-    let tex = ctx.texturePool[Vid(int(paint.image))]
-    assert not tex.isNil
-
-    if tex.imageFlags.flipY:
-      let
-        m1 = translate(vec2(0, paint.extent[1] * 0.5)) * paint.transform
-        m2 = scale(vec2(1, -1)) * m1
-        m3 = translate(vec2(0, -paint.extent[1] * 0.5)) * m2
-      result.paintMat = inverse(m3)
-    else:
-      result.paintMat = inverse(paint.transform)
-
-    if tex.tp == RGBA:
-      if tex.imageFlags.premultiplied:
-        result.texType = 0
-      else:
-        result.texType = 1
-    elif int(paint.colorMap) == 0:
-      result.texType = 2
-    else:
-      result.texType = 3
-
-    if paint.blur[0] > 0 or paint.blur[1] > 0:
-      result.shaderType = uint32(BlurImageShader)
-      result.blurDir = paint.blur
-    else:
-      result.shaderType = uint32(FillImageShader)
-  else:
-    result.paintMat = inverse(paint.transform)
-    result.shaderType = uint32(FillGradientShader)
-    result.radius = paint.radius
-    result.feather = paint.feather
-
-template ternaryExpr(cond, body1, body2: untyped): auto =
-  if cond: body1 else: body2
-
-proc createTextureImpl(
-    ctx: pointer,
-    tp: TextureType,
-    size: IVec2,
-    imageFlags: ImageFlags,
-    data: openArray[byte],
-): ImageId =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  let
-    vid = ctx.texturePool.allocVid()
-    tex = ctx.texturePool[vid]
-
-  glGenTextures(1, tex.tex.addr)
-  tex.size = size
-  tex.tp = tp
-  tex.imageFlags = imageFlags
-
-  if imageFlags.generateMipmaps:
-    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GLint(GL_TRUE))
-
-  if data.len > 0:
-    if tp == ALPHA:
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-      glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GLint(GL_LUMINANCE),
-        size.x,
-        size.y,
-        0,
-        GL_LUMINANCE,
-        GL_UNSIGNED_BYTE,
-        data[0].getAddr,
-      )
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
-    elif tp == RGBA:
-      glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GLint(GL_RGBA),
-        size.x,
-        size.y,
-        0,
-        GL_RGBA,
-        GL_UNSIGNED_BYTE,
-        data[0].getAddr,
-      )
-
-  if imageFlags.generateMipmaps:
-    glTexParameteri(
-      GL_TEXTURE_2D,
-      GL_TEXTURE_MIN_FILTER,
-      ternaryExpr(
-        imageFlags.nearestNeighborFilter, GL_NEAREST_MIPMAP_NEAREST,
-        GL_LINEAR_MIPMAP_LINEAR,
-      ),
-    )
-  else:
-    glTexParameteri(
-      GL_TEXTURE_2D,
-      GL_TEXTURE_MIN_FILTER,
-      ternaryExpr(imageFlags.nearestNeighborFilter, GL_NEAREST, GL_LINEAR),
-    )
-  glTexParameteri(
-    GL_TEXTURE_2D,
-    GL_TEXTURE_MAG_FILTER,
-    ternaryExpr(imageFlags.nearestNeighborFilter, GL_NEAREST, GL_LINEAR),
-  )
-
-  glTexParameteri(
-    GL_TEXTURE_2D,
-    GL_TEXTURE_WRAP_S,
-    ternaryExpr(imageFlags.repeatX, GL_REPEAT, GL_CLAMP_TO_EDGE),
-  )
-  glTexParameteri(
-    GL_TEXTURE_2D,
-    GL_TEXTURE_WRAP_T,
-    ternaryExpr(imageFlags.repeatY, GL_REPEAT, GL_CLAMP_TO_EDGE),
-  )
-
-  if imageFlags.generateMipmaps:
-    glGenerateMipmap(GL_TEXTURE_2D)
-
-  ImageId(vid)
-
-proc deleteTextureImpl(ctx: pointer, image: ImageId) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  let tex = ctx.texturePool[Vid(image)]
-  assert not tex.isNil
-
-  if tex.tex != 0:
-    glDeleteTextures(1, tex.tex.addr)
-
-  ctx.texturePool.releaseVid(Vid(image))
-
-proc updateTextureImpl(
-    ctx: pointer,
-    image: ImageId,
-    size: IVec4,
-    imageFlags: ImageFlags,
-    data: openArray[byte],
-) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  let tex = ctx.texturePool[Vid(image)]
-  assert not tex.isNil
-
-  let
-    x = 0
-    w = tex.size.x
-    y0 = size.y * tex.size.x
-    colorSize = ternaryExpr(tex.tp == RGBA, 4, 1)
-    p = data[y0 * colorSize].getAddr
-
-  glBindTexture(GL_TEXTURE_2D, tex.tex)
-
-  if tex.tp == ALPHA:
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-    glTexSubImage2D(
-      GL_TEXTURE_2D,
-      0,
-      GLint(x),
-      GLint(size.y),
-      w,
-      size.w,
-      GL_LUMINANCE,
-      GL_UNSIGNED_BYTE,
-      p,
-    )
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
-  elif tex.tp == RGBA:
-    glTexSubImage2D(
-      GL_TEXTURE_2D, 0, GLint(x), GLint(size.y), w, size.w, GL_RGBA, GL_UNSIGNED_BYTE, p
-    )
-
-  glBindTexture(GL_TEXTURE_2D, 0)
-
-proc getTextureSizeImpl(ctx: pointer, image: ImageId): IVec2 =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  let tex = ctx.texturePool[Vid(image)]
-  assert not tex.isNil
-
-  tex.size
-
-proc viewportImpl(ctx: pointer, view: Vec2, devicePixelRatio: float32) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  ctx.vertexUniform.view = view
-
-proc maxVertCount(contours: openArray[ContourObj]): uint32 {.inline.} =
-  result = 0
-
-  for p in contours:
-    inc result, p.fill.len
-    inc result, p.stroke.len
-
-proc toBlend(op: CompositeOperation): BlendObj =
+    v0 = bounds[0] - pad
+    v1 = bounds[1] - pad
+    v2 = bounds[2] + pad
+    v3 = bounds[3] + pad
+
+  verts.add(vec4(v2, v3, 0, 0))
+  verts.add(vec4(v2, v1, 0, 0))
+  verts.add(vec4(v0, v3, 0, 0))
+  verts.add(vec4(v0, v1, 0, 0))
+
+proc toBlend(op: CompositeOperation): BlendObj {.inline.} =
   type BlendOp = object
     src: GLenum
     dst: GLenum
@@ -539,376 +143,874 @@ proc toBlend(op: CompositeOperation): BlendObj =
     dstAlpha: blendOp.dst,
   )
 
-proc addCall(
+proc toFillType(pathFlags: PathFlags): uint32 =
+  if pathFlags.evenOdd:
+    result = result or (1 shl 0)
+
+  if pathFlags.convex:
+    result = result or (1 shl 2)
+
+proc toUniform(
     ctx: ptr OpenglBackendContextObj,
-    paint: ptr Paint,
-    compositeOperation: CompositeOperation,
-    bounds: Vec4,
-    clipContours: openArray[ContourObj],
-    contours: openArray[ContourObj],
-    isFill: static[bool],
-) =
-  var call = default(CallObj)
-  call.callType =
-    if isFill:
-      if contours.len == 1 and contours[0].convex: FillConvexCall else: FillCall
-    else:
-      StrokeCall
+    call: ptr CallObj,
+    paint: ptr PaintObj,
+    pathFlags: PathFlags,
+): FragmentUniformObj {.inline.} =
+  var
+    uniform = default(FragmentUniformObj)
 
-  if isFill or clipContours.len > 0:
-    call.triangleCount = 4
-  else:
-    call.triangleCount = 0
+  uniform.fillType = toFillType(pathFlags)
+  uniform.innerColor = paint.innerColor
+  uniform.outerColor = paint.outerColor
+  uniform.extent = paint.extent
 
-  let vertCount =
-    maxVertCount(clipContours) + maxVertCount(contours) + call.triangleCount
+  call.shaderType = FillSolid
 
-  ctx.verts.reserve(vertCount)
+  if paint.innerColor != paint.outerColor:
+    call.shaderType = FillGrad
+    uniform.radius = paint.radius
+    uniform.feather = paint.feather
 
-  if clipContours.len > 0:
-    ctx.contours.reserve(clipContours.len)
-    call.clipContourOffset = uint32(ctx.contours.len)
-    call.clipContourCount = 0
+  uniform
 
-    for p in clipContours:
-      if p.fill.len > 0:
-        var path = default(Contour2Obj)
-        path.fillOffset = uint32(ctx.verts.len)
-        path.fillCount = uint32(p.fill.len)
+proc reserve*[T](s: var seq[T], n: Natural) {.inline.} =
+  let
+    l = s.len
+    c = n + s.len
 
-        ctx.contours.add(path)
-        ctx.verts.add(p.fill.toOpenArray)
-
-        inc call.clipContourCount, 1
-
-  ctx.contours.reserve(contours.len)
-  call.pathOffset = uint32(ctx.contours.len)
-  call.pathCount = 0
-  call.image = paint.image
-  call.colorMap = paint.colorMap
-  call.blend = toBlend(compositeOperation)
-  call.uniformOffset = uint32(ctx.uniforms.len)
-
-  for p in contours:
-    var
-      used = false
-      path = default(Contour2Obj)
-
-    if isFill or p.fill.len > 0:
-      used = true
-      path.fillOffset = uint32(ctx.verts.len)
-      path.fillCount = uint32(p.fill.len)
-
-      ctx.verts.add(p.fill.toOpenArray)
-
-    if p.stroke.len > 0:
-      used = true
-      path.strokeOffset = uint32(ctx.verts.len)
-      path.strokeCount = uint32(p.stroke.len)
-
-      ctx.verts.add(p.stroke.toOpenArray)
-
-    if used:
-      ctx.contours.add(path)
-
-      inc call.pathCount, 1
-
-  if call.triangleCount > 0:
-    call.triangleOffset = uint32(ctx.verts.len)
-
-    ctx.verts.add(vec4(bounds[2], bounds[3], 0.5, 1.0))
-    ctx.verts.add(vec4(bounds[2], bounds[1], 0.5, 1.0))
-    ctx.verts.add(vec4(bounds[0], bounds[3], 0.5, 1.0))
-    ctx.verts.add(vec4(bounds[0], bounds[1], 0.5, 1.0))
-
-  ctx.calls.add(call)
-
-  if call.callType == FillCall:
-    ctx.uniforms.add(FragmentUniformObj(shaderType: uint32(SimpleShader)))
-  ctx.uniforms.add(ctx.toUniform(paint))
+  if capacity(s) < c:
+    s.setLenUninit(c)
+    s.setLenUninit(l)
 
 proc fillImpl(
     ctx: pointer,
-    paint: ptr Paint,
+    paint: ptr PaintObj,
     compositeOperation: CompositeOperation,
+    pathFlags: PathFlags,
     bounds: Vec4,
-    clipContours: openArray[ContourObj],
-    contours: openArray[ContourObj],
-) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-  ctx.addCall(paint, compositeOperation, bounds, clipContours, contours, true)
-
-proc strokeImpl(
-    ctx: pointer,
-    paint: ptr Paint,
-    compositeOperation: CompositeOperation,
-    bounds: Vec4,
-    clipContours: openArray[ContourObj],
-    contours: openArray[ContourObj],
-) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-  ctx.addCall(paint, compositeOperation, bounds, clipContours, contours, false)
-
-proc trianglesImpl(
-    ctx: pointer,
-    paint: ptr Paint,
-    compositeOperation: CompositeOperation,
-    verts: openArray[Vec4],
+    paths: openArray[PathObj],
 ) =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
-  var call = default(CallObj)
-  call.callType = TrianglesCall
-  call.image = paint.image
-  call.colorMap = paint.colorMap
+  var
+    ncalls = 1
+    nedges = 0
 
-  call.triangleOffset = uint32(ctx.verts.len)
-  call.triangleCount = uint32(verts.len)
+  for p in paths:
+    inc nedges, p.fill.len
+
+  when defined(NVG_DEBUG_VERTS):
+    printf("fill nedges: %u\n", nedges)
+
+  if nedges <= 0:
+    return
+
+  var
+    ltrb: array[4, float32]
+    callw = default(float32)
+    callh = default(float32)
+
+  ltrb[0] = clamp(bounds[0], 0, ctx.vertexUniform.view[0 and 0x1])
+  ltrb[1] = clamp(bounds[1], 0, ctx.vertexUniform.view[1 and 0x1])
+  ltrb[2] = clamp(bounds[2], 0, ctx.vertexUniform.view[2 and 0x1])
+  ltrb[3] = clamp(bounds[3], 0, ctx.vertexUniform.view[3 and 0x1])
+
+  callw = ltrb[2] - ltrb[0]
+  callh = ltrb[3] - ltrb[1]
+
+  when defined(NVG_DEBUG_VERTS):
+    printf(
+      "%.6f %.6f %.6f %.6f callw[%.6f] cellh[%.6f]\n",
+      bounds[0],
+      bounds[1],
+      bounds[2],
+      bounds[3],
+      callw,
+      callh,
+    )
+
+  if callw <= 0 or callh <= 0:
+    return
+
+  var
+    flags = pathFlags
+    call = default(CallObj)
+
+  if paths.len == 1 and paths[0].convex and paths[0].fill.len > 2:
+    flags.convex = true
+
+  when defined(NVG_DEBUG_VERTS):
+    printf(
+      "ncalls[%u] npaths[%u] convex[%u] nfill[%u]\n",
+      ncalls,
+      paths.len,
+      paths[0].convex,
+      paths[0].fill.len,
+    )
+
+  call.callType = FillCall
+  call.blend = toBlend(compositeOperation)
   call.uniformOffset = uint32(ctx.uniforms.len)
 
-  var uniform = ctx.toUniform(paint)
-  uniform.shaderType = uint32(ImageShader)
+  ctx.uniforms.add(ctx.toUniform(call.addr, paint, pathFlags))
 
-  ctx.verts.add(verts)
-  ctx.uniforms.add(uniform)
+  const tileSize = 32
 
-proc cancelImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  if flags.convex:
+    call.callType = ConvexFillCall
+    call.fillOffset = 0
+    call.fillCount = 0
+    call.triangleCount = uint32(paths[0].fill.len)
+    call.triangleOffset = uint32(ctx.verts.len)
 
-  ctx.verts.clear()
-  ctx.uniforms.clear()
-  ctx.contours.clear()
-  ctx.calls.clear()
+    ctx.verts.add(paths[0].fill.toOpenArray)
+  elif ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
+    ltrb[0] = floor(ltrb[0])
+    ltrb[1] = floor(ltrb[1])
+    ltrb[2] = ceil(ltrb[2])
+    ltrb[3] = ceil(ltrb[3])
 
-proc flushImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+    callw = ltrb[2] - ltrb[0]
+    callh = ltrb[3] - ltrb[1]
 
-  if ctx.calls.len > 0:
-    glUseProgram(ctx.shader.program)
+    let
+      xtiles = int(ceil(callw / tileSize))
+      ytiles = int(ceil(callh / tileSize))
+      tilew = int(ceil(callw / float32(xtiles)))
+      tileh = int(ceil(callh / float32(ytiles)))
 
-    glEnable(GL_CULL_FACE)
-    glCullFace(GL_BACK)
-    glFrontFace(GL_CCW)
-    glEnable(GL_BLEND)
-    glDisable(GL_DEPTH_TEST)
-    glDisable(GL_SCISSOR_TEST)
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
-    glStencilMask(GLuint(0xFFFFFFFF))
-    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP)
-    glStencilFunc(GL_ALWAYS, 0, GLuint(0xFFFFFFFF))
-    glActiveTexture(GL_TEXTURE0)
-    glBindTexture(GL_TEXTURE_2D, 0)
-
-    glBindVertexArray(ctx.vertArr)
-
-    glBindBuffer(GL_ARRAY_BUFFER, ctx.vertBuf)
-    glBufferData(
-      GL_ARRAY_BUFFER, ctx.verts.len * sizeof(Vec4), ctx.verts[0].addr, GL_STREAM_DRAW
-    )
-    glEnableVertexAttribArray(0)
-    glEnableVertexAttribArray(1)
-
-    glVertexAttribPointer(0, 2, cGL_FLOAT, GL_FALSE, GLsizei(sizeof(Vec4)), nil)
-    glVertexAttribPointer(
-      1,
-      2,
-      cGL_FLOAT,
-      GL_FALSE,
-      GLsizei(sizeof(Vec4)),
-      cast[pointer](2 * sizeof(float32)),
-    )
-
-    glUniform1i(ctx.shader.texLoc, 0)
-    glUniform1i(ctx.shader.colorMap_loc, 1)
-    glUniform4fv(ctx.shader.viewLoc, 1, cast[ptr GLfloat](ctx.vertexUniform.addr))
-
-    for call in ctx.calls:
-      glBlendFuncSeparate(
-        call.blend.srcRGB, call.blend.dstRGB, call.blend.srcAlpha, call.blend.dstAlpha
+    when defined(NVG_DEBUG_VERTS):
+      printf(
+        "ltrb[%.6f %.6f %.6f %.6f] callw[%.6f] callh[%.6f] xtiles[%u] ytiles[%u] tilew[%u] tileh[%u]\n",
+        ltrb[0],
+        ltrb[1],
+        ltrb[2],
+        ltrb[3],
+        callw,
+        callh,
+        xtiles,
+        ytiles,
+        tilew,
+        tileh,
       )
 
-      case call.callType
-      of FillCall:
-        ctx.fill(call.getAddr)
-      of FillConvexCall:
-        ctx.fillConvex(call.getAddr)
-      of StrokeCall:
-        ctx.stroke(call.getAddr)
-      of TrianglesCall:
-        ctx.triangles(call.getAddr)
+    ctx.tiles.setup(xtiles, ytiles, nedges)
 
-    glDisableVertexAttribArray(0)
-    glDisableVertexAttribArray(1)
-    glBindVertexArray(0)
-    glDisable(GL_CULL_FACE)
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glUseProgram(0)
-    glBindTexture(GL_TEXTURE_2D, 0)
+    nedges = 0
+    ncalls = 0
 
-  ctx.verts.clear()
-  ctx.uniforms.clear()
-  ctx.contours.clear()
-  ctx.calls.clear()
+    for p in paths:
+      if p.fill.len <= 0:
+        continue
+
+      let pymin = clamp(int(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0, ytiles - 1)
+
+      for v in p.fill.toOpenArray:
+        let
+          x0 = v[0]
+          y0 = v[1]
+          x1 = v[2]
+          y1 = v[3]
+
+        if x0 == x1:
+          continue
+
+        let
+          vxmin = clamp(int(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0, xtiles - 1)
+          vxmax = clamp(int(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0, xtiles - 1)
+          vymax = clamp(int(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0, ytiles - 1)
+
+        for ix in vxmin .. vxmax:
+          for iy in pymin .. vymax:
+            let
+              tileId = ctx.tiles[ix, iy]
+              p = ctx.tiles.tail(tileId)
+
+            if not p.isNil:
+              let tymax = float32((iy + 1) * tileh) + ltrb[1]
+
+              # when defined(NVG_DEBUG_VERTS):
+              #   printf(
+              #     "%.6f %.6f %.6f %.6f tymax[%.6f]\n",
+              #     p[][0],
+              #     p[][1],
+              #     p[][2],
+              #     p[][3],
+              #     tymax,
+              #   )
+
+              if y0 > tymax and y1 > tymax and p[][1] > tymax and x0 == p[][2] and
+                  y0 == p[][3]:
+                p[][2] = x1
+                p[][3] = y1
+                continue
+            else:
+              inc ncalls, 1
+
+            inc nedges, 1
+
+            ctx.tiles.add(tileId, v)
+
+    ctx.verts.reserve(ncalls * 4)
+    ctx.edges.reserve(nedges)
+    ctx.calls.reserve(xtiles * ytiles)
+
+    var tileBounds: array[4, float32]
+
+    for ix in 0 ..< xtiles:
+      for iy in 0 ..< ytiles:
+        let tileId = ctx.tiles[ix, iy]
+
+        if ctx.tiles.empty(tileId):
+          continue
+
+        call.fillOffset = uint32(ctx.edges.len)
+        call.fillCount = 0
+        call.triangleOffset = uint32(ctx.verts.len)
+        call.triangleCount = 4
+
+        for s in ctx.tiles.slices(tileId):
+          ctx.edges.add(s.toOpenArray)
+
+          inc call.fillCount, s.len
+
+        # when defined(NVG_DEBUG_VERTS):
+        #   printf("x[%u] y[%u] nedges[%u]\n", ix, iy, fillCount)
+        #   for vert in tiles:
+        #     printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+
+        tileBounds[0] = ltrb[0] + float32(ix * tilew)
+        tileBounds[1] = ltrb[1] + float32(iy * tileh)
+        tileBounds[2] = min(ltrb[2], ltrb[0] + float32((ix + 1) * tilew))
+        tileBounds[3] = min(ltrb[3], ltrb[1] + float32((iy + 1) * tileh))
+
+        ctx.verts.addQuad(tileBounds)
+        ctx.calls.add(call)
+  elif ncalls == 1:
+    call.fillOffset = uint32(ctx.edges.len)
+    call.fillCount = uint32(nedges)
+    call.triangleOffset = uint32(ctx.verts.len)
+    call.triangleCount = 4
+
+    for p in paths:
+      ctx.edges.add(p.fill.toOpenArray)
+
+    ctx.verts.addQuad(ltrb, 0.5)
+    ctx.calls.add(call)
+  else:
+    var callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
+
+    for p in paths:
+      callbnds[0] = min(callbnds[0], p.bounds[0])
+      callbnds[1] = min(callbnds[1], p.bounds[1])
+      callbnds[2] = min(callbnds[2], p.bounds[1])
+      callbnds[3] = min(callbnds[3], p.bounds[1])
+
+    callbnds[0] = max(ltrb[0], callbnds[0])
+    callbnds[1] = max(ltrb[1], callbnds[1])
+    callbnds[2] = min(ltrb[2], callbnds[2])
+    callbnds[3] = min(ltrb[3], callbnds[3])
+
+    if callbnds[0] < callbnds[2] and callbnds[1] < callbnds[3]:
+      let offset = uint32(ctx.edges.len)
+
+      for p in paths:
+        ctx.edges.add(p.fill.toOpenArray)
+
+      call.fillOffset = offset
+      call.fillCount = uint32(ctx.edges.len) - offset
+      call.triangleOffset = uint32(ctx.verts.len)
+      call.triangleCount = 4
+
+      ctx.verts.addQuad(callbnds, 0.5)
+      ctx.calls.add(call)
+
+  when defined(NVG_DEBUG_VERTS):
+    printf("nverts: %u\n", uint32(ctx.verts.len))
+    for vert in ctx.verts:
+      printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+
+    printf("nedges: %u\n", uint32(ctx.edges.len))
+    for vert in ctx.edges:
+      printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+
+    printf("ncalls: %u\n", uint32(ctx.calls.len))
+    for call in ctx.calls:
+      printf(
+        "type: %u, shaderType: %u, image: %u, fillOffset: %u, fillCount: %u, triangleOffset: %u, triangleCount: %u, uniformOffset: %u\n",
+        call.callType, call.shaderType, 0, call.fillOffset, call.fillCount,
+        call.triangleOffset, call.triangleCount, call.uniformOffset,
+      )
+
+    printf("nuniforms: %u\n", uint32(ctx.uniforms.len))
+    for uniform in ctx.uniforms:
+      printf(
+        "paintMat: %.6f %.6f %.6f %.6f\ninnerColor: %.6f %.6f %.6f %.6f\nouterColor: %.6f %.6f %.6f %.6f\nextent: %.6f %.6f\nradius: %.6f\nfeather: %.6f\nstrokeMult: %.6f\nstrokeThr: %.6f\ntexType: %u\nfillType: %u\n",
+        uniform.paintMat[0],
+        uniform.paintMat[1],
+        uniform.paintMat[2],
+        uniform.paintMat[3],
+        uniform.innerColor.r,
+        uniform.innerColor.g,
+        uniform.innerColor.b,
+        uniform.innerColor.a,
+        uniform.outerColor.r,
+        uniform.outerColor.g,
+        uniform.outerColor.b,
+        uniform.outerColor.a,
+        uniform.extent[0],
+        uniform.extent[1],
+        uniform.radius,
+        uniform.feather,
+        uniform.strokeMult,
+        uniform.strokeThr,
+        uniform.texType,
+        uniform.fillType,
+      )
+
+proc createGlShader(tp: GLenum, source: cstring): GLuint =
+  let s = glCreateShader(tp)
+
+  var
+    p = source
+    len = GLint(source.len)
+    status = default(GLint)
+
+  glShaderSource(s, GLsizei(1), cast[cstringArray](p.addr), len.addr)
+  glCompileShader(s)
+
+  glGetShaderiv(s, GL_COMPILE_STATUS, status.addr)
+  if status != GLint(GL_TRUE):
+    var log: array[256, char]
+
+    glGetShaderInfoLog(s, GLsizei(len(log)), nil, cast[cstring](log[0].addr))
+    assert false, $cast[cstring](log[0].addr)
+
+  s
+
+proc createProgram(vs, fs: cstring): ShaderProgramObj =
+  let
+    program = glCreateProgram()
+    vsShader = createGlShader(GL_VERTEX_SHADER, vs)
+    fsShader = createGlShader(GL_FRAGMENT_SHADER, fs)
+
+  glAttachShader(program, vsShader)
+  glAttachShader(program, fsShader)
+
+  glBindAttribLocation(program, 0, "va_in")
+  glBindAttribLocation(program, 1, "vb_in")
+
+  glLinkProgram(program)
+
+  var status = default(GLint)
+
+  glGetProgramiv(program, GL_LINK_STATUS, status.addr)
+  if status != GLint(GL_TRUE):
+    assert false
+
+  result.program = program
+  result.fsShader = fsShader
+  result.vsShader = vsShader
+  result.viewLoc = glGetUniformLocation(program, "viewSize")
+  result.texLoc = glGetUniformLocation(program, "imageTex")
+  result.edgeTexLoc = glGetUniformLocation(program, "edgeTex")
+  result.typeLoc = glGetUniformLocation(program, "type")
+  result.nedgesLoc = glGetUniformLocation(program, "nedges")
+  result.offsetLoc = glGetUniformLocation(program, "offset")
+  result.fragmentLoc =
+    when NVG_USE_UNIFORMBUFFER:
+      glGetUniformBlockIndex(program, "frag")
+    else:
+      glGetUniformLocation(program, "frag")
 
 proc createImpl(): pointer =
-  let ctx = create(OpenglBackendContextObj)
+  const header1 =
+    when NVG_USE_GL2:
+      "#define NANOVG_GL2 1\n"
+    elif NVG_USE_GL3:
+      "#version 330 core\n" & "#define NANOVG_GL3 1\n"
+    elif NVG_USE_GLES2:
+      "#version 100\n" & "#define NANOVG_GL2 1\n"
+    elif NVG_USE_GLES3:
+      "#version 300 es\n"
+      "#define NANOVG_GL3 1\n"
+    else:
+      ""
+
+  const header2 =
+    when NVG_USE_UNIFORMBUFFER:
+      "#define USE_UNIFORMBUFFER 1\n"
+    else:
+      "#define UNIFORMARRAY_SIZE 7\n"
 
   const
     vs =
       """
-      #version 410
+      #ifdef NANOVG_GL3
+      #define attribute in
+      #define varying out
+      #endif
 
-      uniform vec4 viewSize;
+      uniform vec2 viewSize;
 
-      layout(location = 0) out vec2 ftcoord;
-      layout(location = 1) in vec2 tcoord;
-      layout(location = 1) out vec2 fpos;
-      layout(location = 0) in vec2 vertex;
+      attribute vec2 va_in;
+      attribute vec2 vb_in;
+
+      varying vec2 va;
+      varying vec2 vb;
 
       void main()
       {
-          ftcoord = tcoord;
-          fpos = vertex;
-          gl_Position = vec4(((2.0 * vertex.x) / viewSize.x) - 1.0, 1.0 - ((2.0 * vertex.y) / viewSize.y), 0.0, 1.0);
+        // nanovg passes vertices in screen coords!
+        va = va_in;
+        vb = vb_in;
+
+        // convert from screen coords to clip coords
+        vec2 pos_ex = va_in;
+        gl_Position = vec4(2.0f*pos_ex.x/viewSize.x - 1.0f, 1.0f - 2.0f*pos_ex.y/viewSize.y, 0.0f, 1.0f);
       }
-    """
+      """
 
     fs =
       """
-      #version 410
+      #ifdef GL_ES
+      precision highp float;
+      precision highp int;
+      precision highp sampler2D;
+      precision highp sampler2DArray;
+      #endif
 
-      uniform vec4 frag_arr[7];
-      uniform sampler2D tex_smp;
-      uniform sampler2D colorMap_smp;
+      #ifdef NANOVG_GL3
+      #define texture2D texture
+      #define varying in
+      #endif
 
-      layout(location = 1) in vec2 fpos;
-      layout(location = 0) in vec2 ftcoord;
-      layout(location = 0) out vec4 outColor;
+      // these must match NVGpathFlags
+      #define NVG_PATH_EVENODD 0x1
+      #define NVG_PATH_NO_AA 0x2
+      #define NVG_PATH_CONVEX 0x4
+
+      #if defined(NANOVG_GL3)
+      layout (location = 0) out vec4 outColor;
+      #else
+      #define outColor gl_FragData[0]
+      #endif
+
+      #define TILE_TEX_WIDTH 256
+
+      #ifdef USE_UNIFORMBUFFER
+        layout(std140) uniform frag {
+          mat3 paintMat;
+          vec4 innerCol;
+          vec4 outerCol;
+          vec2 extent;
+          float radius;
+          float feather;
+          float strokeMult;
+          float strokeThr;
+          int texType;
+          int fillMode;
+        };
+      #else
+        uniform vec4 frag[UNIFORMARRAY_SIZE];
+        #define paintMat mat3(frag[0].xyz, frag[1].xyz, frag[2].xyz)
+        #define innerCol frag[3]
+        #define outerCol frag[4]
+        #define extent frag[5].xy
+        #define radius frag[5].z
+        #define feather frag[5].w
+        #define strokeMult frag[6].x
+        #define strokeThr frag[6].y
+        #define texType int(frag[6].z)
+        #define fillMode int(frag[6].w)
+      #endif
+
+      uniform sampler2D imageTex;
+      uniform sampler2DArray edgeTex;
+      uniform vec2 viewSize;
+      uniform int type;
+      uniform int nedges;
+      uniform int offset;
+
+      varying vec2 va;
+      varying vec2 vb;
+      #define ftcoord vb
+
+      float coversCenter(vec2 v0, vec2 v1)
+      {
+        // no AA - just determine if center of pixel (0,0) is inside trapezoid
+        if(v1.x <= 0.0f || v0.x > 0.0f || v0.x == v1.x)
+          return 0.0f;
+        return v0.y*(v1.x - v0.x) - v0.x*(v1.y - v0.y) > 0.0f ? 1.0f : 0.0f;
+      }
+
+      // unlike areaEdge(), this assumes pixel center is (0,0), not (0.5, 0.5)
+      float areaEdge2(vec2 v0, vec2 v1)
+      {
+        if((fillMode & NVG_PATH_NO_AA) != 0)
+          return v1.x < v0.x ? coversCenter(v1, v0) : -coversCenter(v0, v1);
+        if(v0.y < -0.5f && v1.y < -0.5f)  // entirely below pixel - note that this isn't useful for nanovg_gl
+          return 0.0f;
+        vec2 window = clamp(vec2(v0.x, v1.x), -0.5f, 0.5f);
+        float width = window.y - window.x;
+        if(width == 0.0f)  // entirely left or right
+          return 0.0f;
+        if(v0.y > 0.5f && v1.y > 0.5f)  // entirely above pixel
+          return -width;
+        vec2 dv = v1 - v0;
+        float slope = dv.y/dv.x;
+        float midx = 0.5f*(window.x + window.y);
+        float y = v0.y + (midx - v0.x)*slope;  // y value at middle of window
+        float dy = abs(slope*width);
+        // credit for this to https://git.sr.ht/~eliasnaur/gio/tree/master/gpu/shaders/stencil.frag
+        // if width == 1 (so midx == 0), the components of sides are: y crossing of right edge of frag, y crossing
+        //  of left edge, x crossing of top edge, x crossing of bottom edge.  Since we only consider positive slope
+        //  (note abs() above), there are five cases (below, bottom-right, left-right, left-top, above) - the area
+        //  formula below reduces to these cases thanks to the clamping of the other values to 0 or 1.
+        // I haven't thought carefully about the width < 1 case, but experimentally it matches areaEdge()
+        vec4 sides = vec4(y + 0.5f*dy, y - 0.5f*dy, (0.5f - y)/dy, (-0.5f - y)/dy);  //ry, ly, tx, bx
+        sides = clamp(sides + 0.5f, 0.0f, 1.0f);  // shift from -0.5..0.5 to 0..1 for area calc
+        float area = 0.5f*(sides.z - sides.z*sides.y - 1.0f - sides.x + sides.x*sides.w);
+        return area * width;
+      }
 
       float sdroundrect(vec2 pt, vec2 ext, float rad)
       {
-          vec2 _26 = abs(pt) - (ext - vec2(rad, rad));
-          return (min(max(_26.x, _26.y), 0.0) + length(max(_26, vec2(0.0)))) - rad;
+        vec2 ext2 = ext - vec2(rad,rad);
+        vec2 d = abs(pt) - ext2;
+        return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rad;
       }
 
-      void main()
+      #ifdef USE_SDF_TEXT
+      // Super-sampled SDF text rendering - super-sampling gives big improvement at very small sizes; quality is
+      //  comparable to summed text; w/ supersamping, FPS is actually slightly lower
+      float sdfCov(float D, float sdfscale)
       {
-          vec4 result = vec4(0.0);
-          int _61 = int(frag_arr[5].y);
-          if (_61 == 0)
-          {
-              vec2 param = (mat3(vec3(frag_arr[3].x, frag_arr[3].y, frag_arr[3].z), vec3(frag_arr[3].w, frag_arr[4].x, frag_arr[4].y), vec3(frag_arr[4].z, frag_arr[4].w, frag_arr[5].x)) * vec3(fpos, 1.0)).xy;
-              vec2 param_1 = frag_arr[0].xy;
-              float param_2 = float(int(frag_arr[5].w));
-              float _134 = float(int(frag_arr[6].x));
-              result = mix(frag_arr[1], frag_arr[2], vec4(clamp(fma(_134, 0.5, sdroundrect(param, param_1, param_2)) / _134, 0.0, 1.0)));
-          }
-          else
-          {
-              if (_61 == 1)
-              {
-                  vec4 color = texture(tex_smp, (mat3(vec3(frag_arr[3].x, frag_arr[3].y, frag_arr[3].z), vec3(frag_arr[3].w, frag_arr[4].x, frag_arr[4].y), vec3(frag_arr[4].z, frag_arr[4].w, frag_arr[5].x)) * vec3(fpos, 1.0)).xy / frag_arr[0].xy);
-                  int _222 = int(frag_arr[5].z);
-                  if (_222 == 1)
-                  {
-                      color = vec4(color.xyz * color.w, color.w);
-                  }
-                  if (_222 == 2)
-                  {
-                      color = vec4(color.x);
-                  }
-                  if (_222 == 3)
-                  {
-                      vec4 _259 = texture(colorMap_smp, vec2(color.x, 0.5));
-                      float _263 = _259.w;
-                      color = vec4(_259.xyz * _263, _263);
-                  }
-                  vec4 _273 = color;
-                  vec4 _274 = _273 * frag_arr[1];
-                  color = _274;
-                  result = _274;
-              }
-              else
-              {
-                  if (_61 == 2)
-                  {
-                      result = vec4(1.0);
-                  }
-                  else
-                  {
-                      if (_61 == 3)
-                      {
-                          vec4 color_1 = texture(tex_smp, ftcoord);
-                          int _300 = int(frag_arr[5].z);
-                          if (_300 == 1)
-                          {
-                              color_1 = vec4(color_1.xyz * color_1.w, color_1.w);
-                          }
-                          if (_300 == 2)
-                          {
-                              color_1 = vec4(color_1.x);
-                          }
-                          if (_300 == 3)
-                          {
-                              vec4 _336 = texture(colorMap_smp, vec2(color_1.x, 0.5));
-                              float _340 = _336.w;
-                              color_1 = vec4(_336.xyz * _340, _340);
-                          }
-                          result = color_1 * frag_arr[1];
-                      }
-                      else
-                      {
-                          discard;
-                      }
-                  }
-              }
-          }
-          outColor = result;
+        // Could we use derivative info (and/or distance at pixel center) to improve?
+        return D > 0.0f ? clamp((D - 0.5f)/sdfscale + radius, 0.0f, 1.0f) : 0.0f;  //+ 0.25f
       }
-    """
 
-  let shader = createShader(vs, fs)
+      float superSDF(sampler2D tex, vec2 st)
+      {
+        vec2 tex_wh = vec2(textureSize(tex, 0));  // convert from ivec2 to vec2
+        //st = st + vec2(4.0)/tex_wh;  // account for 4 pixel padding in SDF
+        float s = (32.0f/255.0f)*paintMat[0][0];  // 32/255 is STBTT pixel_dist_scale
+        //return sdfCov(texture2D(tex, st).r, s);  // single sample
+        s = 0.5f*s;  // we're sampling 4 0.5x0.5 subpixels
+        float dx = paintMat[0][0]/tex_wh.x/4.0f;
+        float dy = paintMat[1][1]/tex_wh.y/4.0f;
 
+        //vec2 stextent = extent/tex_wh;  ... clamping doesn't seem to be necessary
+        //vec2 stmin = floor(st*stextent)*stextent;
+        //vec2 stmax = stmin + stextent - vec2(1.0f);
+        float d11 = texture2D(tex, st + vec2(dx, dy)).r;  // clamp(st + ..., stmin, stmax)
+        float d10 = texture2D(tex, st + vec2(dx,-dy)).r;
+        float d01 = texture2D(tex, st + vec2(-dx, dy)).r;
+        float d00 = texture2D(tex, st + vec2(-dx,-dy)).r;
+        return 0.25f*(sdfCov(d11, s) + sdfCov(d10, s) + sdfCov(d01, s) + sdfCov(d00, s));
+      }
+      #else
+      // artifacts w/ GL_LINEAR on Intel GPU and GLES doesn't support texture filtering for f32, so do it ourselves
+      // also, min/mag filter must be set to GL_NEAREST for float texture or texelFetch() will fail on Mali GPUs
+      float texFetchLerp(sampler2D texture, vec2 ij, vec2 ijmin, vec2 ijmax)
+      {
+        vec2 ij00 = clamp(ij, ijmin, ijmax);
+        vec2 ij11 = clamp(ij + vec2(1.0f), ijmin, ijmax);
+        float t00 = texelFetch(texture, ivec2(ij00.x, ij00.y), 0).r;  // implicit floor()
+        float t10 = texelFetch(texture, ivec2(ij11.x, ij00.y), 0).r;
+        float t01 = texelFetch(texture, ivec2(ij00.x, ij11.y), 0).r;
+        float t11 = texelFetch(texture, ivec2(ij11.x, ij11.y), 0).r;
+        vec2 f = ij - floor(ij);
+        //return mix(mix(t00, t10, f.x), mix(t01, t11, f.x), f.y);
+        float t0 = t00 + f.x*(t10 - t00);
+        float t1 = t01 + f.x*(t11 - t01);
+        return t0 + f.y*(t1 - t0);
+      }
+
+      float summedTextCov(sampler2D texture, vec2 st)
+      {
+        ivec2 tex_wh = textureSize(texture, 0);
+        vec2 ij = st*vec2(tex_wh);  // - vec2(1.0f)  -- now done after finding ijmin,max
+        vec2 ijmin = floor(ij/extent)*extent;
+        vec2 ijmax = ijmin + extent - vec2(1.0f);
+        // for some reason, we need to shift by an extra (-0.5, -0.5) for summed case (here or in fons__getQuad)
+        ij -= vec2(0.999999f);
+        float dx = paintMat[0][0]/2.0f;
+        float dy = paintMat[1][1]/2.0f;
+        float s11 = texFetchLerp(texture, ij + vec2(dx, dy), ijmin, ijmax);
+        float s01 = texFetchLerp(texture, ij + vec2(-dx, dy), ijmin, ijmax);
+        float s10 = texFetchLerp(texture, ij + vec2(dx,-dy), ijmin, ijmax);
+        float s00 = texFetchLerp(texture, ij + vec2(-dx,-dy), ijmin, ijmax);
+        float cov = (s11 - s01 - s10 + s00)/(255.0f*4.0f*dx*dy);
+        return clamp(cov, 0.0f, 1.0f);
+      }
+      #endif
+
+      vec4 edgeFetch(int idx)
+      {
+        // col += 1; if(col >= TILE_TEX_WIDTH) { col = 0; row += 1; if(row >= TILE_TEX_WIDTH) { row = 0; layer += 1; } } -- no detectable improvement
+        int idx0 = idx + offset;
+        int layer = idx0/(TILE_TEX_WIDTH*TILE_TEX_WIDTH);
+        int idx1 = idx0 - layer*(TILE_TEX_WIDTH*TILE_TEX_WIDTH);
+        int row = idx1/TILE_TEX_WIDTH;
+        int col = idx1 - row*TILE_TEX_WIDTH;
+        return texelFetch(edgeTex, ivec3(col, row, layer), 0);
+      }
+
+      float coverage(float W)
+      {
+        if((fillMode & NVG_PATH_CONVEX) != 0)
+          return 1.0f;
+        if((fillMode & NVG_PATH_EVENODD) != 0)
+          return 1.0f - abs(mod(W, 2.0f) - 1.0f);
+        return min(abs(W), 1.0f);  // non-zero fill
+      }
+
+      void main(void)
+      {
+        vec4 result;
+        vec2 fpos = vec2(gl_FragCoord.x, viewSize.y - gl_FragCoord.y);
+        float W = 0.0f;
+        for(int ii = 0; ii < nedges; ++ii) {
+          vec4 edge = edgeFetch(ii);
+          W += areaEdge2(edge.zw - fpos, edge.xy - fpos);  //noAA ? coversCenter(vb, va) :
+        }
+        float cov = coverage(W);
+        if (type == 0) {  // not used
+          result = vec4(1.0f, 0, 0, 1.0f);
+        } else if (type == 1) {  // no scissor
+          result = innerCol*cov;
+        } else if (type == 2) {  // Solid color
+          result = innerCol*cov;
+        } else if (type == 3) {  // Gradient
+          // Calculate gradient color using box gradient
+          vec2 pt = (paintMat * vec3(fpos,1.0)).xy;
+          float d = clamp((sdroundrect(pt, extent, radius) + feather*0.5) / feather, 0.0, 1.0);
+          vec4 color = texType > 0 ? texture2D(imageTex, vec2(d,0)) : mix(innerCol,outerCol,d);
+          if (texType == 1) color = vec4(color.rgb*color.a, color.a);
+          // Combine alpha
+          result = color*cov;
+        } else if (type == 4) {  // Image
+          // Calculate color from texture
+          vec2 pt = (paintMat * vec3(fpos,1.0)).xy / extent;
+          vec4 color = texture2D(imageTex, pt);
+          if (texType == 1) color = vec4(color.rgb*color.a,color.a);
+          else if (texType == 2) color = vec4(color.r);
+          // Apply color tint and alpha.
+          color *= innerCol;
+          // Combine alpha
+          result = color*cov;
+        } else if (type == 5) {  // Textured tris - only used for text, so no need for coverage()
+      #ifdef USE_SDF_TEXT
+          float tcov = superSDF(imageTex, ftcoord);
+      #else
+          float tcov = summedTextCov(imageTex, ftcoord);
+      #endif
+          result = vec4(tcov) * innerCol;
+        }
+        outColor = result;
+      }
+      """
+
+  let ctx = create(OpenglBackendContextObj)
+  ctx.shaderProgram = createProgram(header1 & header2 & vs, header1 & header2 & fs)
+
+  when NVG_USE_GL3:
+    glGenVertexArrays(1, ctx.vertArr.addr)
   glGenBuffers(1, ctx.vertBuf.addr)
-  glGenVertexArrays(1, ctx.vertArr.addr)
 
-  ctx.shader = shader
+  var align = GLint(4)
+
+  when NVG_USE_UNIFORMBUFFER:
+    glUniformBlockBinding(
+      ctx.shaderProgram.program, ctx.shaderProgram.fragmentLoc, NVG_FRAGMENT_BINDING
+    )
+
+    glGenBuffers(1, ctx.fragmentBuf.addr)
+    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, align.addr)
+
+  ctx.fragmentSize =
+    uint32(sizeof(FragmentUniformObj)) + uint32(align) -
+    uint32(sizeof(FragmentUniformObj)) mod uint32(align)
+
+  glGenTextures(1, ctx.texEdges.addr)
+  glActiveTexture(GL_TEXTURE0)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texEdges)
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
+
+  glFinish()
+
   ctx
 
-proc destroyImpl(ctx: pointer) =
-  let ctx = create(OpenglBackendContextObj)
+proc cancelImpl(ctx: pointer) =
+  let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
-  if ctx.shader.program != GLuint(0):
-    glDeleteProgram(ctx.shader.program)
+  ctx.verts.setLen(0)
+  ctx.edges.setLen(0)
+  ctx.calls.setLen(0)
+  ctx.uniforms.setLen(0)
 
-  if ctx.shader.vsShader != GLuint(0):
-    glDeleteShader(ctx.shader.vsShader)
+proc viewportImpl(ctx: pointer, view: Vec2, devicePixelRatio: float32) =
+  let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
-  if ctx.shader.fsShader != GLuint(0):
-    glDeleteShader(ctx.shader.fsShader)
+  cancelImpl(ctx)
 
-  if ctx.vertArr != GLuint(0):
-    glDeleteVertexArrays(1, ctx.vertArr.addr)
+  ctx.vertexUniform.view = view
 
-  if ctx.vertBuf != GLuint(0):
-    glDeleteBuffers(1, ctx.vertBuf.addr)
+proc setUniforms(ctx: ptr OpenglBackendContextObj, idx: uint32) =
+  when NVG_USE_UNIFORMBUFFER:
+    glBindBufferRange(
+      GL_UNIFORM_BUFFER,
+      NVG_FRAGMENT_BINDING,
+      ctx.fragmentBuf,
+      idx * sizeof(FragmentUniformObj),
+      sizeof(FragmentUniformObj),
+    )
+  else:
+    let uniform = ctx.uniforms[idx].addr
+    gluniform4fv(ctx.shaderProgram.fragmentLoc, 7, cast[ptr GLfloat](uniform))
 
-  reset(ctx[])
+proc flushImpl(ctx: pointer) =
+  let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
-  dealloc(ctx)
+  if ctx.calls.len <= 0:
+    return
+
+  when NVG_STATS:
+    var
+      npix = default(float32)
+      npixedges = default(float32)
+
+    for idx in 0 ..< ctx.calls.len:
+      let
+        call = ctx.calls[idx].addr
+        lt = ctx.verts[call.triangleOffset]
+        rb = ctx.verts[call.triangleOffset + 3]
+        callpix = (rb.x - lt.x) * (rb.y - lt.y)
+
+      npix = npix + callpix
+      npixedges = float32(call.fillCount) * callpix
+
+  glUseProgram(ctx.shaderProgram.program)
+  glDisable(GL_CULL_FACE)
+  glEnable(GL_BLEND)
+  glDisable(GL_DEPTH_TEST)
+
+  when NVG_USE_GL3:
+    glBindVertexArray(ctx.vertArr)
+
+  glBindBuffer(GL_ARRAY_BUFFER, ctx.vertBuf)
+  glBufferData(
+    GL_ARRAY_BUFFER,
+    GLsizeiptr(ctx.verts.len * sizeof(Vec4)),
+    ctx.verts[0].addr,
+    GL_STREAM_DRAW,
+  )
+  glEnableVertexAttribArray(0)
+  glEnableVertexAttribArray(1)
+  glVertexAttribPointer(0, 2, cGL_FLOAT, GL_FALSE, GLsizei(sizeof(Vec4)), nil)
+  glVertexAttribPointer(
+    1, 2, cGL_FLOAT, GL_FALSE, GLsizei(sizeof(Vec4)), cast[pointer](2 * sizeof(float32))
+  )
+
+  let layerSize = TILE_TEX_WIDTH * TILE_TEX_WIDTH
+  let nTileLayers = block:
+    let n = if (ctx.edges.len mod layerSize) > 0: 1 else: 0
+    ctx.edges.len div layerSize + n
+
+  when defined(NVG_DEBUG_VERTS):
+    printf("nTileLayers: %u\n", nTileLayers)
+
+  glActiveTexture(GL_TEXTURE1)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texEdges)
+
+  let capacity = int(ceil(float32(ctx.edges.len) / float32(layerSize))) * layerSize
+  ctx.edges.setLen(capacity)
+
+  glTexImage3D(
+    GL_TEXTURE_2D_ARRAY,
+    0,
+    GLint(GL_RGBA32F),
+    TILE_TEX_WIDTH,
+    TILE_TEX_WIDTH,
+    GLsizei(nTileLayers),
+    0,
+    GL_RGBA,
+    cGL_FLOAT,
+    ctx.edges[0].addr,
+  )
+
+  glActiveTexture(GL_TEXTURE0)
+  glBindTexture(GL_TEXTURE_2D, 0)
+
+  glUniform2fv(
+    ctx.shaderProgram.viewLoc, 1, cast[ptr GLfloat](ctx.vertexUniform.view.addr)
+  )
+  glUniform1i(ctx.shaderProgram.texLoc, 0)
+  glUniform1i(ctx.shaderProgram.edgeTexLoc, 1)
+
+  when NVG_USE_UNIFORMBUFFER:
+    glBindBuffer(GL_UNIFORM_BUFFER, ctx.fragmentBuf)
+    glBufferData(
+      GL_UNIFORM_BUFFER,
+      (len(ctx.uniforms) * sizeof(FragmentUniformObj)),
+      ctx.uniforms[0].addr,
+      GL_STREAM_DRAW,
+    )
+
+  for idx in 0 ..< ctx.calls.len:
+    let
+      call = ctx.calls[idx].addr
+      blend = call.blend.addr
+      prevBlend = block:
+        if idx > 0: ctx.calls[idx - 1].blend.addr else: nil
+
+    if idx == 0 or call.uniformOffset != ctx.calls[idx - 1].uniformOffset:
+      ctx.setUniforms(call.uniformOffset)
+
+    if prevBlend.isNil or blend.srcRGB != prevBlend.srcRGB or
+        blend.srcAlpha != prevBlend.srcAlpha or blend.dstRGB != prevBlend.dstRGB or
+        blend.dstAlpha != prevBlend.dstAlpha:
+      glBlendFuncSeparate(blend.srcRGB, blend.dstRGB, blend.srcAlpha, blend.dstAlpha)
+
+    glUniform1i(ctx.shaderProgram.typeLoc, GLint(call.shaderType))
+    glUniform1i(ctx.shaderProgram.nedgesLoc, GLint(call.fillCount))
+    glUniform1i(ctx.shaderProgram.offsetLoc, GLint(call.fillOffset))
+
+    if call.callType == FillCall:
+      glDrawArrays(
+        GL_TRIANGLE_STRIP, GLint(call.triangleOffset), GLsizei(call.triangleCount)
+      )
+    elif call.callType == ConvexFillCall:
+      glDrawArrays(
+        GL_TRIANGLE_FAN, GLint(call.triangleOffset), GLsizei(call.triangleCount)
+      )
+    elif call.callType != TrianglesCall:
+      glDrawArrays(
+        GL_TRIANGLES, GLint(call.triangleOffset), GLsizei(call.triangleCount)
+      )
+
+  glDisableVertexAttribArray(0)
+  glDisableVertexAttribArray(1)
+
+  when NVG_USE_GL3:
+    glBindVertexArray(0)
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0)
+  glUseProgram(0)
+  glBindTexture(GL_TEXTURE_2D, 0)
+  glActiveTexture(GL_TEXTURE1)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
 
 proc newContext*(): ptr ContextObj =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,
-      destroyImpl: destroyImpl,
-      createTextureImpl: createTextureImpl,
-      deleteTextureImpl: deleteTextureImpl,
-      updateTextureImpl: updateTextureImpl,
-      getTextureSizeImpl: getTextureSizeImpl,
+      destroyImpl: nil,
       fillImpl: fillImpl,
-      strokeImpl: strokeImpl,
-      trianglesImpl: trianglesImpl,
+      trianglesImpl: nil,
       viewportImpl: viewportImpl,
       cancelImpl: cancelImpl,
       flushImpl: flushImpl,

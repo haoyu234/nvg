@@ -20,6 +20,12 @@ proc slice*[T](s: var seq[T]): Slice2[T] {.inline.} =
 template toOpenArray*[T](s: Slice2[T]): openArray[T] =
   s.storage.toOpenArray(0, s.len - 1)
 
+template toOpenArray*[T](s: Slice2[T], i: Natural): openArray[T] =
+  s.storage.toOpenArray(i, s.len - 1)
+
+template toOpenArray*[T](s: Slice2[T], i, j: Natural): openArray[T] =
+  s.storage.toOpenArray(i, j)
+
 proc `[]`*[T; L, H: Ordinal](s: Slice2[T], x: HSlice[L, H]): Slice2[T] {.inline.} =
   let a = s ^^ x.a
   let L = (s ^^ x.b) - a + 1
@@ -31,5 +37,5 @@ proc `[]`*[T](s: Slice2[T], i: Natural): var T {.inline.} =
 proc `[]`*[T](s: Slice2[T], i: BackwardsIndex): var T {.inline.} =
   s.storage[s.len - int(i)]
 
-proc `[]=`*[T](s: var Slice2[T], i: Natural, v: sink T) {.inline.} =
+proc `[]=`*[T](s: Slice2[T], i: Natural, v: sink T) {.inline.} =
   s.storage[i] = v
