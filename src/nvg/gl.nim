@@ -1,6 +1,6 @@
-import vmath
-import opengl
-import chroma
+import pkg/vmath
+import pkg/opengl
+import pkg/chroma
 
 import ./core
 import ./params

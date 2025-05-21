@@ -1,5 +1,5 @@
-import chroma
-import vmath
+import pkg/chroma
+import pkg/vmath
 
 import std/algorithm
 import std/math

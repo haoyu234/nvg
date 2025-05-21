@@ -1,6 +1,6 @@
 import unittest
 
-import vmath
+import pkg/vmath
 
 import nvg/core
 
@@ -17,8 +17,8 @@ else:
 #   ctx.beginPath()
 #   ctx.moveTo(vec2(10, 100))
 #   ctx.quadCurveTo(vec2(250, 170), vec2(230, 20))
-#   ctx.stroke()
 #   ctx.fill()
+#   ctx.stroke()
 #   ctx.restore()
 
 test "arc":
@@ -38,6 +38,7 @@ test "arc":
   
   ctx.quadCurveTo(vec2(250, 170), vec2(230, 20))
 
-  ctx.stroke()
   ctx.fill()
+  ctx.stroke()
+
   ctx.restore()

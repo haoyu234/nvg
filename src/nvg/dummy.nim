@@ -1,4 +1,4 @@
-import vmath
+import pkg/vmath
 
 import ./core
 import ./params

@@ -1,6 +1,6 @@
-import chroma
-import opengl
-import windy
+import pkg/chroma
+import pkg/opengl
+import pkg/windy
 
 import nvg/core
 import nvg/gl
