@@ -1,6 +1,6 @@
 import pkg/vmath
 
-import ./slice2
+import ./pieces
 
 const N = uint32(16)
 
@@ -137,7 +137,7 @@ iterator items*(tiles: var Tiles, tileId: TileId): Vec4 =
       continue
     break
 
-iterator slices*(tiles: var Tiles, tileId: TileId): Slice2[Vec4] =
+iterator pieces*(tiles: var Tiles, tileId: TileId): Piece[Vec4] =
   let
     n = uint32(tileId)
     s = cast[ptr UncheckedArray[SegmentSeq]](tiles.storage[0].addr)
@@ -146,7 +146,7 @@ iterator slices*(tiles: var Tiles, tileId: TileId): Slice2[Vec4] =
 
   while true:
     let p = cast[ptr UncheckedArray[Vec4]](tiles.storage[b.pos].addr)
-    yield slice(p, int(b.len))
+    yield piece(p, int(b.len))
 
     if b.next > 0:
       b = s[b.next].addr
@@ -206,9 +206,9 @@ iterator slices*(tiles: var Tiles, tileId: TileId): Slice2[Vec4] =
 #   for val in p[]:
 #     yield val
 
-# iterator slices*(tiles: var Tiles, tileId: TileId): Slice2[Vec4] =
+# iterator pieces*(tiles: var Tiles, tileId: TileId): Piece[Vec4] =
 #   let
 #     n = uint32(tileId)
 #     p = tiles.storage[n].addr
 
-#   yield slice(p[])
+#   yield piece(p[])

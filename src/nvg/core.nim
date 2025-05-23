@@ -5,7 +5,7 @@ import std/algorithm
 import std/math
 
 import ./params
-import ./slice2
+import ./pieces
 
 when defined(NVG_DEBUG_CORE):
   proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
@@ -749,7 +749,7 @@ proc curveDivs(r, arc, tol: float32): int {.inline.} =
   max(2, int(ceil(arc / da)))
 
 proc arcJoin(
-    memory: Slice2[Vec4], idx: int, p0, p1, c: Vec2, w: float32, nCap, dir: int
+    memory: Piece[Vec4], idx: int, p0, p1, c: Vec2, w: float32, nCap, dir: int
 ): int =
   var
     pos = idx
@@ -818,7 +818,7 @@ proc expandStroke(
     r = vertCount
     offset = l
 
-  let memory = slice(c.verts)
+  let memory = piece(c.verts)
 
   template incp(v1, v2) =
     inc n, 1
@@ -1169,7 +1169,7 @@ proc expandFill(ctx: ptr ContextObj) =
   c.verts.setLenUninit(vertCount)
 
   var pos = 0
-  let memory = slice(c.verts)
+  let memory = piece(c.verts)
 
   for idx in 0 ..< c.paths.len:
     let

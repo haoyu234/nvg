@@ -4,7 +4,7 @@ import pkg/chroma
 
 import ./core
 import ./params
-import ./slice2
+import ./pieces
 import ./tiles
 
 import ./glsl
@@ -346,7 +346,7 @@ proc fillImpl(
         call.triangleOffset = uint32(ctx.verts.len)
         call.triangleCount = 4
 
-        for s in ctx.tiles.slices(tileId):
+        for s in ctx.tiles.pieces(tileId):
           ctx.edges.add(s.toOpenArray)
 
           inc call.fillCount, s.len

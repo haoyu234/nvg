@@ -1,7 +1,7 @@
 import pkg/chroma
 import pkg/vmath
 
-import ./slice2
+import ./pieces
 
 type
   PaintObj* = object
@@ -45,7 +45,7 @@ type
   PathObj* = object
     offset*: int32
     pointCount*: int32
-    fill*: Slice2[Vec4]
+    fill*: Piece[Vec4]
     ccw*: bool
     closed*: bool
     convex*: bool

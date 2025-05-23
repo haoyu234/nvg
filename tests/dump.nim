@@ -2,7 +2,7 @@ import pkg/vmath
 
 import nvg/core
 import nvg/params
-import nvg/slice2
+import nvg/pieces
 
 # import std/syncio
 
