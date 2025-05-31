@@ -692,7 +692,7 @@ proc createImpl(): pointer =
       type: imageType2d,
       width: 1,
       height: 1,
-      usage: usageImmutable,
+      usage: ImageUsage(immutable: true),
       pixelFormat: pixelFormatRgba32f,
       numMipmaps: 1,
       label: "nvg.texDummy",
@@ -743,8 +743,7 @@ proc updateVertBuf(ctx: ptr OpenglBackendContextObj) =
     ctx.vertBuf.initBuffer(
       BufferDesc(
         size: ctx.vertBufSize * sizeof(Vec4),
-        type: bufferTypeVertexBuffer,
-        usage: usageStream,
+        usage: BufferUsage(vertexBuffer: true, streamUpdate: true),
         label: "nvg.vertBuf",
       )
     )
@@ -781,7 +780,7 @@ proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
         type: imageTypeArray,
         width: TILE_IMAGE_WIDTH,
         height: TILE_IMAGE_WIDTH,
-        usage: usageDynamic,
+        usage: ImageUsage(dynamicUpdate: true),
         pixelFormat: pixelFormatRgba32f,
         numMipmaps: 0,
         numSlices: int32(layerCount),
