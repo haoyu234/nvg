@@ -23,22 +23,19 @@ proc setup*(tiles: var Tiles, w, h, capacity: Natural) {.inline.} =
   let
     n = uint32(w * h)
     len = uint32(float32(capacity) * 1.5) + n
-    oldLen = tiles.storage.len
 
   tiles.tail = n
   tiles.stride = uint32(w)
   tiles.storage.setLenUninit(len)
 
-  if oldLen > 0:
-    let s = cast[ptr UncheckedArray[SegmentSeq]](tiles.storage[0].addr)
-    for idx in 0 ..< n:
-      let b = s[idx].addr
-      if b.pos > 0:
-        b.len = 0
-        b.capacity = 0
-        b.pos = 0
-        b.next = 0
-        b.tail = 0
+  let s = cast[ptr UncheckedArray[SegmentSeq]](tiles.storage[0].addr)
+  for idx in 0 ..< n:
+    let b = s[idx].addr
+    b.len = 0
+    b.capacity = 0
+    b.pos = 0
+    b.next = 0
+    b.tail = 0
 
 template `[]`*(tiles: var Tiles, x, y: Natural): TileId =
   assert x >= 0
