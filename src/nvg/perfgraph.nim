@@ -4,10 +4,9 @@ import pkg/vmath
 import ./core
 
 import std/times
+import std/strformat
 
 const GRAPH_HISTORY_COUNT = 100
-
-proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
 
 type
   PerfGraphRenderStyle* = enum
@@ -36,23 +35,31 @@ proc average*(p: PerfGraph): float32 =
   sum / float32(n)
 
 proc renderGraph*(
-    ctx: ptr ContextObj, pos, size: Vec2, p: PerfGraph, style: PerfGraphRenderStyle
+    ctx: ptr ContextObj,
+    pos: Vec2,
+    p: PerfGraph,
+    style: PerfGraphRenderStyle,
+    fontId: FontId,
 ) =
+  let
+    w = float32(380)
+    h = float32(80)
+
   ctx.save()
   ctx.beginPath()
-  ctx.rect(vec4(pos.x, pos.y, size.x, size.y))
-  ctx.setFillColor(color(0, 0, 0, 0.753))
+  ctx.rect(vec4(pos.x, pos.y, w, h))
+  ctx.setFillColor(color(0, 0, 0, 0.75))
   ctx.fill()
 
   ctx.beginPath()
-  ctx.moveTo(vec2(pos.x, pos.y + size.y))
+  ctx.moveTo(vec2(pos.x, pos.y + h))
 
   template lineTo(MAX: static[float32]) =
     if v > MAX:
       v = MAX
 
-    vx = pos.x + float32(idx) / float32(GRAPH_HISTORY_COUNT - 1) * size.x
-    vy = pos.y + size.y - (v / MAX * size.y)
+    vx = pos.x + float32(idx) / float32(GRAPH_HISTORY_COUNT - 1) * w
+    vy = pos.y + h - (v / MAX * h)
 
     ctx.lineTo(vec2(vx, vy))
 
@@ -82,8 +89,34 @@ proc renderGraph*(
 
       lineTo(float32(100))
 
-  ctx.lineTo(vec2(pos.x + size.x, pos.y + size.y))
-  ctx.setFillColor(color(1, 0.753, 0, 0.5))
+  ctx.lineTo(vec2(pos.x + w, pos.y + h))
+  ctx.setFillColor(color(1, 0.75, 0, 0.5))
   ctx.fill()
+
+  ctx.beginPath()
+
+  ctx.setFontId(fontId)
+  ctx.setFontSize(36)
+  ctx.setFillColor(color(0.58, 0.25, 1, 1))
+  ctx.setTextAlign(RightAlign)
+  ctx.setTextBaseline(TopBaseline)
+
+  let v = p.average
+
+  case style
+  of PERF_GRAPH_RENDER_FPS:
+    ctx.text(fmt"{1 / v:.2f} FPS", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.fill()
+    ctx.setFontSize(30)
+    ctx.setFillColor(color(0.58, 0.25, 1, 0.9))
+    ctx.setTextBaseline(BottomBaseline)
+    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos.x + w - 3, pos.y + h - 1))
+    ctx.fill()
+  of PERF_GRAPH_RENDER_PERCENT:
+    ctx.text(fmt"{v:.1f} %", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.fill()
+  of PERF_GRAPH_RENDER_MS:
+    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.fill()
 
   ctx.restore()
