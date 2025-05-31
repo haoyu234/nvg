@@ -21,8 +21,7 @@ const TILE_IMAGE_WIDTH = 256
 
 type
   ShaderType = enum
-    FillSimple = 1
-    FillSolid
+    FillSolid = 1
     FillGradient
     # FillImage
     # FillText

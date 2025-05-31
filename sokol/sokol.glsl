@@ -179,11 +179,9 @@ void main(void)
     W += areaEdge2(edge.zw - fpos, edge.xy - fpos);  //noAA ? coversCenter(vb, va) :
   }
   float cov = coverage(W);
-  if (shaderType == 1) {  // no scissor
+  if (shaderType == 1) {  // Solid color
     result = innerColor*cov;
-  } else if (shaderType == 2) {  // Solid color
-    result = innerColor*cov;
-  } else if (shaderType == 3) {  // Gradient
+  } else if (shaderType == 2) {  // Gradient
     // Calculate gradient color using box gradient
     vec2 pt = (transform * vec3(fpos,1.0)).xy;
     float d = clamp((sdroundrect(pt, extent, radius) + feather*0.5) / feather, 0.0, 1.0);
@@ -191,7 +189,7 @@ void main(void)
     if (texType == 1) color = vec4(color.rgb*color.a, color.a);
     // Combine alpha
     result = color*cov;
-  } else if (shaderType == 4) {  // Image
+  } else if (shaderType == 3) {  // Image
     // Calculate color from texture
     vec2 pt = (transform * vec3(fpos,1.0)).xy / extent;
     vec4 color = texture(sampler2D(imageTex, smp1), pt);
@@ -201,7 +199,7 @@ void main(void)
     color *= innerColor;
     // Combine alpha
     result = color*cov;
-  } else if (shaderType == 5) {  // Textured tris - only used for text, so no need for coverage()
+  } else if (shaderType == 4) {  // Textured tris - only used for text, so no need for coverage()
     float tcov = superSDF(imageTex, vb);
     result = vec4(tcov) * innerColor;
   } else { // not used

@@ -14,8 +14,7 @@ when defined(NVG_DEBUG_VERTS):
 
 type
   ShaderType = enum
-    FillSimple = 1
-    FillSolid
+    FillSolid = 1
     FillGradient
     # FillImage
     # FillText
