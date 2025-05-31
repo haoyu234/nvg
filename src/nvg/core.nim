@@ -4,6 +4,8 @@ import pkg/vmath
 import std/algorithm
 import std/math
 
+import ./fontstash
+import ./opentype
 import ./params
 import ./pieces
 
@@ -19,6 +21,8 @@ const
   NVG_KAPPA90 = float32(4.0 * (sqrt(2.0) - 1.0) / 3.0)
 
 type
+  FontId* = distinct FonsFontId
+
   LineCap* = enum
     ButtCap
     RoundCap
@@ -41,10 +45,12 @@ type
     BottomBaseline
 
   Command = enum
-    MOVE_TO
-    LINE_TO
-    BEZIER_TO
+    MOVE
+    LINE
+    BEZIER
     CLOSE
+    RESTART
+    WINDING
 
   FillRule* = enum
     NonZero
@@ -71,7 +77,7 @@ type
     fontBlur: float32
     textAlign: HorizontalAlignment
     textBaseline: BaselineAlignment
-    fontId: int
+    fontId: FontId
 
   PathCacheObj = object
     points: seq[Vec2]
@@ -86,10 +92,14 @@ type
 
     commands: seq[float32]
     commandXY: Vec2
+
     state: array[NVG_MAX_STATES, StateObj]
     stateCount: int
     lastState: ptr StateObj
+
+    fons: FonsStashObj
     cache: PathCacheObj
+
     tessTol: float32
     distTol: float32
     distTolSq: float32
@@ -160,7 +170,7 @@ proc reset(ctx: ptr ContextObj) =
   state.fontBlur = 0
   state.textAlign = LeftAlign
   state.textBaseline = AlphabeticBaseline
-  state.fontId = 0
+  state.fontId = default(FontId)
 
 proc createInternal*(params: BackendContextParams): ptr ContextObj =
   assert(params.createImpl != nil)
@@ -168,6 +178,7 @@ proc createInternal*(params: BackendContextParams): ptr ContextObj =
   let ctx = create(ContextObj)
   ctx.params = params
   ctx.ctx = params.createImpl()
+  ctx.fons = default(FonsStashObj)
 
   ctx.commands = newSeqOfCap[float32](NVG_INIT_COMMANDS_SIZE)
 
@@ -284,22 +295,86 @@ proc scale*(ctx: ptr ContextObj, scale: Vec2) =
 
   state.transform = state.transform * scale(scale)
 
+proc setFillRule*(ctx: ptr ContextObj, fillRule: FillRule) =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fillRule = fillRule
+
+proc getFillRule*(ctx: ptr ContextObj): FillRule =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fillRule
+
+proc loadFontFromMemory*(ctx: ptr ContextObj, data: seq[byte]): FontId =
+  FontId(ctx.fons.loadFontFromMemory(data))
+
+proc loadFontFromMemory*(ctx: ptr ContextObj, data: openArray[byte]): FontId =
+  FontId(ctx.fons.loadFontFromMemory(data))
+
+proc setFontId*(ctx: ptr ContextObj, fontId: FontId) =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fontId = fontId
+
+proc getFontId*(ctx: ptr ContextObj): FontId =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fontId
+
+proc setFontSize*(ctx: ptr ContextObj, fontSize: float32) =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fontSize = fontSize
+
+proc getFontSize*(ctx: ptr ContextObj): float32 =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.fontSize
+
+proc setTextAlign*(ctx: ptr ContextObj, textAlign: HorizontalAlignment) =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.textAlign = textAlign
+
+proc getTextAlign*(ctx: ptr ContextObj): HorizontalAlignment =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.textAlign
+
+proc setTextBaseline*(ctx: ptr ContextObj, textBaseline: BaselineAlignment) =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.textBaseline = textBaseline
+
+proc getTextBaseline*(ctx: ptr ContextObj): BaselineAlignment =
+  let state = ctx.lastState
+  assert (not state.isNil)
+
+  state.textBaseline
+
 proc clear(c: ptr PathCacheObj) {.inline, raises: [].} =
   c.currentPath = nil
   c.points.setLenUninit(0)
   c.paths.setLenUninit(0)
 
 proc appendCommands(ctx: ptr ContextObj, values: openArray[float32]) =
-  let
-    c = ctx.cache.addr
-    state = ctx.lastState
+  let state = ctx.lastState
 
   if values.len >= 3:
     ctx.commandXY.x = values[values.len - 2]
     ctx.commandXY.y = values[values.len - 1]
 
   when defined(NVG_DEBUG_CORE):
-    printf("line[%u] appendCommands %u\n", 0, values.len)
+    printf("line[%u] appendCommands %u cmd[%u]\n", 0, values.len, uint32(values[0]))
     printf("commandXY %.6f %.6f\n", ctx.commandXY.x, ctx.commandXY.y)
 
     for v in values:
@@ -318,12 +393,12 @@ proc appendCommands(ctx: ptr ContextObj, values: openArray[float32]) =
 
   while i < values.len:
     case Command(values[i])
-    of Command.MOVE_TO, Command.LINE_TO:
+    of Command.MOVE, Command.LINE:
       let pos = state.transform * vec2(values[i + 1], values[i + 2])
 
       inc i, 1
       modify(pos)
-    of Command.BEZIER_TO:
+    of Command.BEZIER:
       let pos1 = state.transform * vec2(values[i + 1], values[i + 2])
       let pos2 = state.transform * vec2(values[i + 3], values[i + 4])
       let pos3 = state.transform * vec2(values[i + 5], values[i + 6])
@@ -334,6 +409,10 @@ proc appendCommands(ctx: ptr ContextObj, values: openArray[float32]) =
       modify(pos3)
     of Command.CLOSE:
       inc i, 1
+    of Command.RESTART:
+      inc i, 1
+    of Command.WINDING:
+      inc i, 2
 
 proc beginPath*(ctx: ptr ContextObj) =
   let c = ctx.cache.addr
@@ -343,16 +422,16 @@ proc beginPath*(ctx: ptr ContextObj) =
 proc rect*(ctx: ptr ContextObj, rect: Vec4) =
   ctx.appendCommands(
     [
-      float32(Command.MOVE_TO),
+      float32(Command.MOVE),
       rect.x,
       rect.y,
-      float32(Command.LINE_TO),
+      float32(Command.LINE),
       rect.x,
       rect.y + rect.w,
-      float32(Command.LINE_TO),
+      float32(Command.LINE),
       rect.x + rect.z,
       rect.y + rect.w,
-      float32(Command.LINE_TO),
+      float32(Command.LINE),
       rect.x + rect.z,
       rect.y,
       float32(Command.CLOSE),
@@ -422,15 +501,15 @@ proc arc*(ctx: ptr ContextObj, cp: Vec2, r, a0, a1: float32, ccw: bool) =
       )
 
     if i > 0:
-      append(float32(Command.BEZIER_TO))
+      append(float32(Command.BEZIER))
       append(px + ptanx)
       append(py + ptany)
       append(x - tanx)
       append(y - tany)
     elif ctx.commands.len > 0:
-      append(float32(Command.LINE_TO))
+      append(float32(Command.LINE))
     else:
-      append(float32(Command.MOVE_TO))
+      append(float32(Command.MOVE))
 
     append(x)
     append(y)
@@ -451,31 +530,31 @@ proc arc*(ctx: ptr ContextObj, cp: Vec2, r, a0, a1: float32, ccw: bool) =
 proc ellipse*(ctx: ptr ContextObj, c: Vec2, rx, ry: float32) =
   ctx.appendCommands(
     [
-      float32(Command.MOVE_TO),
+      float32(Command.MOVE),
       c.x - rx,
       c.y,
-      float32(Command.BEZIER_TO),
+      float32(Command.BEZIER),
       c.x - rx,
       c.y + ry * NVG_KAPPA90,
       c.x - rx * NVG_KAPPA90,
       c.y + ry,
       c.x,
       c.y + ry,
-      float32(Command.BEZIER_TO),
+      float32(Command.BEZIER),
       c.x + rx * NVG_KAPPA90,
       c.y + ry,
       c.x + rx,
       c.y + ry * NVG_KAPPA90,
       c.x + rx,
       c.y,
-      float32(Command.BEZIER_TO),
+      float32(Command.BEZIER),
       c.x + rx,
       c.y - ry * NVG_KAPPA90,
       c.x + rx * NVG_KAPPA90,
       c.y - ry,
       c.x,
       c.y - ry,
-      float32(Command.BEZIER_TO),
+      float32(Command.BEZIER),
       c.x - rx * NVG_KAPPA90,
       c.y - ry,
       c.x - rx,
@@ -490,15 +569,13 @@ proc circle*(ctx: ptr ContextObj, c: Vec2, r: float32) =
   ctx.ellipse(c, r, r)
 
 proc moveTo*(ctx: ptr ContextObj, pos: Vec2) =
-  ctx.appendCommands([float32(Command.MOVE_TO), pos.x, pos.y])
+  ctx.appendCommands([float32(Command.MOVE), pos.x, pos.y])
 
 proc lineTo*(ctx: ptr ContextObj, pos: Vec2) =
-  ctx.appendCommands([float32(Command.LINE_TO), pos.x, pos.y])
+  ctx.appendCommands([float32(Command.LINE), pos.x, pos.y])
 
 proc bezierTo*(ctx: ptr ContextObj, cp1, cp2, to: Vec2) =
-  ctx.appendCommands(
-    [float32(Command.BEZIER_TO), cp1.x, cp1.y, cp2.x, cp2.y, to.x, to.y]
-  )
+  ctx.appendCommands([float32(Command.BEZIER), cp1.x, cp1.y, cp2.x, cp2.y, to.x, to.y])
 
 proc quadCurveTo*(ctx: ptr ContextObj, cp, to: Vec2) =
   const s = float32(2) / 3
@@ -506,7 +583,7 @@ proc quadCurveTo*(ctx: ptr ContextObj, cp, to: Vec2) =
 
   ctx.appendCommands(
     [
-      float32(Command.BEZIER_TO),
+      float32(Command.BEZIER),
       pos.x + s * (cp.x - pos.x),
       pos.y + s * (cp.y - pos.y),
       to.x + s * (cp.x - to.x),
@@ -589,7 +666,7 @@ proc createPath(c: ptr PathCacheObj) {.inline, raises: [].} =
 
   let p = c.paths[idx].addr
   p.offset = int32(c.points.len)
-  p.ccw = true
+  p.winding = PathWinding.Ccw
 
   c.currentPath = p
 
@@ -641,21 +718,21 @@ proc flattenPaths(ctx: ptr ContextObj) =
   while i < ctx.commands.len:
     let cmd = Command(ctx.commands[i])
     case cmd
-    of Command.MOVE_TO:
+    of Command.MOVE:
       when defined(NVG_DEBUG_CORE):
-        printf("MOVE_TO BEGIN %u\n", c.points.len)
+        printf("MOVE BEGIN %u\n", c.points.len)
         defer:
-          printf("MOVE_TO END %u\n", c.points.len)
+          printf("MOVE END %u\n", c.points.len)
 
       c.createPath()
       c.createPoint(vec2(ctx.commands[i + 1], ctx.commands[i + 2]))
 
       inc i, 3
-    of Command.LINE_TO:
+    of Command.LINE:
       when defined(NVG_DEBUG_CORE):
-        printf("LINE_TO BEGIN %u\n", c.points.len)
+        printf("LINE BEGIN %u\n", c.points.len)
         defer:
-          printf("LINE_TO END %u\n", c.points.len)
+          printf("LINE END %u\n", c.points.len)
 
       if not c.currentPath.isNil:
         let p = vec2(ctx.commands[i + 1], ctx.commands[i + 2])
@@ -669,11 +746,11 @@ proc flattenPaths(ctx: ptr ContextObj) =
         c.createPoint(p)
 
       inc i, 3
-    of Command.BEZIER_TO:
+    of Command.BEZIER:
       when defined(NVG_DEBUG_CORE):
-        printf("BEZIER_TO BEGIN %u\n", c.points.len)
+        printf("BEZIER BEGIN %u\n", c.points.len)
         defer:
-          printf("BEZIER_TO END %u\n", c.points.len)
+          printf("BEZIER END %u\n", c.points.len)
 
       if not c.currentPath.isNil:
         if c.currentPath.pointCount > 0:
@@ -691,6 +768,16 @@ proc flattenPaths(ctx: ptr ContextObj) =
         c.currentPath.closed = true
 
       inc i, 1
+    of Command.RESTART:
+      if not c.currentPath.isNil:
+        c.currentPath.restart = true
+
+      inc i, 1
+    of Command.WINDING:
+      if not c.currentPath.isNil:
+        c.currentPath.winding = PathWinding(ctx.commands[i + 1])
+
+      inc i, 2
 
   when defined(NVG_DEBUG_CORE):
     printf("BEGIN flattenPaths\n")
@@ -714,9 +801,9 @@ proc flattenPaths(ctx: ptr ContextObj) =
 
       p.closed = true
 
-    if p.pointCount > 2:
+    if p.winding != PathWinding.Default and p.pointCount > 2:
       let a = area(c.points.toOpenArray(i, j))
-      if p.ccw:
+      if p.winding == PathWinding.Ccw:
         if a < 0:
           reverse(c.points.toOpenArray(i, j))
       elif a > 0:
@@ -733,16 +820,35 @@ proc updateBounds(c: ptr PathCacheObj, paths: openArray[PathObj], distTolSq: flo
     if p.fill.len <= 0:
       continue
 
+    when defined(NVG_DEBUG_CORE):
+      printf("updateBounds %u\n", idx)
+
     for v in p.fill.toOpenArray:
-      p.bounds.x = min(p.bounds.x, v.x)
-      p.bounds.y = min(p.bounds.y, v.y)
-      p.bounds.z = max(p.bounds.z, v.x)
-      p.bounds.w = max(p.bounds.w, v.y)
+      p.bounds.x = min(p.bounds.x, v.z)
+      p.bounds.y = min(p.bounds.y, v.w)
+      p.bounds.z = max(p.bounds.z, v.z)
+      p.bounds.w = max(p.bounds.w, v.w)
+
+      when defined(NVG_DEBUG_CORE):
+        printf(
+          "x[%.6f] y[%.6f] %.6f %.6f %.6f %.6f\n",
+          v.z,
+          v.w,
+          p.bounds[0],
+          p.bounds[1],
+          p.bounds[2],
+          p.bounds[3],
+        )
 
     c.bounds.x = min(p.bounds.x, c.bounds.x)
     c.bounds.y = min(p.bounds.y, c.bounds.y)
-    c.bounds.z = max(p.bounds.z, c.bounds.x)
-    c.bounds.w = max(p.bounds.w, c.bounds.y)
+    c.bounds.z = max(p.bounds.z, c.bounds.z)
+    c.bounds.w = max(p.bounds.w, c.bounds.w)
+
+    when defined(NVG_DEBUG_CORE):
+      printf(
+        "- %.6f %.6f %.6f %.6f\n", c.bounds[0], c.bounds[1], c.bounds[2], c.bounds[3]
+      )
 
 proc curveDivs(r, arc, tol: float32): int {.inline.} =
   let da = arccos(r / (r + tol)) * 2
@@ -797,25 +903,22 @@ proc expandStroke(
 
   let vertCount = block:
     var count = 0
-
     for p in c.paths.items:
-      inc count, p.pointCount
-
-    if lineJoin == RoundJoin or lineCap == RoundCap:
-      6 * (count * (nCap + 2) + 1) * 2
-    else:
-      6 * (count * 2 + 1) * 2
-
-  var n = default(int)
+      if lineJoin == RoundJoin or lineCap == RoundCap:
+        inc count, (p.pointCount * (nCap + 2) + 1) * 2
+      else:
+        inc count, (p.pointCount * 2 + 1) * 2
+    6 * count
 
   when defined(NVG_DEBUG_CORE):
-    printf("vertCount = %u\n", vertCount)
+    printf("expandStroke vertCount = %u ncap = %u\n", vertCount, nCap)
 
   c.verts.setLenUninit(vertCount)
 
   var
     l = 0
     r = vertCount
+    n = default(int)
     offset = l
 
   let memory = piece(c.verts)
@@ -1073,7 +1176,9 @@ proc expandStroke(
     p.fill = memory[offset ..< l2]
 
     when defined(NVG_DEBUG_CORE):
-      printf("l[%u] r[%u] n[%u]\n", l, r, n)
+      # printf("l[%u] r[%u] n[%u]\n", l, r, n)
+
+      printf("nfill[%u]\n", p.fill.len)
       printf("---->\n")
       for v in p.fill.toOpenArray:
         printf("%.6f %.6f %.6f %.6f\n", v.x, v.y, v.z, v.w)
@@ -1165,6 +1270,9 @@ proc expandFill(ctx: ptr ContextObj) =
         inc count, p.pointCount
 
       count
+
+  when defined(NVG_DEBUG_CORE):
+    printf("expandFill vertCount = %u\n", vertCount)
 
   c.verts.setLenUninit(vertCount)
 
@@ -1297,3 +1405,93 @@ proc begin*(ctx: ptr ContextObj, view: Vec2, devicePixelRatio: float32) =
 
 proc flush*(ctx: ptr ContextObj) =
   ctx.params.flushImpl(ctx.ctx)
+
+proc fonsAlign(state: ptr StateObj): uint32 =
+  case state.textAlign
+  of LeftAlign:
+    result = result or FONS_ALIGN_LEFT
+  of CenterAlign:
+    result = result or FONS_ALIGN_CENTER
+  of RightAlign:
+    result = result or FONS_ALIGN_RIGHT
+
+  case state.textBaseline
+  of TopBaseline:
+    result = result or FONS_ALIGN_TOP
+  of MiddleBaseline:
+    result = result or FONS_ALIGN_MIDDLE
+  of AlphabeticBaseline:
+    result = result or FONS_ALIGN_BASELINE
+  of BottomBaseline:
+    result = result or FONS_ALIGN_BOTTOM
+
+proc text*(ctx: ptr ContextObj, text: openArray[char], pos: Vec2) =
+  let state = ctx.lastState
+
+  assert (not state.isNil)
+
+  let font = ctx.fons.getFontById(FonsFontId(state.fontId))
+  if font.isNil:
+    return
+
+  ctx.beginPath()
+
+  let
+    oldTransform = ctx.getTransform()
+    scale = state.fontSize / float32(font.metrics.ascender - font.metrics.descender)
+
+  when defined(NVG_DEBUG_CORE):
+    printf(
+      "fontSize: %.6f scale: %.6f fonsAlign: %u\n", state.fontSize, scale,
+      state.fonsAlign,
+    )
+
+  for x, y, glyph in ctx.fons.arrange(
+    font, text, pos.x, pos.y, state.fonsAlign, state.fontSize, state.letterSpacing
+  ):
+    let points = ctx.fons.getGlyphShape(glyph)
+
+    when defined(NVG_DEBUG_CORE):
+      printf("glyph: %u x: %.6f y: %.6f\n", glyph.unicodeCodepoint, x, y)
+      printf("len(points): %u\n", len(points))
+
+      for idx in 0 ..< len(points):
+        let p = points[idx].addr
+
+        if p.tp == uint8(GlyphShapeCommand.MOVE):
+          printf("%d %d %d %d\n", int32(idx), int32(p.tp), int32(p.x), int32(p.y))
+        elif p.tp == uint8(GlyphShapeCommand.LINE):
+          printf("%d %d %d %d\n", int32(idx), int32(p.tp), int32(p.x), int32(p.y))
+        elif p.tp == uint8(GlyphShapeCommand.BEZIER):
+          printf(
+            "%d %d %d %d %d %d\n",
+            int32(idx),
+            int32(p.tp),
+            int32(p.x),
+            int32(p.y),
+            int32(p.cx),
+            int32(p.cy),
+          )
+
+    if len(points) <= 0:
+      continue
+
+    ctx.resetTransform()
+    ctx.translate(vec2(x, y))
+    ctx.scale(vec2(scale, -scale))
+
+    for idx in 0 ..< len(points):
+      let p = points[idx].addr
+      if p.tp == uint8(GlyphShapeCommand.MOVE):
+        ctx.moveTo(vec2(float32(p.x), float32(p.y)))
+        ctx.appendCommands([float32(Command.WINDING), float32(PathWinding.Default)])
+        if idx <= 0:
+          ctx.appendCommands([float32(Command.RESTART)])
+      elif p.tp == uint8(GlyphShapeCommand.LINE):
+        ctx.lineTo(vec2(float32(p.x), float32(p.y)))
+      elif p.tp == uint8(GlyphShapeCommand.BEZIER):
+        ctx.quadCurveTo(
+          vec2(float32(p.cx), float32(p.cy)), vec2(float32(p.x), float32(p.y))
+        )
+
+  ctx.setTransform(oldTransform)

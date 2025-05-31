@@ -21,7 +21,7 @@ const TILE_IMAGE_WIDTH = 256
 
 type
   ShaderType = enum
-    FillSimple
+    FillSimple = 1
     FillSolid
     FillGradient
     # FillImage
@@ -182,11 +182,14 @@ proc fillImpl(
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
   var
-    ncalls = 1
+    ncalls = 0
     nedges = 0
 
-  for p in paths:
+  for idx in 0 ..< paths.len:
+    let p = paths[idx].addr
     inc nedges, p.fill.len
+    if idx <= 0 or p.restart:
+      inc ncalls, 1
 
   when defined(NVG_DEBUG_VERTS):
     printf("fill nedges: %u\n", nedges)
@@ -228,20 +231,25 @@ proc fillImpl(
   if paths.len == 1 and paths[0].convex and paths[0].fill.len > 2:
     flags.convex = true
 
+  call.callType = FillCall
+  call.blend = toBlend(compositeOperation)
+
+  let uniform = ctx.toUniform(paint, pathFlags)
+  if ctx.uniforms.len > 0 and ctx.uniforms[ctx.uniforms.len - 1] == uniform:
+    call.uniformOffset = uint32(ctx.uniforms.len) - 1
+  else:
+    call.uniformOffset = uint32(ctx.uniforms.len)
+    ctx.uniforms.add(uniform)
+
   when defined(NVG_DEBUG_VERTS):
     printf(
-      "ncalls[%u] npaths[%u] convex[%u] nfill[%u]\n",
+      "ncalls[%u] npaths[%u] convex[%u] nfill[%u] uniformOffset[%u]\n",
       ncalls,
       paths.len,
       paths[0].convex,
       paths[0].fill.len,
+      call.uniformOffset,
     )
-
-  call.callType = FillCall
-  call.blend = toBlend(compositeOperation)
-  call.uniformOffset = uint32(ctx.uniforms.len)
-
-  ctx.uniforms.add(ctx.toUniform(paint, pathFlags))
 
   const tileSize = 32
 
@@ -387,32 +395,47 @@ proc fillImpl(
     ctx.verts.addQuad(ltrb, 0.5)
     ctx.calls.add(call)
   else:
-    var callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
+    var
+      lastIdx = 0
+      callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
 
-    for p in paths:
+    for idx in 0 ..< paths.len:
+      let p = paths[idx].addr
+
       callbnds[0] = min(callbnds[0], p.bounds[0])
       callbnds[1] = min(callbnds[1], p.bounds[1])
-      callbnds[2] = min(callbnds[2], p.bounds[1])
-      callbnds[3] = min(callbnds[3], p.bounds[1])
+      callbnds[2] = max(callbnds[2], p.bounds[2])
+      callbnds[3] = max(callbnds[3], p.bounds[3])
 
-    callbnds[0] = max(ltrb[0], callbnds[0])
-    callbnds[1] = max(ltrb[1], callbnds[1])
-    callbnds[2] = min(ltrb[2], callbnds[2])
-    callbnds[3] = min(ltrb[3], callbnds[3])
+      if (idx + 1) == paths.len or paths[idx + 1].restart:
+        callbnds[0] = max(ltrb[0], callbnds[0])
+        callbnds[1] = max(ltrb[1], callbnds[1])
+        callbnds[2] = min(ltrb[2], callbnds[2])
+        callbnds[3] = min(ltrb[3], callbnds[3])
 
-    if callbnds[0] < callbnds[2] and callbnds[1] < callbnds[3]:
-      let offset = uint32(ctx.edges.len)
+        if callbnds[0] >= callbnds[2] or callbnds[1] >= callbnds[3]:
+          if call.fillOffset > 0:
+            ctx.calls.setLen(ctx.calls.len - 1)
+            ctx.verts.setLen(ctx.verts.len - 4)
+            ctx.edges.setLen(int(call.fillOffset))
+        else:
+          let offset = uint32(ctx.edges.len)
 
-      for p in paths:
-        ctx.edges.add(p.fill.toOpenArray)
+          for idx2 in lastIdx .. idx:
+            let p = paths[idx2].addr
+            ctx.edges.add(p.fill.toOpenArray)
 
-      call.fillOffset = offset
-      call.fillCount = uint32(ctx.edges.len) - offset
-      call.triangleOffset = uint32(ctx.verts.len)
-      call.triangleCount = 4
+          lastIdx = idx + 1
 
-      ctx.verts.addQuad(callbnds, 0.5)
-      ctx.calls.add(call)
+          call.fillOffset = offset
+          call.fillCount = uint32(ctx.edges.len) - offset
+          call.triangleOffset = uint32(ctx.verts.len)
+          call.triangleCount = 4
+
+          ctx.verts.addQuad(callbnds, 0.5)
+          ctx.calls.add(call)
+
+        callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
 
   when defined(NVG_DEBUG_VERTS):
     printf("nverts: %u\n", uint32(ctx.verts.len))
@@ -425,20 +448,27 @@ proc fillImpl(
 
     printf("ncalls: %u\n", uint32(ctx.calls.len))
     for call in ctx.calls:
+      let
+        uniform = ctx.uniforms[call.uniformOffset].addr
+        shaderType = uint32(uniform.compressed3Type) and 0xFF
       printf(
         "type: %u, shaderType: %u, image: %u, fillOffset: %u, fillCount: %u, triangleOffset: %u, triangleCount: %u, uniformOffset: %u\n",
-        call.callType, call.shaderType, 0, call.fillOffset, call.fillCount,
+        call.callType, shaderType, 0, call.fillOffset, call.fillCount,
         call.triangleOffset, call.triangleCount, call.uniformOffset,
       )
 
     printf("nuniforms: %u\n", uint32(ctx.uniforms.len))
     for uniform in ctx.uniforms:
+      let
+        texType = (uint32(uniform.compressed3Type) shr 8) and 0xFF
+        fillType = (uint32(uniform.compressed3Type) shr 16) and 0xFF
+
       printf(
         "transform: %.6f %.6f %.6f %.6f\ninnerColor: %.6f %.6f %.6f %.6f\nouterColor: %.6f %.6f %.6f %.6f\nextent: %.6f %.6f\nradius: %.6f\nfeather: %.6f\nstrokeMult: %.6f\nstrokeThr: %.6f\ntexType: %u\nfillType: %u\n",
-        uniform.transform[0],
-        uniform.transform[1],
-        uniform.transform[2],
-        uniform.transform[3],
+        0, # uniform.transform[0],
+        0, # uniform.transform[1],
+        0, # uniform.transform[2],
+        0, # uniform.transform[3],
         uniform.innerColor.r,
         uniform.innerColor.g,
         uniform.innerColor.b,
@@ -453,8 +483,8 @@ proc fillImpl(
         uniform.feather,
         0, # uniform.strokeMult,
         0, # uniform.strokeThr,
-        uniform.texType,
-        uniform.fillType,
+        texType,
+        fillType,
       )
 
 proc createGlShader(tp: GLenum, source: cstring): GLuint =

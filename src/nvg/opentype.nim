@@ -218,7 +218,7 @@ proc getGlyphId*(font: OpenTypeObj, unicodeCodepoint: uint32): GlyphId =
 
     let
       item = search - endCountIdx
-      movePos = font.data.toInt(endCountIdx + segCount + 2 + item, 2, uint32)
+      movePos = font.data.toInt(endCountIdx + segCount * 2 + 2 + item, 2, uint32)
       stop = font.data.toInt(endCountIdx + item, 2, uint32)
 
     if unicodeCodepoint < movePos or unicodeCodepoint > stop:
@@ -235,8 +235,8 @@ proc getGlyphId*(font: OpenTypeObj, unicodeCodepoint: uint32): GlyphId =
       result = GlyphId(glyphId)
     else:
       let glyphId =
-        unicodeCodepoint +
-        font.data.toInt(endCountIdx + segCOunt * 4 + 2 + item, 2, uint32)
+        int32(unicodeCodepoint) +
+        font.data.toInt(endCountIdx + segCount * 4 + 2 + item, 2, int32)
 
       result = GlyphId(glyphId)
     return

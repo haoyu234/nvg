@@ -4,12 +4,6 @@ import nvg/core
 import nvg/params
 import nvg/pieces
 
-# import std/syncio
-
-# proc freopen(
-#   p: cstring, mode: cstring, stream: File
-# ) {.header: "<stdio.h>", importc: "freopen".}
-
 proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
 
 proc createImpl(): pointer =
@@ -25,7 +19,7 @@ proc dumpPath(i: int, p: ptr PathObj) =
     p.offset,
     p.pointCount,
     p.fill.len,
-    p.ccw,
+    p.winding,
     p.closed,
     p.convex,
   )
@@ -52,8 +46,8 @@ proc dumpPaint(p: ptr PaintObj) =
     p.blur.y,
     p.radius,
     p.feather,
-    p.image,
-    p.colorMap,
+    0,
+    0,
     p.innerColor.r,
     p.innerColor.g,
     p.innerColor.b,

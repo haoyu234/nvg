@@ -42,13 +42,19 @@ type
     evenOdd*: bool
     convex*: bool
 
+  PathWinding* = enum
+    Default
+    Ccw
+    Cw
+
   PathObj* = object
     offset*: int32
     pointCount*: int32
     fill*: Piece[Vec4]
-    ccw*: bool
     closed*: bool
+    restart*: bool
     convex*: bool
+    winding*: PathWinding
     bounds*: Vec4
 
   BackendContextParams* = object
