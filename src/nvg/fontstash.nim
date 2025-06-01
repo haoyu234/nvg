@@ -97,19 +97,19 @@ proc measureText*(
     text: openArray[char],
     size, spacing: float32,
 ): float32 =
-  var prevGlyph = default(ptr FonsGlyphObj)
+  var prevGlyphId = default(GlyphId)
   let scale = size / float32(font.metrics.ascender - font.metrics.descender)
 
   for r in runes(text):
     let glyph = fons.getGlyph(font, uint32(r))
     if glyph.isNil:
-      prevGlyph = default(ptr FonsGlyphObj)
+      prevGlyphId = default(GlyphId)
       continue
 
-    if not prevGlyph.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyph.glyphId, glyph.glyphId)
+    if not prevGlyphId.isNil:
+      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyph.glyphId)
       result = result + scale * float32(adv) + spacing
-    prevGlyph = glyph
+    prevGlyphId = glyph.glyphId
 
     result = result + scale * float32(glyph.advance)
 
@@ -124,7 +124,7 @@ iterator arrange*(
   var
     x = x
     y = y
-    prevGlyph = default(ptr FonsGlyphObj)
+    prevGlyphId = default(GlyphId)
 
   # x align
   if (align and FONS_ALIGN_LEFT) > 0:
@@ -156,13 +156,13 @@ iterator arrange*(
   for r in runes(text):
     let glyph = fons.getGlyph(font, uint32(r))
     if glyph.isNil:
-      prevGlyph = default(ptr FonsGlyphObj)
+      prevGlyphId = default(GlyphId)
       continue
 
-    if not prevGlyph.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyph.glyphId, glyph.glyphId)
+    if not prevGlyphId.isNil:
+      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyph.glyphId)
       x = x + scale * float32(adv) + spacing
-    prevGlyph = glyph
+    prevGlyphId = glyph.glyphId
 
     yield (x, y, glyph)
 
