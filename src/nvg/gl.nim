@@ -1,13 +1,15 @@
-import pkg/vmath
 import pkg/opengl
-import pkg/chroma
 
+import ./color
 import ./core
+import ./glsl
+import ./math
 import ./params
 import ./pieces
 import ./tiles
+import ./vec2
 
-import ./glsl
+import std/math
 
 when defined(NVG_DEBUG_VERTS):
   proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
@@ -373,7 +375,7 @@ proc fillImpl(
         # when defined(NVG_DEBUG_VERTS):
         #   printf("x[%u] y[%u] nedges[%u]\n", ix, iy, fillCount)
         #   for vert in tiles:
-        #     printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+        #     printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
 
         tileBounds[0] = ltrb[0] + float32(ix * tilew)
         tileBounds[1] = ltrb[1] + float32(iy * tileh)
@@ -439,11 +441,11 @@ proc fillImpl(
   when defined(NVG_DEBUG_VERTS):
     printf("nverts: %u\n", uint32(ctx.verts.len))
     for vert in ctx.verts:
-      printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+      printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
 
     printf("nedges: %u\n", uint32(ctx.edges.len))
     for vert in ctx.edges:
-      printf("%.6f %.6f %.6f %.6f\n", vert.x, vert.y, vert.z, vert.w)
+      printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
 
     printf("ncalls: %u\n", uint32(ctx.calls.len))
     for call in ctx.calls:
@@ -468,14 +470,14 @@ proc fillImpl(
         0, # uniform.transform[1],
         0, # uniform.transform[2],
         0, # uniform.transform[3],
-        uniform.innerColor.r,
-        uniform.innerColor.g,
-        uniform.innerColor.b,
-        uniform.innerColor.a,
-        uniform.outerColor.r,
-        uniform.outerColor.g,
-        uniform.outerColor.b,
-        uniform.outerColor.a,
+        uniform.innerColor[0],
+        uniform.innerColor[1],
+        uniform.innerColor[2],
+        uniform.innerColor[3],
+        uniform.outerColor[0],
+        uniform.outerColor[1],
+        uniform.outerColor[2],
+        uniform.outerColor[3],
         uniform.extent[0],
         uniform.extent[1],
         uniform.radius,
@@ -607,7 +609,7 @@ proc flushImpl(ctx: pointer) =
         call = ctx.calls[idx].addr
         lt = ctx.verts[call.triangleOffset]
         rb = ctx.verts[call.triangleOffset + 3]
-        callpix = (rb.x - lt.x) * (rb.y - lt.y)
+        callpix = (rb[0] - lt[0]) * (rb[1] - lt[1])
 
       npix = npix + callpix
       npixedges = float32(call.fillCount) * callpix

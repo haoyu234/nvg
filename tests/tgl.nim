@@ -32,7 +32,7 @@ proc display() =
   glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
   glViewport(0, 0, size.x, size.y)
 
-  ctx.begin(vec2(size), 1)
+  ctx.begin([float32(size.x), float32(size.y)], float32(1))
 
   ctx.renderDemo1()
   ctx.renderDemo2()

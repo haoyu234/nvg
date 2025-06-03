@@ -1,8 +1,7 @@
-import pkg/chroma
-import pkg/vmath
-
+import nvg/color
 import nvg/core
 import nvg/perfgraph
+import nvg/vec2
 
 import std/monotimes
 import std/strformat
@@ -31,7 +30,7 @@ proc renderDemo1*(ctx: ptr ContextObj) =
   ctx.setStrokeColor(color(0, 1, 0, 0.50))
 
   ctx.beginPath()
-  ctx.moveTo(vec2(100, 100))
+  ctx.moveTo([float32(100), 100])
 
   ctx.arc(vec2(250, 170), 20, 40, 50, true)
   ctx.arc(vec2(250, 170), 20, 40, 50, false)
@@ -60,7 +59,7 @@ proc renderDemo2*(ctx: ptr ContextObj) =
     for baseline in BaselineAlignment:
       ctx.setTextAlign(align)
       ctx.setTextBaseline(baseline)
-      ctx.text("123456790", vec2(float32(100), float32(y * 20 + 100)))
+      ctx.text("123456790", vec2(100, float32(y * 20 + 100)))
       ctx.fill()
 
       inc y, 1

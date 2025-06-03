@@ -1,6 +1,5 @@
-import pkg/vmath
-
 import nvg/core
+import nvg/math
 import nvg/params
 import nvg/pieces
 

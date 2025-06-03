@@ -1,6 +1,6 @@
-import pkg/vmath
-
+import ./math
 import ./pieces
+import ./vec2
 
 const N = uint32(16)
 

@@ -1,7 +1,7 @@
-import pkg/chroma
-import pkg/vmath
-
+import ./color
 import ./core
+import ./math
+import ./vec2
 
 import std/times
 import std/strformat
@@ -47,19 +47,19 @@ proc renderGraph*(
 
   ctx.save()
   ctx.beginPath()
-  ctx.rect(vec4(pos.x, pos.y, w, h))
+  ctx.rectXYWH(vec4(pos[0], pos[1], w, h))
   ctx.setFillColor(color(0, 0, 0, 0.75))
   ctx.fill()
 
   ctx.beginPath()
-  ctx.moveTo(vec2(pos.x, pos.y + h))
+  ctx.moveTo(vec2(pos[0], pos[1] + h))
 
   template lineTo(MAX: static[float32]) =
     if v > MAX:
       v = MAX
 
-    vx = pos.x + float32(idx) / float32(GRAPH_HISTORY_COUNT - 1) * w
-    vy = pos.y + h - (v / MAX * h)
+    vx = pos[0] + float32(idx) / float32(GRAPH_HISTORY_COUNT - 1) * w
+    vy = pos[1] + h - (v / MAX * h)
 
     ctx.lineTo(vec2(vx, vy))
 
@@ -89,7 +89,7 @@ proc renderGraph*(
 
       lineTo(float32(100))
 
-  ctx.lineTo(vec2(pos.x + w, pos.y + h))
+  ctx.lineTo(vec2(pos[0] + w, pos[1] + h))
   ctx.setFillColor(color(1, 0.75, 0, 0.5))
   ctx.fill()
 
@@ -105,18 +105,18 @@ proc renderGraph*(
 
   case style
   of PERF_GRAPH_RENDER_FPS:
-    ctx.text(fmt"{1 / v:.2f} FPS", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.text(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fill()
     ctx.setFontSize(30)
     ctx.setFillColor(color(0.58, 0.25, 1, 0.9))
     ctx.setTextBaseline(BottomBaseline)
-    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos.x + w - 3, pos.y + h - 1))
+    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
     ctx.fill()
   of PERF_GRAPH_RENDER_PERCENT:
-    ctx.text(fmt"{v:.1f} %", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.text(fmt"{v:.1f} %", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fill()
   of PERF_GRAPH_RENDER_MS:
-    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos.x + w - 3, pos.y + 1))
+    ctx.text(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fill()
 
   ctx.restore()

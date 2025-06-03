@@ -1,13 +1,13 @@
-import pkg/chroma
-import pkg/vmath
-
-import std/algorithm
-import std/math
-
+import ./color
 import ./fontstash
+import ./math
 import ./opentype
 import ./params
 import ./pieces
+import ./vec2
+
+import std/algorithm
+import std/math
 
 when defined(NVG_DEBUG_CORE):
   proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
@@ -158,7 +158,7 @@ proc reset(ctx: ptr ContextObj) =
   state.miterLimit = 10
   state.lineCap = ButtCap
   state.lineJoin = MiterJoin
-  state.dashArray.setLenUninit(0)
+  state.dashArray.setLen(0)
   state.dashOffset = 0
   state.globalAlpha = 1
   state.transform = mat3()
@@ -275,13 +275,13 @@ proc translate*(ctx: ptr ContextObj, vec: Vec2) =
   let state = ctx.lastState
   assert (not state.isNil)
 
-  state.transform = state.transform * translate(vec)
+  state.transform = translate(state.transform, vec)
 
 proc rotate*(ctx: ptr ContextObj, angle: float32) =
   let state = ctx.lastState
   assert (not state.isNil)
 
-  state.transform = state.transform * rotate(angle)
+  state.transform = rotate(state.transform, angle)
 
 # proc skewX*(ctx: ptr ContextObj, angle: float32) =
 #   discard
@@ -293,7 +293,7 @@ proc scale*(ctx: ptr ContextObj, scale: Vec2) =
   let state = ctx.lastState
   assert (not state.isNil)
 
-  state.transform = state.transform * scale(scale)
+  state.transform = scale(state.transform, scale)
 
 proc setFillRule*(ctx: ptr ContextObj, fillRule: FillRule) =
   let state = ctx.lastState
@@ -370,12 +370,12 @@ proc appendCommands(ctx: ptr ContextObj, values: openArray[float32]) =
   let state = ctx.lastState
 
   if values.len >= 3:
-    ctx.commandXY.x = values[values.len - 2]
-    ctx.commandXY.y = values[values.len - 1]
+    ctx.commandXY[0] = values[values.len - 2]
+    ctx.commandXY[1] = values[values.len - 1]
 
   when defined(NVG_DEBUG_CORE):
     printf("line[%u] appendCommands %u cmd[%u]\n", 0, values.len, uint32(values[0]))
-    printf("commandXY %.6f %.6f\n", ctx.commandXY.x, ctx.commandXY.y)
+    printf("commandXY %.6f %.6f\n", ctx.commandXY[0], ctx.commandXY[1])
 
     for v in values:
       printf("_ %.6f\n", v)
@@ -387,8 +387,8 @@ proc appendCommands(ctx: ptr ContextObj, values: openArray[float32]) =
   ctx.commands.add(values)
 
   template modify(pos: Vec2) =
-    ctx.commands[offset + i] = pos.x
-    ctx.commands[offset + i + 1] = pos.y
+    ctx.commands[offset + i] = pos[0]
+    ctx.commands[offset + i + 1] = pos[1]
     inc i, 2
 
   while i < values.len:
@@ -419,21 +419,40 @@ proc beginPath*(ctx: ptr ContextObj) =
   ctx.commands.setLenUninit(0)
   c.clear()
 
-proc rect*(ctx: ptr ContextObj, rect: Vec4) =
+proc rectXYWH*(ctx: ptr ContextObj, rect: Vec4) =
   ctx.appendCommands(
     [
       float32(Command.MOVE),
-      rect.x,
-      rect.y,
+      rect[0],
+      rect[1],
       float32(Command.LINE),
-      rect.x,
-      rect.y + rect.w,
+      rect[0],
+      rect[1] + rect[3],
       float32(Command.LINE),
-      rect.x + rect.z,
-      rect.y + rect.w,
+      rect[0] + rect[2],
+      rect[1] + rect[3],
       float32(Command.LINE),
-      rect.x + rect.z,
-      rect.y,
+      rect[0] + rect[2],
+      rect[1],
+      float32(Command.CLOSE),
+    ]
+  )
+
+proc rectLTRB*(ctx: ptr ContextObj, rect: Vec4) =
+  ctx.appendCommands(
+    [
+      float32(Command.MOVE),
+      rect[0],
+      rect[1],
+      float32(Command.LINE),
+      rect[0],
+      rect[3],
+      float32(Command.LINE),
+      rect[2],
+      rect[3],
+      float32(Command.LINE),
+      rect[2],
+      rect[1],
       float32(Command.CLOSE),
     ]
   )
@@ -489,8 +508,8 @@ proc arc*(ctx: ptr ContextObj, cp: Vec2, r, a0, a1: float32, ccw: bool) =
       a = a0 + da * float32(i) / float32(ndivs)
       dx = cos(a)
       dy = sin(a)
-      x = cp.x + dx * r
-      y = cp.y + dy * r
+      x = cp[0] + dx * r
+      y = cp[1] + dy * r
       tanx = -dy * r * kappa
       tany = dx * r * kappa
 
@@ -531,36 +550,36 @@ proc ellipse*(ctx: ptr ContextObj, c: Vec2, rx, ry: float32) =
   ctx.appendCommands(
     [
       float32(Command.MOVE),
-      c.x - rx,
-      c.y,
+      c[0] - rx,
+      c[1],
       float32(Command.BEZIER),
-      c.x - rx,
-      c.y + ry * NVG_KAPPA90,
-      c.x - rx * NVG_KAPPA90,
-      c.y + ry,
-      c.x,
-      c.y + ry,
+      c[0] - rx,
+      c[1] + ry * NVG_KAPPA90,
+      c[0] - rx * NVG_KAPPA90,
+      c[1] + ry,
+      c[0],
+      c[1] + ry,
       float32(Command.BEZIER),
-      c.x + rx * NVG_KAPPA90,
-      c.y + ry,
-      c.x + rx,
-      c.y + ry * NVG_KAPPA90,
-      c.x + rx,
-      c.y,
+      c[0] + rx * NVG_KAPPA90,
+      c[1] + ry,
+      c[0] + rx,
+      c[1] + ry * NVG_KAPPA90,
+      c[0] + rx,
+      c[1],
       float32(Command.BEZIER),
-      c.x + rx,
-      c.y - ry * NVG_KAPPA90,
-      c.x + rx * NVG_KAPPA90,
-      c.y - ry,
-      c.x,
-      c.y - ry,
+      c[0] + rx,
+      c[1] - ry * NVG_KAPPA90,
+      c[0] + rx * NVG_KAPPA90,
+      c[1] - ry,
+      c[0],
+      c[1] - ry,
       float32(Command.BEZIER),
-      c.x - rx * NVG_KAPPA90,
-      c.y - ry,
-      c.x - rx,
-      c.y - ry * NVG_KAPPA90,
-      c.x - rx,
-      c.y,
+      c[0] - rx * NVG_KAPPA90,
+      c[1] - ry,
+      c[0] - rx,
+      c[1] - ry * NVG_KAPPA90,
+      c[0] - rx,
+      c[1],
       float32(Command.CLOSE),
     ]
   )
@@ -569,13 +588,15 @@ proc circle*(ctx: ptr ContextObj, c: Vec2, r: float32) =
   ctx.ellipse(c, r, r)
 
 proc moveTo*(ctx: ptr ContextObj, pos: Vec2) =
-  ctx.appendCommands([float32(Command.MOVE), pos.x, pos.y])
+  ctx.appendCommands([float32(Command.MOVE), pos[0], pos[1]])
 
 proc lineTo*(ctx: ptr ContextObj, pos: Vec2) =
-  ctx.appendCommands([float32(Command.LINE), pos.x, pos.y])
+  ctx.appendCommands([float32(Command.LINE), pos[0], pos[1]])
 
 proc bezierTo*(ctx: ptr ContextObj, cp1, cp2, to: Vec2) =
-  ctx.appendCommands([float32(Command.BEZIER), cp1.x, cp1.y, cp2.x, cp2.y, to.x, to.y])
+  ctx.appendCommands(
+    [float32(Command.BEZIER), cp1[0], cp1[1], cp2[0], cp2[1], to[0], to[1]]
+  )
 
 proc quadCurveTo*(ctx: ptr ContextObj, cp, to: Vec2) =
   const s = float32(2) / 3
@@ -584,17 +605,14 @@ proc quadCurveTo*(ctx: ptr ContextObj, cp, to: Vec2) =
   ctx.appendCommands(
     [
       float32(Command.BEZIER),
-      pos.x + s * (cp.x - pos.x),
-      pos.y + s * (cp.y - pos.y),
-      to.x + s * (cp.x - to.x),
-      to.y + s * (cp.y - to.y),
-      to.x,
-      to.y,
+      pos[0] + s * (cp[0] - pos[0]),
+      pos[1] + s * (cp[1] - pos[1]),
+      to[0] + s * (cp[0] - to[0]),
+      to[1] + s * (cp[1] - to[1]),
+      to[0],
+      to[1],
     ]
   )
-
-proc cross(p1, p2: Vec2): float32 {.inline, raises: [].} =
-  p2.x * p1.y - p1.x * p2.y
 
 proc distSegment(p1, p2, p3: Vec2): float32 {.inline, raises: [].} =
   let
@@ -603,14 +621,14 @@ proc distSegment(p1, p2, p3: Vec2): float32 {.inline, raises: [].} =
 
   var
     d = v32.lengthSq
-    t = v32.x * v12.x + v32.y * v12.y
+    t = v32[0] * v12[0] + v32[1] * v12[1]
 
   if d > 0:
     t = t / d
 
   t = clamp(t, 0, 1)
 
-  lengthSq(p2 + t * v32 - p1)
+  lengthSq(p2 + v32 * t - p1)
 
 proc equals(a, b: Vec2, distTolSq: float32): bool {.inline.} =
   lengthSq(b - a) < distTolSq
@@ -641,20 +659,20 @@ proc arcTo*(ctx: ptr ContextObj, a, b: Vec2, r: float32) =
     a1 = default(float32)
     ccw = false
 
-  if cross(d0, d1) > 0:
-    cpx = a.x + d0.x * d + d0.y * r
-    cpy = a.y + d0.y * d - d0.x * r
-    a0 = arctan2(d0.x, -d0.y)
-    a1 = arctan2(-d1.x, d1.y)
+  if cross(d1, d0) > 0:
+    cpx = a[0] + d0[0] * d + d0[1] * r
+    cpy = a[1] + d0[1] * d - d0[0] * r
+    a0 = arctan2(d0[0], -d0[1])
+    a1 = arctan2(-d1[0], d1[1])
     ccw = false
   else:
-    cpx = a.x + d0.x * d - d0.y * r
-    cpy = a.x + d0.y * d + d0.x * r
-    a0 = arctan2(-d0.x, d0.y)
-    a1 = arctan2(d1.x, -d1.y)
+    cpx = a[0] + d0[0] * d - d0[1] * r
+    cpy = a[0] + d0[1] * d + d0[0] * r
+    a0 = arctan2(-d0[0], d0[1])
+    a1 = arctan2(d1[0], -d1[1])
     ccw = true
 
-  ctx.arc(vec2(cpx, cpy), r, a0, a1, ccw)
+  ctx.arc([cpx, cpy], r, a0, a1, ccw)
 
 proc closePath*(ctx: ptr ContextObj) =
   const cmds = [float32(Command.CLOSE)]
@@ -679,8 +697,8 @@ proc bezier(
 ) =
   let
     d = p4 - p1
-    d2 = cross(p2 - p4, d)
-    d3 = cross(p3 - p4, d)
+    d2 = cross(d, p2 - p4)
+    d3 = cross(d, p3 - p4)
     d4 = d2 + d3
 
   if d4 * d4 < tessTol * d.lengthSq or level >= 9:
@@ -706,7 +724,7 @@ proc area(pts: openArray[Vec2]): float32 {.inline.} =
       b = pts[i - 1]
       c = pts[i]
 
-    r = r + cross(b - a, c - a)
+    r = r + cross(c - a, b - a)
   r
 
 proc flattenPaths(ctx: ptr ContextObj) =
@@ -782,7 +800,7 @@ proc flattenPaths(ctx: ptr ContextObj) =
   when defined(NVG_DEBUG_CORE):
     printf("BEGIN flattenPaths\n")
     for v in c.points:
-      printf("__ %.6f %.6f\n", v.x, v.y)
+      printf("__ %.6f %.6f\n", v[0], v[1])
     printf("END flattenPaths\n")
 
   for idx in 0 ..< c.paths.len:
@@ -824,26 +842,26 @@ proc updateBounds(c: ptr PathCacheObj, paths: openArray[PathObj], distTolSq: flo
       printf("updateBounds %u\n", idx)
 
     for v in p.fill.toOpenArray:
-      p.bounds.x = min(p.bounds.x, v.z)
-      p.bounds.y = min(p.bounds.y, v.w)
-      p.bounds.z = max(p.bounds.z, v.z)
-      p.bounds.w = max(p.bounds.w, v.w)
+      p.bounds[0] = min(p.bounds[0], v[2])
+      p.bounds[1] = min(p.bounds[1], v[3])
+      p.bounds[2] = max(p.bounds[2], v[2])
+      p.bounds[3] = max(p.bounds[3], v[3])
 
       when defined(NVG_DEBUG_CORE):
         printf(
           "x[%.6f] y[%.6f] %.6f %.6f %.6f %.6f\n",
-          v.z,
-          v.w,
+          v[2],
+          v[3],
           p.bounds[0],
           p.bounds[1],
           p.bounds[2],
           p.bounds[3],
         )
 
-    c.bounds.x = min(p.bounds.x, c.bounds.x)
-    c.bounds.y = min(p.bounds.y, c.bounds.y)
-    c.bounds.z = max(p.bounds.z, c.bounds.z)
-    c.bounds.w = max(p.bounds.w, c.bounds.w)
+    c.bounds[0] = min(p.bounds[0], c.bounds[0])
+    c.bounds[1] = min(p.bounds[1], c.bounds[1])
+    c.bounds[2] = max(p.bounds[2], c.bounds[2])
+    c.bounds[3] = max(p.bounds[3], c.bounds[3])
 
     when defined(NVG_DEBUG_CORE):
       printf(
@@ -873,8 +891,8 @@ proc arcJoin(
     let
       u = float32(i) / float32(n - 1)
       a = a0 + u * (a1 - a0)
-      rx = c.x + cos(a) * w
-      ry = c.y + sin(a) * w
+      rx = c[0] + cos(a) * w
+      ry = c[1] + sin(a) * w
 
     if i > 0:
       if dir < 0:
@@ -926,16 +944,16 @@ proc expandStroke(
   template incp(v1, v2) =
     inc n, 1
     when defined(NVG_DEBUG_CORE):
-      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1.x, v1.y, v2.x, v2.y)
-    memory[l] = vec4(v1.x, v1.y, v2.x, v2.y)
+      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1[0], v1[1], v2[0], v2[1])
+    memory[l] = vec4(v1[0], v1[1], v2[0], v2[1])
     inc l
 
   template decp(v1, v2) =
     inc n, 1
     when defined(NVG_DEBUG_CORE):
-      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1.x, v1.y, v2.x, v2.y)
+      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1[0], v1[1], v2[0], v2[1])
     dec r
-    memory[r] = vec4(v1.x, v1.y, v2.x, v2.y)
+    memory[r] = vec4(v1[0], v1[1], v2[0], v2[1])
 
   for idx in 0 ..< c.paths.len:
     let p = c.paths[idx].addr
@@ -965,8 +983,8 @@ proc expandStroke(
       p0 = c.points[i].addr
       p1 = tmp.addr
 
-      tmp.x = p0[].x + w / float32(256)
-      tmp.y = p0[].y
+      tmp[0] = p0[][0] + w / float32(256)
+      tmp[1] = p0[][1]
 
       inc i, 2
     else:
@@ -979,7 +997,7 @@ proc expandStroke(
 
     var
       d01 = p1[] - p0[]
-      n01 = normalize(vec2(-d01.y, d01.x))
+      n01 = normalize(vec2(-d01[1], d01[0]))
 
       lp = default(Vec2)
       rp = default(Vec2)
@@ -987,7 +1005,7 @@ proc expandStroke(
       l00 = default(Vec2)
       r00 = default(Vec2)
 
-      wn01 = w * n01
+      wn01 = n01 * w
 
     if not closed:
       lp = p0[] + wn01
@@ -997,9 +1015,9 @@ proc expandStroke(
         incp(rp, lp)
       elif lineCap == SquareCap:
         let
-          cd = vec2(wn01.y, -wn01.x)
-          v1 = vec2(rp.x - cd.x, rp.y - cd.y)
-          v2 = vec2(lp.x - cd.x, lp.y - cd.y)
+          cd = vec2(wn01[1], -wn01[0])
+          v1 = vec2(rp[0] - cd[0], rp[1] - cd[1])
+          v2 = vec2(lp[0] - cd[0], lp[1] - cd[1])
 
         incp(rp, v1)
         incp(v1, v2)
@@ -1012,12 +1030,12 @@ proc expandStroke(
 
       let
         d12 = p2[] - p1[]
-        n12 = normalize(vec2(-d12.y, d12.x))
-        wn12 = w * n12
+        n12 = normalize(vec2(-d12[1], d12[0]))
+        wn12 = n12 * w
         miterDenom = max(1e-6f, 1 + dot(n01, n12))
         e = (n01 + n12) / miterDenom
-        we = w * e
-        mLenSq = w * w * e.lengthSq
+        we = e * w
+        mLenSq = e.lengthSq * w * w
         l01Sq = d01.lengthSq
         l12Sq = d12.lengthSq
 
@@ -1030,7 +1048,7 @@ proc expandStroke(
         outerJoin = if lineJoin == RoundJoin: RoundJoin else: join
         innerJoin = if l01Sq < mLenSq or l12Sq < mLenSq: BevelJoin else: join
 
-        left = cross(d12, d01) > 0
+        left = cross(d01, d12) > 0
         lJoin = if left: innerJoin else: outerJoin
         rJoin = if left: outerJoin else: innerJoin
 
@@ -1073,16 +1091,16 @@ proc expandStroke(
         printf(
           "ljoin[%u] wn01[%.6f, %.6f] wn12[%.6f, %.6f] p1[%.6f, %.6f]\n",
           lJoin == MiterJoin,
-          wn01.x,
-          wn01.y,
-          wn12.x,
-          wn12.y,
-          p1[].x,
-          p1[].y,
+          wn01[0],
+          wn01[1],
+          wn12[0],
+          wn12[1],
+          p1[][0],
+          p1[][1],
         )
 
-        printf("l01[%.6f, %.6f] l12[%.6f, %.6f]\n", l01.x, l01.y, l12.x, l12.y)
-        printf("%.6f, %.6f\n", p1[].x + w * n01.x, p1[].y + w * n01.y)
+        printf("l01[%.6f, %.6f] l12[%.6f, %.6f]\n", l01[0], l01[1], l12[0], l12[1])
+        printf("%.6f, %.6f\n", p1[][0] + w * n01[0], p1[][1] + w * n01[1])
 
       if i > p.offset:
         incp(lp, l01)
@@ -1124,7 +1142,7 @@ proc expandStroke(
       d01 = d12
       n01 = n12
 
-      wn01 = w * n01
+      wn01 = n01 * w
 
     if not closed:
       let
@@ -1134,14 +1152,14 @@ proc expandStroke(
       when defined(NVG_DEBUG_CORE):
         printf(
           "x[%.6f] y[%.6f] n01x[%.6f] n01y[%.6f] l01x[%.6f] l01y[%.6f] r01x[%.6f] r01y[%.6f] w[%.6f]\n",
-          p1[].x,
-          p1[].y,
-          n01.x,
-          n01.y,
-          l01.x,
-          l01.y,
-          r01.x,
-          r01.y,
+          p1[][0],
+          p1[][1],
+          n01[0],
+          n01[1],
+          l01[0],
+          l01[1],
+          r01[0],
+          r01[1],
           w,
         )
 
@@ -1154,9 +1172,9 @@ proc expandStroke(
         incp(lp, rp)
       elif lineCap == SquareCap:
         let
-          cd = vec2(wn01.y, -wn01.x)
-          v1 = vec2(lp.x + cd.x, lp.y + cd.y)
-          v2 = vec2(rp.x + cd.x, rp.y + cd.y)
+          cd = vec2(wn01[1], -wn01[0])
+          v1 = vec2(lp[0] + cd[0], lp[1] + cd[1])
+          v2 = vec2(rp[0] + cd[0], rp[1] + cd[1])
 
         incp(lp, v1)
         incp(v1, v2)
@@ -1181,7 +1199,7 @@ proc expandStroke(
       printf("nfill[%u]\n", p.fill.len)
       printf("---->\n")
       for v in p.fill.toOpenArray:
-        printf("%.6f %.6f %.6f %.6f\n", v.x, v.y, v.z, v.w)
+        printf("%.6f %.6f %.6f %.6f\n", v[0], v[1], v[2], v[3])
       printf("---->\n")
 
     l = l2
@@ -1299,13 +1317,13 @@ proc expandFill(ctx: ptr ContextObj) =
           "line[%u] %u %.6f %.6f %.6f %.6f\n",
           0,
           succ(pos),
-          p0[].x,
-          p0[].y,
-          p1[].x,
-          p1[].y,
+          p0[][0],
+          p0[][1],
+          p1[][0],
+          p1[][1],
         )
 
-      memory[pos] = vec4(p0[].x, p0[].y, p1[].x, p1[].y)
+      memory[pos] = vec4(p0[][0], p0[][1], p1[][0], p1[][1])
 
       inc i, 1
       inc pos, 1
@@ -1345,14 +1363,8 @@ proc fill*(ctx: ptr ContextObj) =
 
 proc getAverageScale(t: Mat3): float32 =
   let
-    t0 = t[0, 0]
-    t1 = t[0, 1]
-    t2 = t[1, 0]
-    t3 = t[1, 1]
-
-  let
-    sx = sqrt(t0 * t0 + t2 * t2)
-    sy = sqrt(t1 * t1 + t3 * t3)
+    sx = sqrt(t[0] * t[0] + t[3] * t[3])
+    sy = sqrt(t[1] * t[1] + t[4] * t[4])
 
   (sx + sy) * 0.5
 
@@ -1364,8 +1376,8 @@ proc stroke*(ctx: ptr ContextObj) =
     c = ctx.cache.addr
 
   var paint = state.stroke
-  paint.innerColor.a = state.globalAlpha * paint.innerColor.a
-  paint.outerColor.a = state.globalAlpha * paint.outerColor.a
+  paint.innerColor[3] = state.globalAlpha * paint.innerColor[3]
+  paint.outerColor[3] = state.globalAlpha * paint.outerColor[3]
 
   when defined(NVG_DEBUG_CORE):
     printf("stroke begin\n")
@@ -1447,7 +1459,7 @@ proc text*(ctx: ptr ContextObj, text: openArray[char], pos: Vec2) =
     )
 
   for x, y, glyph in ctx.fons.arrange(
-    font, text, pos.x, pos.y, state.fonsAlign, state.fontSize, state.letterSpacing
+    font, text, pos[0], pos[1], state.fonsAlign, state.fontSize, state.letterSpacing
   ):
     let points = ctx.fons.getGlyphShape(glyph)
 

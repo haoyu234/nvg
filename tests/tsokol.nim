@@ -1,4 +1,3 @@
-import pkg/vmath
 import pkg/sokol/app
 import pkg/sokol/gfx
 import pkg/sokol/glue
@@ -6,6 +5,7 @@ import pkg/sokol/log
 
 import nvg/core
 import nvg/sokol
+import nvg/vec2
 
 import std/strformat
 

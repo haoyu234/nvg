@@ -1,7 +1,6 @@
-import pkg/chroma
-import pkg/vmath
-
+import ./color
 import ./pieces
+import ./vec2
 
 type
   PaintObj* = object

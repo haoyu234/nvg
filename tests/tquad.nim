@@ -1,8 +1,7 @@
 import unittest
 
-import pkg/vmath
-
 import nvg/core
+import nvg/vec2
 
 when defined(NVG_DUMP):
   import ./dump
