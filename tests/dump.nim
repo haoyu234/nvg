@@ -1,4 +1,4 @@
-import nvg/core
+import nvg/context
 import nvg/math
 import nvg/params
 import nvg/pieces
@@ -11,7 +11,7 @@ proc createImpl(): pointer =
 proc destroyImpl(ctx: pointer) =
   discard
 
-proc dumpPath(i: int, p: ptr PathObj) =
+proc dumpPath(i: int, p: ptr FlattenedPath) =
   printf(
     "-%03u offset[%u] count[%u] fill[%u] ccw[%u] closed[%u] convex[%u]\n",
     i + 1,
@@ -26,7 +26,7 @@ proc dumpPath(i: int, p: ptr PathObj) =
   for v in p.fill.toOpenArray:
     printf("-- %.6f %.6f %.6f %.6f\n", v.x, v.y, v.z, v.w)
 
-proc dumpPaint(p: ptr PaintObj) =
+proc dumpPaint(p: Paint) =
   let t = cast[ptr UncheckedArray[float32]](p.transform.addr)
   printf(
     "transform[%.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f]\nextent[%.6f %.6f] blur[%.6f %.6f] radius[%.6f] feather[%.6f] image[%u] colorMap[%u]\ninnerColor[%.6f %.6f %.6f %.6f]\nouterColor[%.6f %.6f %.6f %.6f] outerColor[%.6f %.6f %.6f %.6f]\n",
@@ -63,11 +63,11 @@ proc dumpPaint(p: ptr PaintObj) =
 
 proc fillImpl(
     ctx: pointer,
-    paint: ptr PaintObj,
+    paint: Paint,
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[PathObj],
+    paths: openArray[FlattenedPath],
 ) =
   printf("bounds[%.6f %.6f %.6f %.6f]\n", bounds[0], bounds[1], bounds[2], bounds[3])
   dumpPaint(paint)
@@ -78,7 +78,7 @@ proc fillImpl(
 
 proc trianglesImpl(
     ctx: pointer,
-    paint: ptr PaintObj,
+    paint: Paint,
     compositeOperation: CompositeOperation,
     verts: openArray[Vec4],
 ) =
@@ -93,7 +93,7 @@ proc cancelImpl(ctx: pointer) =
 proc flushImpl(ctx: pointer) =
   discard
 
-proc newContext*(): ptr ContextObj =
+proc newContext*(): ptr Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,

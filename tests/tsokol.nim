@@ -3,7 +3,7 @@ import pkg/sokol/gfx
 import pkg/sokol/glue
 import pkg/sokol/log
 
-import nvg/core
+import nvg/context
 import nvg/sokol
 import nvg/vec2
 
@@ -20,7 +20,7 @@ const action = PassAction(
   ]
 )
 
-var ctx = default(ptr ContextObj)
+var ctx = default(ptr Context)
 
 proc frame() {.cdecl.} =
   frameStart()
@@ -31,7 +31,6 @@ proc frame() {.cdecl.} =
 
   ctx.renderDemo1()
   ctx.renderDemo2()
-
   ctx.renderPerfGraph()
 
   ctx.flush()
@@ -64,7 +63,7 @@ proc init() {.cdecl.} =
 
   ctx = newContext()
 
-  ctx.initDemo("sokol")
+  ctx.initDemo()
 
 proc cleanup() {.cdecl.} =
   shutdown()

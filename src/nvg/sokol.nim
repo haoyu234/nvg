@@ -1,6 +1,7 @@
 import pkg/sokol/gfx except Color
 
 import ./color
+import ./context
 import ./core
 import ./glsl
 import ./math
@@ -130,7 +131,7 @@ proc toFillType(pathFlags: PathFlags): uint32 =
     result = result or (1 shl 1)
 
 proc toUniform(
-    ctx: ptr OpenglBackendContextObj, paint: ptr PaintObj, pathFlags: PathFlags
+    ctx: ptr OpenglBackendContextObj, paint: Paint, pathFlags: PathFlags
 ): FragmentUniformObj {.inline.} =
   var
     shaderType = FillSolid
@@ -162,11 +163,11 @@ proc reserve*[T](s: var seq[T], n: Natural) {.inline.} =
 
 proc fillImpl(
     ctx: pointer,
-    paint: ptr PaintObj,
+    paint: Paint,
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[PathObj],
+    paths: openArray[FlattenedPath],
 ) =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
@@ -886,7 +887,7 @@ proc flushImpl(ctx: pointer) =
 
       draw(int32(call.triangleOffset), int32(call.triangleCount), 1)
 
-proc newContext*(): ptr ContextObj =
+proc newContext*(): ptr Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,

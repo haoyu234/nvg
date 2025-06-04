@@ -1,7 +1,7 @@
 import pkg/opengl
 import pkg/windy
 
-import nvg/core
+import nvg/context
 import nvg/gl
 
 import ./demo
@@ -18,10 +18,9 @@ window.makeContextCurrent()
 loadExtensions()
 
 let
-  numRun = 10000
   ctx = newContext()
 
-ctx.initDemo("tgl")
+ctx.initDemo()
 
 proc display() =
   frameStart()

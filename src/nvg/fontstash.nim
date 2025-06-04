@@ -39,6 +39,9 @@ type
     flags: uint32 = FONS_ZERO_TOP_LEFT
     fonts: seq[ptr FonsFontObj]
 
+proc isNil*(fontId: FonsFontId): bool {.inline.} =
+  uint32(fontId) == 0
+
 proc loadFontFromMemory*(fons: var FonsStashObj, data: sink seq[byte]): FonsFontId =
   let
     p = create(FonsFontObj)

@@ -8,7 +8,7 @@ srcDir = "src"
 
 # Dependencies
 
-requires "nim >= 2.3.1"
+requires "nim >= 2.2.0"
 requires "opengl >= 1.2.9"
 
 requires "sokol >= 0.6.0"

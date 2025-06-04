@@ -1,3 +1,4 @@
+import ./context
 import ./core
 import ./params
 import ./vec2
@@ -10,17 +11,17 @@ proc destroyImpl(ctx: pointer) =
 
 proc fillImpl(
     ctx: pointer,
-    paint: ptr PaintObj,
+    paint: Paint,
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[PathObj],
+    paths: openArray[FlattenedPath],
 ) =
   discard
 
 proc trianglesImpl(
     ctx: pointer,
-    paint: ptr PaintObj,
+    paint: Paint,
     compositeOperation: CompositeOperation,
     verts: openArray[Vec4],
 ) =
@@ -35,7 +36,7 @@ proc cancelImpl(ctx: pointer) =
 proc flushImpl(ctx: pointer) =
   discard
 
-proc newContext*(): ptr ContextObj =
+proc newContext*(): ptr Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,
