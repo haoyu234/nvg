@@ -533,8 +533,8 @@ proc createProgram(vs, fs: cstring): ShaderProgramObj =
   result.fsShader = fsShader
   result.vsShader = vsShader
   result.viewLoc = glGetUniformLocation(program, "view")
-  result.texLoc = glGetUniformLocation(program, "imageTex")
-  result.edgeTexLoc = glGetUniformLocation(program, "edgeTex")
+  result.texLoc = glGetUniformLocation(program, "imageTex_smp1")
+  result.edgeTexLoc = glGetUniformLocation(program, "edgeTex_smp2")
   result.fillLoc = glGetUniformLocation(program, "fill")
   result.paintLoc = glGetUniformLocation(program, "paint")
 
@@ -624,6 +624,7 @@ proc flushImpl(ctx: pointer) =
     glBindVertexArray(ctx.vertArr)
 
   glBindBuffer(GL_ARRAY_BUFFER, ctx.vertBuf)
+
   glBufferData(
     GL_ARRAY_BUFFER,
     GLsizeiptr(ctx.verts.len * sizeof(Vec4)),
@@ -669,8 +670,8 @@ proc flushImpl(ctx: pointer) =
   glUniform4fv(
     ctx.shaderProgram.viewLoc, 1, cast[ptr GLfloat](ctx.vertexUniform.view.addr)
   )
-  glUniform1i(ctx.shaderProgram.texLoc, 0)
-  glUniform1i(ctx.shaderProgram.edgeTexLoc, 1)
+  glUniform1i(ctx.shaderProgram.texLoc, 1)
+  glUniform1i(ctx.shaderProgram.edgeTexLoc, 0)
 
   for idx in 0 ..< ctx.calls.len:
     let
