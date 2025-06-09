@@ -1,38 +1,44 @@
+import pkg/sdl2
 import pkg/opengl
-import pkg/windy
 
 import nvg/context
 import nvg/gl
 
 import ./demo
 
-let window = newWindow(
-  "Windy Example",
-  ivec2(400, 300),
-  openglVersion = OpenGL4Dot1,
-  msaa = msaa4x,
-  vsync = false,
-)
+discard sdl2.init(INIT_EVERYTHING)
 
-window.makeContextCurrent()
+discard glSetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE.cint)
+discard glSetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4.cint)
+discard glSetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1.cint)
+discard glSetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG.cint)
+
+var
+  window = createWindow("tgl.nim SDL2", 100, 100, 640,480, SDL_WINDOW_SHOWN or SDL_WINDOW_OPENGL)
+  glContext = window.glCreateContext()
+
 loadExtensions()
 
-let
+var
+  evt = sdl2.defaultEvent
+  runGame = true
+
   ctx = newContext()
 
-ctx.initDemo()
+initDemo(ctx)
 
-proc display() =
+while runGame:
+  while pollEvent(evt):
+    if evt.kind == QuitEvent:
+      runGame = false
+      break
+
   frameStart()
-
-  let size = window.size
 
   glClearColor(0.3, 0.3, 0.32, 1)
   glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
-  glViewport(0, 0, size.x, size.y)
 
-  ctx.begin([float32(size.x), float32(size.y)], float32(1))
-
+  ctx.begin([float32(640), float32(480)], float32(1))
   ctx.renderDemo1()
   ctx.renderDemo2()
   ctx.renderPerfGraph()
@@ -41,11 +47,6 @@ proc display() =
 
   frameEnd()
 
-  window.swapBuffers()
+  window.glSwapWindow()
 
-while not window.closeRequested:
-  display()
-
-  pollEvents()
-
-dump()
+destroy window
