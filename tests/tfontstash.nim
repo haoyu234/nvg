@@ -4,7 +4,7 @@ const FONT = staticRead("../msyh.ttf")
 
 proc main() =
   var
-    fons = default(FonsStashObj)
+    fons = FonsStash()
     fontId = fons.loadFontFromMemory(cast[seq[byte]](FONT))
     text = "你好世界"
 

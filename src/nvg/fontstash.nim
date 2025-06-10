@@ -21,30 +21,32 @@ type
   FonsQuad* = object
     x1*, y1*, x2*, y2*: float32
 
-  FonsGlyphObj* = object
+  FonsGlyph* = object
     fontId*: FonsFontId
     unicodeCodepoint*: uint32
     glyphId*: GlyphId
     advance: int32
     shape: seq[GlyphVertex]
 
+  FonsFont* = ref FonsFontObj
   FonsFontObj = object
     fontId: FonsFontId
     openType*: OpenTypeObj
     metrics*: FontMetrics
-    glyphs: Table[uint32, FonsGlyphObj]
+    glyphs: Table[uint32, FonsGlyph]
     data: seq[byte]
 
-  FonsStashObj* = object
+  FonsStash* = ref FonsStashObj
+  FonsStashObj = object
     flags: uint32 = FONS_ZERO_TOP_LEFT
-    fonts: seq[ptr FonsFontObj]
+    fonts: seq[FonsFont]
 
 proc isNil*(fontId: FonsFontId): bool {.inline.} =
   uint32(fontId) == 0
 
-proc loadFontFromMemory*(fons: var FonsStashObj, data: sink seq[byte]): FonsFontId =
+proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FonsFontId =
   let
-    p = create(FonsFontObj)
+    p = FonsFont()
     fontId = FonsFontId(succ(fons.fonts.len))
 
   p.data = move data
@@ -56,12 +58,12 @@ proc loadFontFromMemory*(fons: var FonsStashObj, data: sink seq[byte]): FonsFont
 
   fontId
 
-proc loadFontFromMemory*(fons: var FonsStashObj, data: openArray[byte]): FonsFontId =
+proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FonsFontId =
   let
-    p = create(FonsFontObj)
+    p = FonsFont()
     fontId = FonsFontId(succ(fons.fonts.len))
 
-  p.openType = parseOpenType(p.data, 0)
+  p.openType = parseOpenType(data, 0)
   p.metrics = p.openType.getFontMetrics()
   p.fontId = fontId
 
@@ -69,7 +71,7 @@ proc loadFontFromMemory*(fons: var FonsStashObj, data: openArray[byte]): FonsFon
 
   fontId
 
-proc getFontById*(fons: var FonsStashObj, fontId: FonsFontId): ptr FonsFontObj =
+proc getFontById*(fons: FonsStash, fontId: FonsFontId): FonsFont =
   let n = min(len(fons.fonts), int(fontId))
 
   for idx in 0 ..< n:
@@ -78,14 +80,14 @@ proc getFontById*(fons: var FonsStashObj, fontId: FonsFontId): ptr FonsFontObj =
       return p
 
 proc getGlyph*(
-    fons: var FonsStashObj, font: ptr FonsFontObj, unicodeCodepoint: uint32
-): ptr FonsGlyphObj =
+    fons: FonsStash, font: FonsFont, unicodeCodepoint: uint32
+): ptr FonsGlyph =
   if not font.glyphs.contains(unicodeCodepoint):
     let glyphId = font.openType.getGlyphId(unicodeCodepoint)
     if glyphId.isNil:
       return
 
-    var glyph = default(FonsGlyphObj)
+    var glyph = default(FonsGlyph)
     glyph.fontId = font.fontId
     glyph.unicodeCodepoint = unicodeCodepoint
     glyph.glyphId = glyphId
@@ -95,10 +97,7 @@ proc getGlyph*(
   font.glyphs[unicodeCodepoint].addr
 
 proc measureText*(
-    fons: var FonsStashObj,
-    font: ptr FonsFontObj,
-    text: openArray[char],
-    size, spacing: float32,
+    fons: FonsStash, font: FonsFont, text: openArray[char], size, spacing: float32
 ): float32 =
   var prevGlyphId = default(GlyphId)
   let scale = size / float32(font.metrics.ascender - font.metrics.descender)
@@ -117,13 +116,13 @@ proc measureText*(
     result = result + scale * float32(glyph.advance)
 
 iterator arrange*(
-    fons: var FonsStashObj,
-    font: ptr FonsFontObj,
+    fons: FonsStash,
+    font: FonsFont,
     text: openArray[char],
     x, y: float32,
     align: uint32,
     size, spacing: float32,
-): (float32, float32, ptr FonsGlyphObj) =
+): (float32, float32, ptr FonsGlyph) =
   var
     x = x
     y = y
@@ -171,9 +170,7 @@ iterator arrange*(
 
     x = x + scale * float32(glyph.advance)
 
-proc getGlyphShape*(
-    fons: var FonsStashObj, glyph: ptr FonsGlyphObj
-): lent seq[GlyphVertex] =
+proc getGlyphShape*(fons: FonsStash, glyph: ptr FonsGlyph): lent seq[GlyphVertex] =
   if glyph.shape.len <= 0:
     let font = fons.getFontById(glyph.fontId)
     if font.isNil:

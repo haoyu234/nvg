@@ -41,7 +41,7 @@ type
     ctx: pointer
     params: BackendContextParams
 
-    fons: FonsStashObj
+    fons*: FonsStash
     cache: CachedPath
 
     tessTol: float32
@@ -80,7 +80,7 @@ type
     # flush texture
     textureDirty: bool
 
-proc reset(ctx: ptr Context) =
+proc resetState(ctx: ptr Context) =
   ctx.fillRule = NonZero
   ctx.fillStyle = color(1, 1, 1, 1)
   ctx.strokeStyle = color(0, 0, 0, 1)
@@ -169,9 +169,7 @@ proc createInternal*(params: BackendContextParams): ptr Context =
   let ctx = create(Context)
   ctx.params = params
   ctx.ctx = params.createImpl()
-  ctx.fons = default(FonsStashObj)
-
-  ctx.reset()
+  ctx.resetState()
 
   setDevicePixelRatio(ctx, 1)
 
@@ -193,9 +191,15 @@ proc getTransform*(ctx: ptr Context): Mat3 =
   ctx.transform
 
 proc loadFontFromMemory*(ctx: ptr Context, data: sink seq[byte]): FontId =
+  if ctx.fons.isNil:
+    ctx.fons = FonsStash()
+
   FontId(ctx.fons.loadFontFromMemory(data))
 
 proc loadFontFromMemory*(ctx: ptr Context, data: openArray[byte]): FontId =
+  if ctx.fons.isNil:
+    ctx.fons = FonsStash()
+
   FontId(ctx.fons.loadFontFromMemory(data))
 
 proc fillPath*(ctx: ptr Context, path: Path) =
@@ -263,7 +267,7 @@ proc strokePath*(ctx: ptr Context, path: Path) =
 
 proc begin*(ctx: ptr Context, view: Vec2, devicePixelRatio: float32) =
   ctx.states.setLen(0)
-  ctx.reset()
+  ctx.resetState()
 
   ctx.setDevicePixelRatio(devicePixelRatio)
 
@@ -294,6 +298,9 @@ proc fonsAlign(ctx: ptr Context): uint32 =
     result = result or FONS_ALIGN_BOTTOM
 
 proc textToPath*(ctx: ptr Context, text: openArray[char], pos: Vec2): Path =
+  if ctx.fons.isNil:
+    return
+
   let font = ctx.fons.getFontById(FonsFontId(ctx.fontId))
   if font.isNil:
     return
