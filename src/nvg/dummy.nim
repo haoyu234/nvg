@@ -15,7 +15,7 @@ proc fillImpl(
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[FlattenedPath],
+    contours: openArray[Contour],
 ) =
   discard
 

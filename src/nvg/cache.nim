@@ -10,33 +10,33 @@ import std/math
 when defined(NVG_DEBUG_CORE):
   proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
 
-type CachedPath* = object
+type Cache* = object
   points: seq[Vec2]
-  paths*: seq[FlattenedPath]
+  contours*: seq[Contour]
   bounds*: Vec4
-  curPath: ptr FlattenedPath
+  curPath: ptr Contour
   storage: seq[Vec4]
 
-proc clear*(c: var CachedPath) {.inline, raises: [].} =
+proc clear*(c: var Cache) {.inline, raises: [].} =
   c.curPath = nil
   c.points.setLen(0)
-  c.paths.setLen(0)
+  c.contours.setLen(0)
 
-proc addPath(c: var CachedPath) {.inline, raises: [].} =
-  let idx = c.paths.len
-  c.paths.setLen(idx + 1)
+proc addPath(c: var Cache) {.inline, raises: [].} =
+  let idx = c.contours.len
+  c.contours.setLen(idx + 1)
 
-  let p = c.paths[idx].addr
+  let p = c.contours[idx].addr
   p.offset = int32(c.points.len)
 
   c.curPath = p
 
-proc addPoint(c: var CachedPath, p: Vec2) {.inline, raises: [].} =
+proc addPoint(c: var Cache, p: Vec2) {.inline, raises: [].} =
   inc c.curPath.pointCount, 1
   c.points.add(p)
 
 proc bezier(
-    c: var CachedPath, p1, p2, p3, p4: Vec2, level: int, tessTol, distTolSq: float32
+    c: var Cache, p1, p2, p3, p4: Vec2, level: int, tessTol, distTolSq: float32
 ) =
   let
     d = p4 - p1
@@ -59,11 +59,11 @@ proc bezier(
     c.bezier(p1, p12, p123, p1234, level + 1, tessTol, distTolSq)
     c.bezier(p1234, p234, p34, p4, level + 1, tessTol, distTolSq)
 
-proc updateBounds(c: var CachedPath, distTolSq: float32) =
+proc updateBounds(c: var Cache, distTolSq: float32) =
   c.bounds = vec4(1e6, 1e6, -1e6, -1e6)
 
-  for idx in 0 ..< c.paths.len:
-    let p = c.paths[idx].addr
+  for idx in 0 ..< c.contours.len:
+    let p = c.contours[idx].addr
 
     p.bounds = vec4(1e6, 1e6, -1e6, -1e6)
 
@@ -101,11 +101,11 @@ proc updateBounds(c: var CachedPath, distTolSq: float32) =
       )
 
 proc flattenPaths*(
-    c: var CachedPath, path: Path, matrix: Mat3, tessTol, distTolSq: float32
+    c: var Cache, path: Path, matrix: Mat3, tessTol, distTolSq: float32
 ) =
-  if c.paths.len > 0:
+  if c.contours.len > 0:
     c.curPath = nil
-    c.paths.setLen(0)
+    c.contours.setLen(0)
 
   for command, vals in path.commands:
     case command
@@ -162,8 +162,8 @@ proc flattenPaths*(
       printf("__ %.6f %.6f\n", v[0], v[1])
     printf("END flattenPaths\n")
 
-  for idx in 0 ..< c.paths.len:
-    let p = c.paths[idx].addr
+  for idx in 0 ..< c.contours.len:
+    let p = c.contours[idx].addr
 
     if p.pointCount <= 1:
       continue
@@ -218,7 +218,7 @@ proc arcJoin(
   pos
 
 proc expandStroke*(
-    c: var CachedPath,
+    c: var Cache,
     lineCap: LineCap,
     lineJoin: LineJoin,
     strokeWidth, miterLimit: float32,
@@ -231,7 +231,7 @@ proc expandStroke*(
 
   let vertCount = block:
     var count = 0
-    for p in c.paths:
+    for p in c.contours:
       if lineJoin == RoundJoin or lineCap == RoundCap:
         inc count, (p.pointCount * (nCap + 2) + 1) * 2
       else:
@@ -265,8 +265,8 @@ proc expandStroke*(
     dec r
     memory[r] = vec4(v1[0], v1[1], v2[0], v2[1])
 
-  for idx in 0 ..< c.paths.len:
-    let p = c.paths[idx].addr
+  for idx in 0 ..< c.contours.len:
+    let p = c.contours[idx].addr
 
     if p.pointCount <= 0:
       continue
@@ -518,11 +518,11 @@ proc expandStroke*(
 
   c.updateBounds(distTolSq)
 
-proc expandFill*(c: var CachedPath, distTolSq: float32) =
+proc expandFill*(c: var Cache, distTolSq: float32) =
   let vertCount = block:
     var count = 0
 
-    for p in c.paths:
+    for p in c.contours:
       inc count, p.pointCount
 
     count
@@ -535,9 +535,9 @@ proc expandFill*(c: var CachedPath, distTolSq: float32) =
   var pos = 0
   let memory = piece(c.storage)
 
-  for idx in 0 ..< c.paths.len:
+  for idx in 0 ..< c.contours.len:
     let
-      p = c.paths[idx].addr
+      p = c.contours[idx].addr
       oldPos = pos
 
     var

@@ -167,7 +167,7 @@ proc fillImpl(
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[FlattenedPath],
+    contours: openArray[Contour],
 ) =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
@@ -175,8 +175,8 @@ proc fillImpl(
     ncalls = 0
     nedges = 0
 
-  for idx in 0 ..< paths.len:
-    let p = paths[idx].addr
+  for idx in 0 ..< contours.len:
+    let p = contours[idx].addr
     inc nedges, p.fill.len
     if idx <= 0 or p.restart:
       inc ncalls, 1
@@ -218,7 +218,7 @@ proc fillImpl(
     flags = pathFlags
     call = default(CallObj)
 
-  if paths.len == 1 and paths[0].convex and paths[0].fill.len > 2:
+  if contours.len == 1 and contours[0].convex and contours[0].fill.len > 2:
     flags.convex = true
 
   call.callType = FillCall
@@ -235,9 +235,9 @@ proc fillImpl(
     printf(
       "ncalls[%u] npaths[%u] convex[%u] nfill[%u] uniformOffset[%u]\n",
       ncalls,
-      paths.len,
-      paths[0].convex,
-      paths[0].fill.len,
+      contours.len,
+      contours[0].convex,
+      contours[0].fill.len,
       call.uniformOffset,
     )
 
@@ -247,10 +247,10 @@ proc fillImpl(
     call.callType = ConvexFillCall
     call.fillOffset = 0
     call.fillCount = 0
-    call.triangleCount = uint32(paths[0].fill.len)
+    call.triangleCount = uint32(contours[0].fill.len)
     call.triangleOffset = uint32(ctx.verts.len)
 
-    ctx.verts.add(paths[0].fill.toOpenArray)
+    ctx.verts.add(contours[0].fill.toOpenArray)
   elif ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
     ltrb[0] = floor(ltrb[0])
     ltrb[1] = floor(ltrb[1])
@@ -286,7 +286,7 @@ proc fillImpl(
     nedges = 0
     ncalls = 0
 
-    for p in paths:
+    for p in contours:
       if p.fill.len <= 0:
         continue
 
@@ -379,7 +379,7 @@ proc fillImpl(
     call.triangleOffset = uint32(ctx.verts.len)
     call.triangleCount = 4
 
-    for p in paths:
+    for p in contours:
       ctx.edges.add(p.fill.toOpenArray)
 
     ctx.verts.addQuad(ltrb, 0.5)
@@ -389,15 +389,15 @@ proc fillImpl(
       lastIdx = 0
       callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
 
-    for idx in 0 ..< paths.len:
-      let p = paths[idx].addr
+    for idx in 0 ..< contours.len:
+      let p = contours[idx].addr
 
       callbnds[0] = min(callbnds[0], p.bounds[0])
       callbnds[1] = min(callbnds[1], p.bounds[1])
       callbnds[2] = max(callbnds[2], p.bounds[2])
       callbnds[3] = max(callbnds[3], p.bounds[3])
 
-      if (idx + 1) == paths.len or paths[idx + 1].restart:
+      if (idx + 1) == contours.len or contours[idx + 1].restart:
         callbnds[0] = max(ltrb[0], callbnds[0])
         callbnds[1] = max(ltrb[1], callbnds[1])
         callbnds[2] = min(ltrb[2], callbnds[2])
@@ -412,7 +412,7 @@ proc fillImpl(
           let offset = uint32(ctx.edges.len)
 
           for idx2 in lastIdx .. idx:
-            let p = paths[idx2].addr
+            let p = contours[idx2].addr
             ctx.edges.add(p.fill.toOpenArray)
 
           lastIdx = idx + 1

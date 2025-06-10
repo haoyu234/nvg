@@ -11,7 +11,7 @@ proc createImpl(): pointer =
 proc destroyImpl(ctx: pointer) =
   discard
 
-proc dumpPath(i: int, p: ptr FlattenedPath) =
+proc dumpPath(i: int, p: ptr Contour) =
   printf(
     "-%03u offset[%u] count[%u] fill[%u] ccw[%u] closed[%u] convex[%u]\n",
     i + 1,
@@ -67,14 +67,14 @@ proc fillImpl(
     compositeOperation: CompositeOperation,
     pathFlags: PathFlags,
     bounds: Vec4,
-    paths: openArray[FlattenedPath],
+    contours: openArray[Contour],
 ) =
   printf("bounds[%.6f %.6f %.6f %.6f]\n", bounds[0], bounds[1], bounds[2], bounds[3])
   dumpPaint(paint)
 
-  printf("paths %u\n", paths.len)
-  for i in 0 ..< paths.len:
-    dumpPath(i, paths[i].addr)
+  printf("contours %u\n", contours.len)
+  for i in 0 ..< contours.len:
+    dumpPath(i, contours[i].addr)
 
 proc trianglesImpl(
     ctx: pointer,

@@ -72,7 +72,7 @@ type
     distTolSq: float32
     devicePxRatio: float32
 
-    cache: CachedPath
+    cache: Cache
     states: seq[ContextState]
 
     # stats
@@ -214,13 +214,13 @@ proc fillPath*(ctx: Context, path: Path) =
 
   ctx.params.fillImpl(
     ctx.ctx, ctx.fillStyle, ctx.compositeOperation, pathFlags, ctx.cache.bounds,
-    ctx.cache.paths,
+    ctx.cache.contours,
   )
 
   when defined(NVG_DEBUG_CORE):
     printf("fill end\n")
 
-  for idx in 0 ..< ctx.cache.paths.len:
+  for idx in 0 ..< ctx.cache.contours.len:
     inc ctx.drawCallCount, 2
 
 proc getAverageScale(t: Mat3): float32 =
@@ -254,13 +254,13 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.compositeOperation,
     PathFlags(),
     ctx.cache.bounds,
-    ctx.cache.paths,
+    ctx.cache.contours,
   )
 
   when defined(NVG_DEBUG_CORE):
     printf("stroke end\n")
 
-  for idx in 0 ..< ctx.cache.paths.len:
+  for idx in 0 ..< ctx.cache.contours.len:
     inc ctx.drawCallCount, 2
 
 proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =

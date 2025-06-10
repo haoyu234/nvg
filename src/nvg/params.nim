@@ -7,7 +7,7 @@ type
     evenOdd*: bool
     convex*: bool
 
-  FlattenedPath* = object
+  Contour* = object
     offset*: int32
     pointCount*: int32
     fill*: Piece[Vec4]
@@ -45,7 +45,7 @@ type
       compositeOperation: CompositeOperation,
       pathFlags: PathFlags,
       bounds: Vec4,
-      paths: openArray[FlattenedPath],
+      contours: openArray[Contour],
     ) {.nimcall.}
 
     trianglesImpl*: proc(
