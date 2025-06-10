@@ -722,7 +722,7 @@ proc flushImpl(ctx: pointer) =
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
   glBindSampler(0, 0)
 
-proc newContext*(): ptr Context =
+proc newContext*(): Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,

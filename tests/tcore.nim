@@ -7,7 +7,7 @@ import std/monotimes
 import std/strformat
 import std/times
 
-proc draw(ctx: ptr Context) =
+proc draw(ctx: Context) =
   ctx.begin(vec2(200, 200), 1)
 
   ctx.save()

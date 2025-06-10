@@ -93,7 +93,7 @@ proc cancelImpl(ctx: pointer) =
 proc flushImpl(ctx: pointer) =
   discard
 
-proc newContext*(): ptr Context =
+proc newContext*(): Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,

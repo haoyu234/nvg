@@ -20,7 +20,7 @@ const action = PassAction(
   ]
 )
 
-var ctx = default(ptr Context)
+var ctx = default(Context)
 
 proc frame() {.cdecl.} =
   frameStart()

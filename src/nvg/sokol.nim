@@ -887,7 +887,7 @@ proc flushImpl(ctx: pointer) =
 
       draw(int32(call.triangleOffset), int32(call.triangleCount), 1)
 
-proc newContext*(): ptr Context =
+proc newContext*(): Context =
   createInternal(
     BackendContextParams(
       createImpl: createImpl,

@@ -44,7 +44,7 @@ proc average*(p: PerfGraph): float32 =
 
   sum / float32(n)
 
-proc renderGraph*(ctx: ptr Context, pos: Vec2, perfGraph: PerfGraph) =
+proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   var p = default(Path)
 
   let

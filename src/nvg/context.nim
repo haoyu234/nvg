@@ -37,21 +37,9 @@ type
     textBaseline: BaselineAlignment
     fontId: FontId
 
-  Context* = object
-    ctx: pointer
-    params: BackendContextParams
-
-    fons*: FonsStash
-    cache: CachedPath
-
-    tessTol: float32
-    distTol: float32
-    distTolSq: float32
-    devicePxRatio: float32
-
-    # 
+  Context* = ref ContextObj
+  ContextObj = object # state
     fillRule*: FillRule
-    compositeOperation*: CompositeOperation
     fillStyle*: Paint
     strokeStyle*: Paint
     strokeWidth*: float32
@@ -61,6 +49,7 @@ type
     dashArray*: seq[float32]
     dashOffset*: float32
     globalAlpha*: float32
+    compositeOperation*: CompositeOperation
     transform: Mat3
 
     # font state
@@ -72,6 +61,18 @@ type
     textBaseline*: BaselineAlignment
     fontId*: FontId
 
+    # 
+    ctx: pointer
+    params: BackendContextParams
+
+    fons*: FonsStash
+
+    tessTol: float32
+    distTol: float32
+    distTolSq: float32
+    devicePxRatio: float32
+
+    cache: CachedPath
     states: seq[ContextState]
 
     # stats
@@ -80,7 +81,7 @@ type
     # flush texture
     textureDirty: bool
 
-proc resetState(ctx: ptr Context) =
+proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
   ctx.fillStyle = color(1, 1, 1, 1)
   ctx.strokeStyle = color(0, 0, 0, 1)
@@ -104,13 +105,13 @@ proc resetState(ctx: ptr Context) =
   ctx.textBaseline = AlphabeticBaseline
   ctx.fontId = default(FontId)
 
-proc setDevicePixelRatio(ctx: ptr Context, ratio: float32) =
+proc setDevicePixelRatio(ctx: Context, ratio: float32) {.inline.} =
   ctx.tessTol = 0.25 / ratio
   ctx.distTol = 0.01 / ratio
   ctx.distTolSq = ctx.distTol * ctx.distTol
   ctx.devicePxRatio = ratio
 
-proc state(ctx: ptr Context): ContextState =
+proc state(ctx: Context): ContextState =
   result.fillRule = ctx.fillRule
   result.compositeOperation = ctx.compositeOperation
   result.fillStyle = ctx.fillStyle
@@ -132,10 +133,10 @@ proc state(ctx: ptr Context): ContextState =
   result.textBaseline = ctx.textBaseline
   result.fontId = ctx.fontId
 
-proc save*(ctx: ptr Context) =
+proc save*(ctx: Context) =
   ctx.states.add(ctx.state)
 
-proc restore*(ctx: ptr Context) =
+proc restore*(ctx: Context) =
   assert ctx.states.len > 0
 
   if ctx.states.len > 0:
@@ -163,46 +164,43 @@ proc restore*(ctx: ptr Context) =
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(params: BackendContextParams): ptr Context =
+proc createInternal*(params: BackendContextParams): Context =
   assert(params.createImpl != nil)
 
-  let ctx = create(Context)
-  ctx.params = params
-  ctx.ctx = params.createImpl()
-  ctx.resetState()
+  result = Context()
+  result.params = params
+  result.ctx = params.createImpl()
+  result.resetState()
+  result.setDevicePixelRatio(1)
 
-  setDevicePixelRatio(ctx, 1)
-
-  ctx
-
-proc translate*(ctx: ptr Context, v: Vec2) =
+proc translate*(ctx: Context, v: Vec2) =
   ctx.transform.translate(v)
 
-proc scale*(ctx: ptr Context, v: Vec2) =
+proc scale*(ctx: Context, v: Vec2) =
   ctx.transform.scale(v)
 
-proc rotate*(ctx: ptr Context, v: float32) =
+proc rotate*(ctx: Context, v: float32) =
   ctx.transform.rotate(v)
 
-proc resetTransform*(ctx: ptr Context) =
+proc resetTransform*(ctx: Context) =
   ctx.transform = mat3()
 
-proc getTransform*(ctx: ptr Context): Mat3 =
+proc getTransform*(ctx: Context): Mat3 =
   ctx.transform
 
-proc loadFontFromMemory*(ctx: ptr Context, data: sink seq[byte]): FontId =
+proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId =
   if ctx.fons.isNil:
     ctx.fons = FonsStash()
 
   FontId(ctx.fons.loadFontFromMemory(data))
 
-proc loadFontFromMemory*(ctx: ptr Context, data: openArray[byte]): FontId =
+proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId =
   if ctx.fons.isNil:
     ctx.fons = FonsStash()
 
   FontId(ctx.fons.loadFontFromMemory(data))
 
-proc fillPath*(ctx: ptr Context, path: Path) =
+proc fillPath*(ctx: Context, path: Path) =
   when defined(NVG_DEBUG_CORE):
     printf("fill begin\n")
 
@@ -232,7 +230,7 @@ proc getAverageScale(t: Mat3): float32 =
 
   (sx + sy) * 0.5
 
-proc strokePath*(ctx: ptr Context, path: Path) =
+proc strokePath*(ctx: Context, path: Path) =
   let
     s = getAverageScale(ctx.transform)
     strokeWidth = clamp(ctx.strokeWidth * s, 1, 200)
@@ -265,7 +263,7 @@ proc strokePath*(ctx: ptr Context, path: Path) =
   for idx in 0 ..< ctx.cache.paths.len:
     inc ctx.drawCallCount, 2
 
-proc begin*(ctx: ptr Context, view: Vec2, devicePixelRatio: float32) =
+proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
   ctx.states.setLen(0)
   ctx.resetState()
 
@@ -275,10 +273,10 @@ proc begin*(ctx: ptr Context, view: Vec2, devicePixelRatio: float32) =
 
   ctx.drawCallCount = 0
 
-proc flush*(ctx: ptr Context) =
+proc flush*(ctx: Context) =
   ctx.params.flushImpl(ctx.ctx)
 
-proc fonsAlign(ctx: ptr Context): uint32 =
+proc fonsAlign(ctx: Context): uint32 =
   case ctx.textAlign
   of LeftAlign:
     result = result or FONS_ALIGN_LEFT
@@ -297,7 +295,7 @@ proc fonsAlign(ctx: ptr Context): uint32 =
   of BottomBaseline:
     result = result or FONS_ALIGN_BOTTOM
 
-proc textToPath*(ctx: ptr Context, text: openArray[char], pos: Vec2): Path =
+proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
   if ctx.fons.isNil:
     return
 

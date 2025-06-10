@@ -18,10 +18,10 @@ var
   totalTime = default(Duration)
   graph = default(PerfGraph)
 
-proc initDemo*(ctx: ptr Context) =
+proc initDemo*(ctx: Context) =
   graph = initGraph("Frame ", PERF_GRAPH_RENDER_FPS)
 
-proc renderDemo1*(ctx: ptr Context) =
+proc renderDemo1*(ctx: Context) =
   ctx.save()
 
   ctx.fillStyle = color(1, 0, 0, 0.50)
@@ -44,7 +44,7 @@ proc renderDemo1*(ctx: ptr Context) =
 
   ctx.restore()
 
-proc renderDemo2*(ctx: ptr Context) =
+proc renderDemo2*(ctx: Context) =
   ctx.save()
 
   ctx.fontId = ctx.getDefaultFont()
@@ -65,7 +65,7 @@ proc renderDemo2*(ctx: ptr Context) =
 
   ctx.restore()
 
-proc renderPerfGraph*(ctx: ptr Context) =
+proc renderPerfGraph*(ctx: Context) =
   ctx.renderGraph(vec2(10, 40), graph)
 
 proc frameStart*() =
