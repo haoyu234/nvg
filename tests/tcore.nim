@@ -1,7 +1,7 @@
 import nvg/context
+import nvg/core
 import nvg/dummy
 import nvg/path
-import nvg/vec2
 
 import std/monotimes
 import std/strformat

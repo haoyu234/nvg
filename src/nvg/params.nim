@@ -1,6 +1,5 @@
 import ./core
 import ./pieces
-import ./vec2
 
 type
   PathFlags* = object

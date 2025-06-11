@@ -1,7 +1,6 @@
 import ./context
 import ./core
 import ./params
-import ./vec2
 
 proc createImpl(): pointer =
   default(pointer)

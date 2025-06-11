@@ -5,7 +5,7 @@ import pkg/sokol/log
 
 import nvg/context
 import nvg/sokol
-import nvg/vec2
+import nvg/core
 
 import std/strformat
 

@@ -3,7 +3,6 @@ import ./math
 import ./params
 import ./path
 import ./pieces
-import ./vec2
 
 import std/math
 

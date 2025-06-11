@@ -1,6 +1,5 @@
 import pkg/opengl
 
-import ./color
 import ./context
 import ./core
 import ./glsl
@@ -8,7 +7,6 @@ import ./math
 import ./params
 import ./pieces
 import ./tiles
-import ./vec2
 
 import std/math
 
@@ -471,14 +469,14 @@ proc fillImpl(
         0, # uniform.transform[1],
         0, # uniform.transform[2],
         0, # uniform.transform[3],
-        uniform.innerColor[0],
-        uniform.innerColor[1],
-        uniform.innerColor[2],
-        uniform.innerColor[3],
-        uniform.outerColor[0],
-        uniform.outerColor[1],
-        uniform.outerColor[2],
-        uniform.outerColor[3],
+        uniform.innerColor.r,
+        uniform.innerColor.g,
+        uniform.innerColor.b,
+        uniform.innerColor.a,
+        uniform.outerColor.r,
+        uniform.outerColor.g,
+        uniform.outerColor.b,
+        uniform.outerColor.a,
         uniform.extent[0],
         uniform.extent[1],
         uniform.radius,

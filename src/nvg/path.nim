@@ -1,6 +1,6 @@
+import ./core
 import ./math
 import ./pieces
-import ./vec2
 
 import std/math
 

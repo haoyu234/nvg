@@ -1,12 +1,10 @@
 import ./cache
-import ./color
 import ./core
 import ./fontstash
 import ./math
 import ./opentype
 import ./params
 import ./path
-import ./vec2
 
 import std/math
 
@@ -223,7 +221,7 @@ proc fillPath*(ctx: Context, path: Path) =
   for idx in 0 ..< ctx.cache.contours.len:
     inc ctx.drawCallCount, 2
 
-proc getAverageScale(t: Mat3): float32 =
+proc getAverageScale(t: Mat3): float32 {.inline.} =
   let
     sx = sqrt(t[0] * t[0] + t[3] * t[3])
     sy = sqrt(t[1] * t[1] + t[4] * t[4])
@@ -236,8 +234,8 @@ proc strokePath*(ctx: Context, path: Path) =
     strokeWidth = clamp(ctx.strokeWidth * s, 1, 200)
 
   var paint = ctx.strokeStyle
-  paint.innerColor[3] = ctx.globalAlpha * paint.innerColor[3]
-  paint.outerColor[3] = ctx.globalAlpha * paint.outerColor[3]
+  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
+  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
   when defined(NVG_DEBUG_CORE):
     printf("stroke begin\n")
@@ -276,7 +274,7 @@ proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
 proc flush*(ctx: Context) =
   ctx.params.flushImpl(ctx.ctx)
 
-proc fonsAlign(ctx: Context): uint32 =
+proc fonsAlign(ctx: Context): uint32 {.inline.} =
   case ctx.textAlign
   of LeftAlign:
     result = result or FONS_ALIGN_LEFT

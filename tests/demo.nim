@@ -1,8 +1,6 @@
-import nvg/color
 import nvg/context
 import nvg/core
 import nvg/path
-import nvg/vec2
 
 import ./perfgraph
 import ./fonts

@@ -1,9 +1,7 @@
-import nvg/color
 import nvg/context
 import nvg/core
 import nvg/math
 import nvg/path
-import nvg/vec2
 
 import ./fonts
 

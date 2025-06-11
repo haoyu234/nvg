@@ -1,4 +1,4 @@
-import ./vec2
+import ./core
 
 import std/math
 

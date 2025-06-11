@@ -1,8 +1,8 @@
 import unittest
 
 import nvg/context
+import nvg/core
 import nvg/path
-import nvg/vec2
 
 when defined(NVG_DUMP):
   import ./dump
