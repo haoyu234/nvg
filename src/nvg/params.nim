@@ -2,9 +2,9 @@ import ./core
 import ./pieces
 
 type
-  PathFlags* = object
-    evenOdd*: bool
-    convex*: bool
+  ContourFlags* = enum
+    EvenOdd
+    Convex
 
   Contour* = object
     offset*: int32
@@ -42,7 +42,7 @@ type
       ctx: pointer,
       paint: Paint,
       compositeOperation: CompositeOperation,
-      pathFlags: PathFlags,
+      contourFlags: set[ContourFlags],
       bounds: Vec4,
       contours: openArray[Contour],
     ) {.nimcall.}

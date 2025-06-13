@@ -97,7 +97,7 @@ proc resetState(ctx: Context) =
   # font settings
   ctx.fontSize = 16
   ctx.letterSpacing = 0
-  ctx.lineHeight = 1
+  ctx.lineHeight = 16
   ctx.fontBlur = 0
   ctx.textAlign = LeftAlign
   ctx.textBaseline = AlphabeticBaseline
@@ -206,12 +206,12 @@ proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
 
-  var pathFlags = default(PathFlags)
-  if ctx.fillRule == EvenOdd:
-    pathFlags.evenOdd = true
+  var contourFlags = default(set[ContourFlags])
+  if ctx.fillRule == FillRule.EvenOdd:
+    contourFlags.incl(ContourFlags.EvenOdd)
 
   ctx.params.fillImpl(
-    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, pathFlags, ctx.cache.bounds,
+    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, contourFlags, ctx.cache.bounds,
     ctx.cache.contours,
   )
 
@@ -250,7 +250,7 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.ctx,
     ctx.strokeStyle,
     ctx.compositeOperation,
-    PathFlags(),
+    default(set[ContourFlags]),
     ctx.cache.bounds,
     ctx.cache.contours,
   )

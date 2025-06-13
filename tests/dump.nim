@@ -65,7 +65,7 @@ proc fillImpl(
     ctx: pointer,
     paint: Paint,
     compositeOperation: CompositeOperation,
-    pathFlags: PathFlags,
+    contourFlags: set[ContourFlags],
     bounds: Vec4,
     contours: openArray[Contour],
 ) =

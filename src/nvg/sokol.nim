@@ -121,20 +121,20 @@ proc toBlend(op: CompositeOperation): BlendObj {.inline.} =
     dstAlpha: blendOp.dst,
   )
 
-proc toFillType(pathFlags: PathFlags): uint32 =
-  if pathFlags.evenOdd:
+proc toFillType(contourFlags: set[ContourFlags]): uint32 {.inline.} =
+  if ContourFlags.EvenOdd in contourFlags:
     result = result or (1 shl 0)
 
-  if pathFlags.convex:
-    result = result or (1 shl 1)
+  if ContourFlags.Convex in contourFlags:
+    result = result or (1 shl 2)
 
 proc toUniform(
-    ctx: ptr OpenglBackendContextObj, paint: Paint, pathFlags: PathFlags
+    ctx: ptr OpenglBackendContextObj, paint: Paint, contourFlags: set[ContourFlags]
 ): FragmentUniformObj {.inline.} =
   var
     shaderType = FillSolid
     texType = default(uint32)
-    fillType = toFillType(pathFlags)
+    fillType = toFillType(contourFlags)
     uniform = default(FragmentUniformObj)
 
   uniform.innerColor = paint.innerColor
@@ -163,7 +163,7 @@ proc fillImpl(
     ctx: pointer,
     paint: Paint,
     compositeOperation: CompositeOperation,
-    pathFlags: PathFlags,
+    contourFlags: set[ContourFlags],
     bounds: Vec4,
     contours: openArray[Contour],
 ) =
@@ -213,16 +213,16 @@ proc fillImpl(
     return
 
   var
-    flags = pathFlags
+    contourFlags = contourFlags
     call = default(CallObj)
 
   if contours.len == 1 and contours[0].convex and contours[0].fill.len > 2:
-    flags.convex = true
+    contourFlags.incl(ContourFlags.Convex)
 
   call.callType = FillCall
   call.blend = toBlend(compositeOperation)
 
-  let uniform = ctx.toUniform(paint, pathFlags)
+  let uniform = ctx.toUniform(paint, contourFlags)
   if ctx.uniforms.len > 0 and ctx.uniforms[ctx.uniforms.len - 1] == uniform:
     call.uniformOffset = uint32(ctx.uniforms.len) - 1
   else:
@@ -241,7 +241,7 @@ proc fillImpl(
 
   const tileSize = 32
 
-  if flags.convex:
+  if ContourFlags.Convex in contourFlags:
     call.callType = ConvexFillCall
     call.fillOffset = 0
     call.fillCount = 0
