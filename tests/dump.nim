@@ -1,5 +1,5 @@
 import nvg/context
-import nvg/math
+import nvg/core
 import nvg/params
 import nvg/pieces
 
@@ -18,13 +18,14 @@ proc dumpPath(i: int, p: ptr Contour) =
     p.offset,
     p.pointCount,
     p.fill.len,
-    p.winding,
+    # p.winding,
+    0,
     p.closed,
     p.convex,
   )
 
   for v in p.fill.toOpenArray:
-    printf("-- %.6f %.6f %.6f %.6f\n", v.x, v.y, v.z, v.w)
+    printf("-- %.6f %.6f %.6f %.6f\n", v[0], v[1], v[2], v[3])
 
 proc dumpPaint(p: Paint) =
   let t = cast[ptr UncheckedArray[float32]](p.transform.addr)
@@ -39,10 +40,10 @@ proc dumpPaint(p: Paint) =
     t[6],
     t[7],
     t[8],
-    p.extent.x,
-    p.extent.y,
-    p.blur.x,
-    p.blur.y,
+    p.extent[0],
+    p.extent[1],
+    p.blur[0],
+    p.blur[1],
     p.radius,
     p.feather,
     0,
