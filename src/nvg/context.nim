@@ -242,6 +242,10 @@ proc strokePath*(ctx: Context, path: Path) =
 
   ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
+
+  if len(ctx.dashArray) > 0 and ctx.dashArray[0] > 0:
+    ctx.cache.dashStroke(s, strokeWidth, ctx.dashOffset, ctx.dashArray)
+
   ctx.cache.expandStroke(
     ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit, ctx.tessTol, ctx.distTolSq
   )
@@ -351,9 +355,11 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
 
         if idx <= 0:
           result.restart()
+
       elif vert.tp == uint8(GlyphShapeCommand.LINE):
         let p1 = matrix * vec2(float32(vert.x), float32(vert.y))
         result.lineTo(p1)
+
       elif vert.tp == uint8(GlyphShapeCommand.BEZIER):
         let
           p1 = matrix * vec2(float32(vert.x), float32(vert.y))

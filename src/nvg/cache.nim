@@ -21,7 +21,7 @@ proc clear*(c: var Cache) {.inline, raises: [].} =
   c.points.setLen(0)
   c.contours.setLen(0)
 
-proc addPath(c: var Cache) {.inline, raises: [].} =
+proc addContour(c: var Cache) {.inline, raises: [].} =
   let idx = c.contours.len
   c.contours.setLen(idx + 1)
 
@@ -114,10 +114,11 @@ proc flattenPaths*(
         defer:
           printf("MOVE END %u\n", c.points.len)
 
-      c.addPath()
+      c.addContour()
 
       let p = matrix * vec2(vals[0], vals[1])
       c.addPoint(p)
+
     of PathCommand.LINE:
       when defined(NVG_DEBUG_CORE):
         printf("LINE BEGIN %u\n", c.points.len)
@@ -133,6 +134,7 @@ proc flattenPaths*(
             continue
 
         c.addPoint(p)
+
     of PathCommand.BEZIER:
       when defined(NVG_DEBUG_CORE):
         printf("BEZIER BEGIN %u\n", c.points.len)
@@ -148,9 +150,11 @@ proc flattenPaths*(
             p = matrix * vec2(vals[4], vals[5])
 
           c.bezier(c.points[idx], cp1, cp2, p, 0, tessTol, distTolSq)
+
     of PathCommand.CLOSE:
       if not c.curPath.isNil:
         c.curPath.closed = true
+
     of PathCommand.RESTART:
       if not c.curPath.isNil:
         c.curPath.restart = true
@@ -215,6 +219,84 @@ proc arcJoin(
     ay = ry
 
   pos
+
+proc dashStroke*(
+    c: var Cache,
+    scale, strokeWidth: float32,
+    dashOffset: float32,
+    dashArray: openArray[float32],
+) =
+  var dashSum = sum(dashArray)
+  if (dashArray.len and 0x1) > 0:
+    dashSum = dashSum + dashSum
+
+  var dashOffset = dashOffset mod dashSum
+  if dashOffset < 0:
+    dashOffset = dashOffset + dashSum
+
+  var dash0 = 0
+  while dashOffset > dashArray[dash0]:
+    dashOffset = dashOffset - dashArray[dash0]
+    dash0 = succ(dash0) mod dashArray.len
+
+  let contours = move c.contours
+  c.curPath = nil
+
+  for idx in 0 ..< contours.len:
+    let p = contours[idx].addr
+
+    if p.pointCount <= 1:
+      continue
+
+    var
+      totalDist = float32(0)
+      dashLen = (dashArray[dash0] - dashOffset) * scale
+      dashState = true
+      dashIdx = dash0
+
+      p0 = c.points[p.offset]
+
+      i = p.offset + 1
+      j =
+        if p.closed:
+          p.offset + p.pointCount
+        else:
+          p.offset + p.pointCount - 1
+
+    c.addContour()
+    c.curPath.restart = p.restart
+    # p = contours[idx].addr
+
+    c.addPoint(p0)
+
+    while i <= j:
+      let
+        k = p.offset + (i - p.offset) mod p.pointCount
+        dp = c.points[k] - p0
+        dist = dp.length
+
+      if totalDist + dist >= dashLen:
+        let
+          d = (dashLen - totalDist) / dist
+          p1 = p0 + dp * d
+
+        if not dashState:
+          c.addContour()
+          # p = contours[idx].addr
+
+        c.addPoint(p1)
+
+        dashState = not dashState
+        dashIdx = succ(dashIdx) mod dashArray.len
+        dashLen = dashArray[dashIdx] * scale
+        totalDist = 0
+        p0 = p1
+      else:
+        totalDist = totalDist + dist
+        p0 = c.points[k]
+        if dashState:
+          c.addPoint(p0)
+        inc i, 1
 
 proc expandStroke*(
     c: var Cache,
