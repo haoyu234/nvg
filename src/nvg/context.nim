@@ -297,6 +297,16 @@ proc fonsAlign(ctx: Context): uint32 {.inline.} =
   of BottomBaseline:
     result = result or FONS_ALIGN_BOTTOM
 
+proc measureText*(ctx: Context, text: openArray[char]): float32 =
+  if ctx.fons.isNil:
+    return
+
+  let font = ctx.fons.getFontById(FonsFontId(ctx.fontId))
+  if font.isNil:
+    return
+
+  ctx.fons.measureText(font, text, ctx.fontSize, ctx.letterSpacing)
+
 proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
   if ctx.fons.isNil:
     return
