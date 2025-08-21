@@ -11,6 +11,7 @@ type
   PathCommand* = enum
     MOVE
     LINE
+    CURVE
     BEZIER
     CLOSE
     RESTART
@@ -140,7 +141,8 @@ proc arc*(path: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
 
     when defined(NVG_DEBUG_CORE):
       printf(
-        "a[%f] dx[%.6f] dy[%.6f] x[%.6f] y[%.6f] tanx[%.6f] tany[%.6f]\n", a, dx, dy, x,
+        "a[%f] dx[%.6f] dy[%.6f] x[%.6f] y[%.6f] tanx[%.6f] tany[%.6f]\n", a,
+        dx, dy, x,
         y, tanx, tany,
       )
 
@@ -224,19 +226,8 @@ proc bezierTo*(path: var Path, cp1, cp2, to: Vec2) {.inline.} =
   )
 
 proc quadCurveTo*(path: var Path, cp, to: Vec2) {.inline.} =
-  const s = float32(2) / 3
-  let pos = path.commandXY
-
   path.appendCommands(
-    [
-      float32(PathCommand.BEZIER),
-      pos[0] + s * (cp[0] - pos[0]),
-      pos[1] + s * (cp[1] - pos[1]),
-      to[0] + s * (cp[0] - to[0]),
-      to[1] + s * (cp[1] - to[1]),
-      to[0],
-      to[1],
-    ]
+    [float32(PathCommand.CURVE), cp[0], cp[1], to[0], to[1]]
   )
 
 proc arcTo*(path: var Path, a, b: Vec2, r: float32) =
@@ -316,11 +307,19 @@ iterator commands*(path: Path): (PathCommand, Piece[float32]) =
       inc j, 2
 
       yield (cmd, data[i ..< j])
+
+    of PathCommand.CURVE:
+      let i = j
+      inc j, 4
+
+      yield (cmd, data[i ..< j])
+
     of PathCommand.BEZIER:
       let i = j
       inc j, 6
 
       yield (cmd, data[i ..< j])
+
     of PathCommand.CLOSE, PathCommand.RESTART:
       let i = j
       inc j, 0

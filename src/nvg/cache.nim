@@ -34,29 +34,56 @@ proc addPoint(c: var Cache, p: Vec2) {.inline, raises: [].} =
   inc c.curPath.pointCount, 1
   c.points.add(p)
 
-proc bezier(
-    c: var Cache, p1, p2, p3, p4: Vec2, level: int, tessTol, distTolSq: float32
+proc quadCurve(
+    c: var Cache, p1, p2, p3: Vec2, level: int, tessTolSq, distTolSq: float32
 ) =
   let
-    d = p4 - p1
-    d2 = cross(d, p2 - p4)
-    d3 = cross(d, p3 - p4)
-    d4 = d2 + d3
+    d = p3 - p1
+    d2 = cross(d, p2 - p1)
+    distSq = (d2 * d2) / d.lengthSq
 
-  if d4 * d4 < tessTol * d.lengthSq or level >= 9:
-    if not equals(p1, p4, distTolSq):
-      c.addPoint(p4)
+  if distSq < tessTolSq or level >= 9:
+    if not equals(p1, p3, distTolSq):
+      c.addPoint(p3)
   else:
     let
       p12 = (p1 + p2) / 2
       p23 = (p2 + p3) / 2
-      p34 = (p3 + p4) / 2
       p123 = (p12 + p23) / 2
-      p234 = (p23 + p34) / 2
-      p1234 = (p123 + p234) / 2
 
-    c.bezier(p1, p12, p123, p1234, level + 1, tessTol, distTolSq)
-    c.bezier(p1234, p234, p34, p4, level + 1, tessTol, distTolSq)
+    c.quadCurve(p1, p12, p123, level + 1, tessTolSq, distTolSq)
+    c.quadCurve(p123, p23, p3, level + 1, tessTolSq, distTolSq)
+
+proc bezier(
+    c: var Cache, p1, p2, p3, p4: Vec2, level: int, tessTolSq,
+        distTolSq: float32
+) =
+  let d = p4 - p1
+  let distSq = d.lengthSq
+  if distSq < distTolSq:
+    if not equals(p1, p4, distTolSq):
+      c.addPoint(p4)
+    return
+
+  let
+    p12 = (p1 + p2) / 2
+    p23 = (p2 + p3) / 2
+    p34 = (p3 + p4) / 2
+    p123 = (p12 + p23) / 2
+    p234 = (p23 + p34) / 2
+    p1234 = (p123 + p234) / 2
+
+  let crossDist = cross(d, p1234 - p1)
+  let crossDistSq = crossDist * crossDist
+  let toleranceSq = tessTolSq * distSq
+
+  if crossDistSq < toleranceSq or level >= 9:
+    if not equals(p1, p4, distTolSq):
+      c.addPoint(p4)
+    return
+
+  c.bezier(p1, p12, p123, p1234, level + 1, tessTolSq, distTolSq)
+  c.bezier(p1234, p234, p34, p4, level + 1, tessTolSq, distTolSq)
 
 proc updateBounds(c: var Cache, distTolSq: float32) =
   c.bounds = vec4(1e6, 1e6, -1e6, -1e6)
@@ -96,11 +123,12 @@ proc updateBounds(c: var Cache, distTolSq: float32) =
 
     when defined(NVG_DEBUG_CORE):
       printf(
-        "- %.6f %.6f %.6f %.6f\n", c.bounds[0], c.bounds[1], c.bounds[2], c.bounds[3]
+        "- %.6f %.6f %.6f %.6f\n", c.bounds[0], c.bounds[1], c.bounds[2],
+            c.bounds[3]
       )
 
 proc flattenPaths*(
-    c: var Cache, path: Path, matrix: Mat3, tessTol, distTolSq: float32
+    c: var Cache, path: Path, matrix: Mat3, tessTolSq, distTolSq: float32
 ) =
   if c.contours.len > 0:
     c.curPath = nil
@@ -135,6 +163,21 @@ proc flattenPaths*(
 
         c.addPoint(p)
 
+    of PathCommand.CURVE:
+      when defined(NVG_DEBUG_CORE):
+        printf("CURVE BEGIN %u\n", c.points.len)
+        defer:
+          printf("CURVE END %u\n", c.points.len)
+
+      if not c.curPath.isNil:
+        if c.curPath.pointCount > 0:
+          let
+            idx = c.curPath.offset + c.curPath.pointCount - 1
+            cp = matrix * vec2(vals[0], vals[1])
+            p = matrix * vec2(vals[2], vals[3])
+
+          c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
+
     of PathCommand.BEZIER:
       when defined(NVG_DEBUG_CORE):
         printf("BEZIER BEGIN %u\n", c.points.len)
@@ -149,7 +192,7 @@ proc flattenPaths*(
             cp2 = matrix * vec2(vals[2], vals[3])
             p = matrix * vec2(vals[4], vals[5])
 
-          c.bezier(c.points[idx], cp1, cp2, p, 0, tessTol, distTolSq)
+          c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 
     of PathCommand.CLOSE:
       if not c.curPath.isNil:

@@ -66,6 +66,7 @@ type
     fons*: FonsStash
 
     tessTol: float32
+    tessTolSq: float32
     distTol: float32
     distTolSq: float32
     devicePxRatio: float32
@@ -106,6 +107,7 @@ proc resetState(ctx: Context) =
 proc setDevicePixelRatio(ctx: Context, ratio: float32) {.inline.} =
   ctx.tessTol = 0.25 / ratio
   ctx.distTol = 0.01 / ratio
+  ctx.tessTolSq = ctx.tessTol * ctx.tessTol
   ctx.distTolSq = ctx.distTol * ctx.distTol
   ctx.devicePxRatio = ratio
 
