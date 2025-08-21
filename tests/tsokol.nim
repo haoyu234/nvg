@@ -31,7 +31,8 @@ proc frame() {.cdecl.} =
 
   ctx.renderDemo1()
   ctx.renderDemo2()
-  ctx.renderPerfGraph()
+  ctx.renderTiger()
+  ctx.renderPerfGraph(vec2(10, float32(height() - 90)))
 
   ctx.flush()
 
@@ -75,8 +76,8 @@ app.run(
     cleanupCb: cleanup,
     swapInterval: 0,
     sampleCount: 4,
-    width: 400,
-    height: 300,
+    width: 800,
+    height: 600,
     icon: IconDesc(sokol_default: true),
     logger: app.Logger(fn: log.fn),
   )

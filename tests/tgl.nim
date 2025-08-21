@@ -2,6 +2,7 @@ import pkg/sdl2
 import pkg/opengl
 
 import nvg/context
+import nvg/core
 import nvg/gl
 
 import ./demo
@@ -41,7 +42,8 @@ while runGame:
   ctx.begin([float32(640), float32(480)], float32(1))
   ctx.renderDemo1()
   ctx.renderDemo2()
-  ctx.renderPerfGraph()
+  ctx.renderTiger()
+  ctx.renderPerfGraph(vec2(10, 390))
 
   ctx.flush()
 

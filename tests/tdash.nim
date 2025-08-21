@@ -138,6 +138,5 @@ app.run(
     height: 400,
     icon: IconDesc(sokol_default: true),
     logger: app.Logger(fn: log.fn),
-    fullscreen: true,
   )
 )
