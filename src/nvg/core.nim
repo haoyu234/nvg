@@ -46,7 +46,7 @@ type
     blur*: Vec2
 
   CompositeOperation* = enum
-    SourceOverOperation
+    SourceOverOperation = 1
     SourceInOperation
     SourceOutOperation
     ATopOperation
