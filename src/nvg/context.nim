@@ -8,9 +8,6 @@ import ./path
 
 import std/math
 
-when defined(NVG_DEBUG_CORE):
-  proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
-
 type
   ContextState = object
     fillRule: FillRule
@@ -203,9 +200,6 @@ proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId =
   FontId(ctx.fons.loadFontFromMemory(data))
 
 proc fillPath*(ctx: Context, path: Path) =
-  when defined(NVG_DEBUG_CORE):
-    printf("fill begin\n")
-
   ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
@@ -219,9 +213,6 @@ proc fillPath*(ctx: Context, path: Path) =
     ctx.cache.bounds,
     ctx.cache.contours,
   )
-
-  when defined(NVG_DEBUG_CORE):
-    printf("fill end\n")
 
   for idx in 0 ..< ctx.cache.contours.len:
     inc ctx.drawCallCount, 2
@@ -242,9 +233,6 @@ proc strokePath*(ctx: Context, path: Path) =
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
-  when defined(NVG_DEBUG_CORE):
-    printf("stroke begin\n")
-
   ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
 
@@ -263,9 +251,6 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.cache.bounds,
     ctx.cache.contours,
   )
-
-  when defined(NVG_DEBUG_CORE):
-    printf("stroke end\n")
 
   for idx in 0 ..< ctx.cache.contours.len:
     inc ctx.drawCallCount, 2
@@ -323,38 +308,10 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
   let scale = ctx.fontSize / float32(font.metrics.ascender -
       font.metrics.descender)
 
-  when defined(NVG_DEBUG_CORE):
-    printf(
-      "fontSize: %.6f scale: %.6f fonsAlign: %u\n", ctx.fontSize, scale, ctx.fonsAlign
-    )
-
   for x, y, glyph in ctx.fons.arrange(
     font, text, pos[0], pos[1], ctx.fonsAlign, ctx.fontSize, ctx.letterSpacing
   ):
     let points = ctx.fons.getGlyphShape(glyph)
-
-    when defined(NVG_DEBUG_CORE):
-      printf("glyph: %u x: %.6f y: %.6f\n", glyph.unicodeCodepoint, x, y)
-      printf("len(points): %u\n", len(points))
-
-      for idx in 0 ..< len(points):
-        let p = points[idx].addr
-
-        if p.tp == uint8(GlyphShapeCommand.MOVE):
-          printf("%d %d %d %d\n", int32(idx), int32(p.tp), int32(p.x), int32(p.y))
-        elif p.tp == uint8(GlyphShapeCommand.LINE):
-          printf("%d %d %d %d\n", int32(idx), int32(p.tp), int32(p.x), int32(p.y))
-        elif p.tp == uint8(GlyphShapeCommand.BEZIER):
-          printf(
-            "%d %d %d %d %d %d\n",
-            int32(idx),
-            int32(p.tp),
-            int32(p.x),
-            int32(p.y),
-            int32(p.cx),
-            int32(p.cy),
-          )
-
     if len(points) <= 0:
       continue
 

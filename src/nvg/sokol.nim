@@ -10,9 +10,6 @@ import ./tiles
 
 import std/math
 
-when defined(NVG_DEBUG_VERTS):
-  proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
-
 type
   ShaderType = enum
     FillSolid = 1
@@ -179,9 +176,6 @@ proc fillImpl(
     if idx <= 0 or p.restart:
       inc ncalls, 1
 
-  when defined(NVG_DEBUG_VERTS):
-    printf("fill nedges: %u\n", nedges)
-
   if nedges <= 0:
     return
 
@@ -197,17 +191,6 @@ proc fillImpl(
 
   callw = ltrb[2] - ltrb[0]
   callh = ltrb[3] - ltrb[1]
-
-  when defined(NVG_DEBUG_VERTS):
-    printf(
-      "%.6f %.6f %.6f %.6f callw[%.6f] cellh[%.6f]\n",
-      bounds[0],
-      bounds[1],
-      bounds[2],
-      bounds[3],
-      callw,
-      callh,
-    )
 
   if callw <= 0 or callh <= 0:
     return
@@ -228,16 +211,6 @@ proc fillImpl(
   else:
     call.uniformOffset = uint32(ctx.uniforms.len)
     ctx.uniforms.add(uniform)
-
-  when defined(NVG_DEBUG_VERTS):
-    printf(
-      "ncalls[%u] npaths[%u] convex[%u] nfill[%u] uniformOffset[%u]\n",
-      ncalls,
-      contours.len,
-      contours[0].convex,
-      contours[0].fill.len,
-      call.uniformOffset,
-    )
 
   const tileSize = 32
 
@@ -263,21 +236,6 @@ proc fillImpl(
       ytiles = int(ceil(callh / tileSize))
       tilew = int(ceil(callw / float32(xtiles)))
       tileh = int(ceil(callh / float32(ytiles)))
-
-    when defined(NVG_DEBUG_VERTS):
-      printf(
-        "ltrb[%.6f %.6f %.6f %.6f] callw[%.6f] callh[%.6f] xtiles[%u] ytiles[%u] tilew[%u] tileh[%u]\n",
-        ltrb[0],
-        ltrb[1],
-        ltrb[2],
-        ltrb[3],
-        callw,
-        callh,
-        xtiles,
-        ytiles,
-        tilew,
-        tileh,
-      )
 
     ctx.tiles.setup(xtiles, ytiles, nedges)
 
@@ -314,16 +272,6 @@ proc fillImpl(
             if not p.isNil:
               let tymax = float32((iy + 1) * tileh) + ltrb[1]
 
-              # when defined(NVG_DEBUG_VERTS):
-              #   printf(
-              #     "%.6f %.6f %.6f %.6f tymax[%.6f]\n",
-              #     p[][0],
-              #     p[][1],
-              #     p[][2],
-              #     p[][3],
-              #     tymax,
-              #   )
-
               if y0 > tymax and y1 > tymax and p[][1] > tymax and x0 == p[][2] and
                   y0 == p[][3]:
                 p[][2] = x1
@@ -358,11 +306,6 @@ proc fillImpl(
           ctx.edges.add(s.toOpenArray)
 
           inc call.fillCount, s.len
-
-        # when defined(NVG_DEBUG_VERTS):
-        #   printf("x[%u] y[%u] nedges[%u]\n", ix, iy, fillCount)
-        #   for vert in tiles:
-        #     printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
 
         tileBounds[0] = ltrb[0] + float32(ix * tilew)
         tileBounds[1] = ltrb[1] + float32(iy * tileh)
@@ -424,56 +367,6 @@ proc fillImpl(
           ctx.calls.add(call)
 
         callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
-
-  when defined(NVG_DEBUG_VERTS):
-    printf("nverts: %u\n", uint32(ctx.verts.len))
-    for vert in ctx.verts:
-      printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
-
-    printf("nedges: %u\n", uint32(ctx.edges.len))
-    for vert in ctx.edges:
-      printf("%.6f %.6f %.6f %.6f\n", vert[0], vert[1], vert[2], vert[3])
-
-    printf("ncalls: %u\n", uint32(ctx.calls.len))
-    for call in ctx.calls:
-      let
-        uniform = ctx.uniforms[call.uniformOffset].addr
-        shaderType = uint32(uniform.compressed3Type) and 0xFF
-      printf(
-        "type: %u, shaderType: %u, image: %u, fillOffset: %u, fillCount: %u, triangleOffset: %u, triangleCount: %u, uniformOffset: %u\n",
-        call.callType, shaderType, 0, call.fillOffset, call.fillCount,
-        call.triangleOffset, call.triangleCount, call.uniformOffset,
-      )
-
-    printf("nuniforms: %u\n", uint32(ctx.uniforms.len))
-    for uniform in ctx.uniforms:
-      let
-        texType = (uint32(uniform.compressed3Type) shr 8) and 0xFF
-        fillType = (uint32(uniform.compressed3Type) shr 16) and 0xFF
-
-      printf(
-        "transform: %.6f %.6f %.6f %.6f\ninnerColor: %.6f %.6f %.6f %.6f\nouterColor: %.6f %.6f %.6f %.6f\nextent: %.6f %.6f\nradius: %.6f\nfeather: %.6f\nstrokeMult: %.6f\nstrokeThr: %.6f\ntexType: %u\nfillType: %u\n",
-        0, # uniform.transform[0],
-        0, # uniform.transform[1],
-        0, # uniform.transform[2],
-        0, # uniform.transform[3],
-        uniform.innerColor.r,
-        uniform.innerColor.g,
-        uniform.innerColor.b,
-        uniform.innerColor.a,
-        uniform.outerColor.r,
-        uniform.outerColor.g,
-        uniform.outerColor.b,
-        uniform.outerColor.a,
-        uniform.extent[0],
-        uniform.extent[1],
-        uniform.radius,
-        uniform.feather,
-        0, # uniform.strokeMult,
-        0, # uniform.strokeThr,
-        texType,
-        fillType,
-      )
 
 proc getShader(): Shader =
   var s = ShaderDesc(label: "nvg.shader")

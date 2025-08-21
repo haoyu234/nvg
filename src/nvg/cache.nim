@@ -6,9 +6,6 @@ import ./pieces
 
 import std/math
 
-when defined(NVG_DEBUG_CORE):
-  proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
-
 type Cache* = object
   points: seq[Vec2]
   contours*: seq[Contour]
@@ -96,36 +93,16 @@ proc updateBounds(c: var Cache, distTolSq: float32) =
     if p.fill.len <= 0:
       continue
 
-    when defined(NVG_DEBUG_CORE):
-      printf("updateBounds %u\n", idx)
-
     for v in p.fill.toOpenArray:
       p.bounds[0] = min(p.bounds[0], v[2])
       p.bounds[1] = min(p.bounds[1], v[3])
       p.bounds[2] = max(p.bounds[2], v[2])
       p.bounds[3] = max(p.bounds[3], v[3])
 
-      when defined(NVG_DEBUG_CORE):
-        printf(
-          "x[%.6f] y[%.6f] %.6f %.6f %.6f %.6f\n",
-          v[2],
-          v[3],
-          p.bounds[0],
-          p.bounds[1],
-          p.bounds[2],
-          p.bounds[3],
-        )
-
     c.bounds[0] = min(p.bounds[0], c.bounds[0])
     c.bounds[1] = min(p.bounds[1], c.bounds[1])
     c.bounds[2] = max(p.bounds[2], c.bounds[2])
     c.bounds[3] = max(p.bounds[3], c.bounds[3])
-
-    when defined(NVG_DEBUG_CORE):
-      printf(
-        "- %.6f %.6f %.6f %.6f\n", c.bounds[0], c.bounds[1], c.bounds[2],
-            c.bounds[3]
-      )
 
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat3, tessTolSq, distTolSq: float32
@@ -137,22 +114,12 @@ proc flattenPaths*(
   for command, vals in path.commands:
     case command
     of PathCommand.MOVE:
-      when defined(NVG_DEBUG_CORE):
-        printf("MOVE BEGIN %u\n", c.points.len)
-        defer:
-          printf("MOVE END %u\n", c.points.len)
-
       c.addContour()
 
       let p = matrix * vec2(vals[0], vals[1])
       c.addPoint(p)
 
     of PathCommand.LINE:
-      when defined(NVG_DEBUG_CORE):
-        printf("LINE BEGIN %u\n", c.points.len)
-        defer:
-          printf("LINE END %u\n", c.points.len)
-
       if not c.curPath.isNil:
         let p = matrix * vec2(vals[0], vals[1])
 
@@ -164,11 +131,6 @@ proc flattenPaths*(
         c.addPoint(p)
 
     of PathCommand.CURVE:
-      when defined(NVG_DEBUG_CORE):
-        printf("CURVE BEGIN %u\n", c.points.len)
-        defer:
-          printf("CURVE END %u\n", c.points.len)
-
       if not c.curPath.isNil:
         if c.curPath.pointCount > 0:
           let
@@ -179,11 +141,6 @@ proc flattenPaths*(
           c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
     of PathCommand.BEZIER:
-      when defined(NVG_DEBUG_CORE):
-        printf("BEZIER BEGIN %u\n", c.points.len)
-        defer:
-          printf("BEZIER END %u\n", c.points.len)
-
       if not c.curPath.isNil:
         if c.curPath.pointCount > 0:
           let
@@ -201,12 +158,6 @@ proc flattenPaths*(
     of PathCommand.RESTART:
       if not c.curPath.isNil:
         c.curPath.restart = true
-
-  when defined(NVG_DEBUG_CORE):
-    printf("BEGIN flattenPaths\n")
-    for v in c.points:
-      printf("__ %.6f %.6f\n", v[0], v[1])
-    printf("END flattenPaths\n")
 
   for idx in 0 ..< c.contours.len:
     let p = c.contours[idx].addr
@@ -362,9 +313,6 @@ proc expandStroke*(
         inc count, (p.pointCount * 2 + 1) * 2
     6 * count
 
-  when defined(NVG_DEBUG_CORE):
-    printf("expandStroke vertCount = %u ncap = %u\n", vertCount, nCap)
-
   c.storage.setLenUninit(vertCount)
 
   var
@@ -377,15 +325,11 @@ proc expandStroke*(
 
   template incp(v1, v2) =
     inc n, 1
-    when defined(NVG_DEBUG_CORE):
-      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1[0], v1[1], v2[0], v2[1])
     memory[l] = vec4(v1[0], v1[1], v2[0], v2[1])
     inc l
 
   template decp(v1, v2) =
     inc n, 1
-    when defined(NVG_DEBUG_CORE):
-      printf("line[%u] %u %.6f %.6f %.6f %.6f\n", 0, n, v1[0], v1[1], v2[0], v2[1])
     dec r
     memory[r] = vec4(v1[0], v1[1], v2[0], v2[1])
 
@@ -486,27 +430,6 @@ proc expandStroke*(
         lJoin = if left: innerJoin else: outerJoin
         rJoin = if left: outerJoin else: innerJoin
 
-      when defined(NVG_DEBUG_CORE):
-        template joinToStr(t: LineJoin): cstring =
-          if t == MiterJoin:
-            "MiterJoin".cstring
-          elif t == BevelJoin:
-            "BevelJoin".cstring
-          elif t == RoundJoin:
-            "RoundJoin".cstring
-          else:
-            "?".cstring
-
-        printf(
-          "join[%s] outerJoin[%s] innerJoin[%s] lJoin[%s] rJoin[%s] left[%u]\n",
-          joinToStr(join),
-          joinToStr(outerJoin),
-          joinToStr(innerJoin),
-          joinToStr(lJoin),
-          joinToStr(rJoin),
-          left,
-        )
-
       var
         l01 = default(Vec2)
         l12 = default(Vec2)
@@ -520,21 +443,6 @@ proc expandStroke*(
       else:
         l01 = p1[] + wn01
         l12 = p1[] + wn12
-
-      when defined(NVG_DEBUG_CORE):
-        printf(
-          "ljoin[%u] wn01[%.6f, %.6f] wn12[%.6f, %.6f] p1[%.6f, %.6f]\n",
-          lJoin == MiterJoin,
-          wn01[0],
-          wn01[1],
-          wn12[0],
-          wn12[1],
-          p1[][0],
-          p1[][1],
-        )
-
-        printf("l01[%.6f, %.6f] l12[%.6f, %.6f]\n", l01[0], l01[1], l12[0], l12[1])
-        printf("%.6f, %.6f\n", p1[][0] + w * n01[0], p1[][1] + w * n01[1])
 
       if i > p.offset:
         incp(lp, l01)
@@ -583,20 +491,6 @@ proc expandStroke*(
         l01 = p1[] + wn01
         r01 = p1[] - wn01
 
-      when defined(NVG_DEBUG_CORE):
-        printf(
-          "x[%.6f] y[%.6f] n01x[%.6f] n01y[%.6f] l01x[%.6f] l01y[%.6f] r01x[%.6f] r01y[%.6f] w[%.6f]\n",
-          p1[][0],
-          p1[][1],
-          n01[0],
-          n01[1],
-          l01[0],
-          l01[1],
-          r01[0],
-          r01[1],
-          w,
-        )
-
       incp(lp, l01)
       lp = l01
       decp(r01, rp)
@@ -627,15 +521,6 @@ proc expandStroke*(
 
     p.fill = memory[offset ..< l2]
 
-    when defined(NVG_DEBUG_CORE):
-      # printf("l[%u] r[%u] n[%u]\n", l, r, n)
-
-      printf("nfill[%u]\n", p.fill.len)
-      printf("---->\n")
-      for v in p.fill.toOpenArray:
-        printf("%.6f %.6f %.6f %.6f\n", v[0], v[1], v[2], v[3])
-      printf("---->\n")
-
     l = l2
     offset = l2
     r = vertCount
@@ -650,9 +535,6 @@ proc expandFill*(c: var Cache, distTolSq: float32) =
       inc count, p.pointCount
 
     count
-
-  when defined(NVG_DEBUG_CORE):
-    printf("expandFill vertCount = %u\n", vertCount)
 
   c.storage.setLenUninit(vertCount)
 
@@ -673,17 +555,6 @@ proc expandFill*(c: var Cache, distTolSq: float32) =
 
     while i <= j:
       p1 = c.points[i].addr
-
-      when defined(NVG_DEBUG_CORE):
-        printf(
-          "line[%u] %u %.6f %.6f %.6f %.6f\n",
-          0,
-          succ(pos),
-          p0[][0],
-          p0[][1],
-          p1[][0],
-          p1[][1],
-        )
 
       memory[pos] = vec4(p0[][0], p0[][1], p1[][0], p1[][1])
 

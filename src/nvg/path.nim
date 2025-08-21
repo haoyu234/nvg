@@ -4,9 +4,6 @@ import ./pieces
 
 import std/math
 
-when defined(NVG_DEBUG_CORE):
-  proc printf(fmt: cstring) {.header: "<stdio.h>", importc: "printf", varargs.}
-
 type
   PathCommand* = enum
     MOVE
@@ -35,13 +32,6 @@ proc appendCommands*(path: var Path, values: openArray[float32]) {.inline.} =
   if values.len >= 3:
     path.commandXY[0] = values[values.len - 2]
     path.commandXY[1] = values[values.len - 1]
-
-  when defined(NVG_DEBUG_CORE):
-    printf("line[%u] appendCommands %u cmd[%u]\n", 0, values.len, uint32(values[0]))
-    printf("commandXY %.6f %.6f\n", path.commandXY[0], path.commandXY[1])
-
-    for v in values:
-      printf("_ %.6f\n", v)
 
   path.commands.add(values)
 
@@ -120,9 +110,6 @@ proc arc*(path: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
   if ccw:
     kappa = -kappa
 
-  when defined(NVG_DEBUG_CORE):
-    printf("ndivs[%u] hda[%.6f] kappa[%.6f]\n", ndivs, hda, kappa)
-
   var
     px = float32(0)
     py = float32(0)
@@ -138,13 +125,6 @@ proc arc*(path: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
       y = cp[1] + dy * r
       tanx = -dy * r * kappa
       tany = dx * r * kappa
-
-    when defined(NVG_DEBUG_CORE):
-      printf(
-        "a[%f] dx[%.6f] dy[%.6f] x[%.6f] y[%.6f] tanx[%.6f] tany[%.6f]\n", a,
-        dx, dy, x,
-        y, tanx, tany,
-      )
 
     if i > 0:
       append(float32(PathCommand.BEZIER))
@@ -164,12 +144,6 @@ proc arc*(path: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
     py = y
     ptanx = tanx
     ptany = tany
-
-  when defined(NVG_DEBUG_CORE):
-    printf("commands: \n")
-    for i in 0 ..< idx:
-      printf("%.6f ", commands[i])
-    printf("\n")
 
   path.appendCommands(commands.toOpenArray(0, idx - 1))
 
