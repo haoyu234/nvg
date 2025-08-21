@@ -31,7 +31,7 @@ proc clear*(path: var Path) {.inline.} =
   path.commands.setLen(0)
   path.commandXY = vec2(0, 0)
 
-proc appendCommands(path: var Path, values: openArray[float32]) {.inline.} =
+proc appendCommands*(path: var Path, values: openArray[float32]) {.inline.} =
   if values.len >= 3:
     path.commandXY[0] = values[values.len - 2]
     path.commandXY[1] = values[values.len - 1]
@@ -287,10 +287,6 @@ proc addPath*(path: var Path, other: Path) {.inline.} =
 
 proc closePath*(path: var Path) {.inline.} =
   const commands = [float32(PathCommand.CLOSE)]
-  path.appendCommands(commands)
-
-proc restart*(path: var Path) {.inline.} =
-  const commands = [float32(PathCommand.RESTART)]
   path.appendCommands(commands)
 
 iterator commands*(path: Path): (PathCommand, Piece[float32]) =

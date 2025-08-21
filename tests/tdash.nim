@@ -44,9 +44,9 @@ proc frame() {.cdecl.} =
   p2.moveTo(vec2(size / 2, padding))
   p2.lineTo(vec2(size / 2, size - padding))
 
-  p2.moveTo(vec2(padding, size / 2))
-  p2.restart()
-  p2.lineTo(vec2(size - padding, size / 2))
+  var p3 = Path()
+  p3.moveTo(vec2(padding, size / 2))
+  p3.lineTo(vec2(size - padding, size / 2))
 
   let text = "秦时明月汉时关，万里长征人未还。但使龙城飞将在，不教胡马度阴山。"
   var idxChar = 0
@@ -71,6 +71,7 @@ proc frame() {.cdecl.} =
     ctx.dashArray = @[padding, padding]
     ctx.strokeStyle = color(221f / 255f, 153f / 255f, 160f / 255f, 1)
     ctx.strokePath(p2)
+    ctx.strokePath(p3)
     ctx.dashArray.setLen(0)
 
     let n = text.runeLenAt(lastIdx)

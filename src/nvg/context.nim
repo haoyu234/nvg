@@ -59,7 +59,7 @@ type
     textBaseline*: BaselineAlignment
     fontId*: FontId
 
-    # 
+    #
     ctx: pointer
     params: BackendContextParams
 
@@ -74,6 +74,8 @@ type
     cache: Cache
     states: seq[ContextState]
 
+    path: Path
+
     # stats
     drawCallCount: int
 
@@ -85,7 +87,7 @@ proc resetState(ctx: Context) =
   ctx.fillStyle = color(1, 1, 1, 1)
   ctx.strokeStyle = color(0, 0, 0, 1)
 
-  ctx.compositeOperation = CompositeOperation.SOURCE_OVER_OPERATION
+  ctx.compositeOperation = SOURCE_OVER_OPERATION
   ctx.strokeWidth = 1
   ctx.miterLimit = 10
   ctx.lineCap = ButtCap
@@ -213,7 +215,8 @@ proc fillPath*(ctx: Context, path: Path) =
     contourFlags.incl(ContourFlags.EvenOdd)
 
   ctx.params.fillImpl(
-    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, contourFlags, ctx.cache.bounds,
+    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, contourFlags,
+    ctx.cache.bounds,
     ctx.cache.contours,
   )
 
@@ -317,7 +320,8 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
   if font.isNil:
     return
 
-  let scale = ctx.fontSize / float32(font.metrics.ascender - font.metrics.descender)
+  let scale = ctx.fontSize / float32(font.metrics.ascender -
+      font.metrics.descender)
 
   when defined(NVG_DEBUG_CORE):
     printf(
@@ -366,7 +370,7 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
         result.moveTo(p1)
 
         if idx <= 0:
-          result.restart()
+          result.appendCommands([float32(PathCommand.RESTART)])
 
       elif vert.tp == uint8(GlyphShapeCommand.LINE):
         let p1 = matrix * vec2(float32(vert.x), float32(vert.y))
@@ -378,3 +382,45 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
           p2 = matrix * vec2(float32(vert.cx), float32(vert.cy))
 
         result.quadCurveTo(p2, p1)
+
+proc beginPath*(ctx: Context) {.inline.} =
+  ctx.path.clear()
+
+proc rectXYWH*(ctx: Context, rect: Vec4) {.inline.} =
+  ctx.path.rectXYWH(rect)
+
+proc rectLTRB*(ctx: Context, rect: Vec4) {.inline.} =
+  ctx.path.rectLTRB(rect)
+
+proc arc*(ctx: Context, cp: Vec2, r, a0, a1: float32, ccw: bool) =
+  ctx.path.arc(cp, r, a0, a1, ccw)
+
+proc ellipse*(ctx: Context, c: Vec2, rx, ry: float32) {.inline.} =
+  ctx.path.ellipse(c, rx, ry)
+
+proc circle*(ctx: Context, c: Vec2, r: float32) {.inline.} =
+  ctx.path.circle(c, r)
+
+proc moveTo*(ctx: Context, pos: Vec2) {.inline.} =
+  ctx.path.moveTo(pos)
+
+proc lineTo*(ctx: Context, pos: Vec2) {.inline.} =
+  ctx.path.lineTo(pos)
+
+proc bezierTo*(ctx: Context, cp1, cp2, to: Vec2) {.inline.} =
+  ctx.path.bezierTo(cp1, cp2, to)
+
+proc quadCurveTo*(ctx: Context, cp, to: Vec2) {.inline.} =
+  ctx.path.quadCurveTo(cp, to)
+
+proc arcTo*(ctx: Context, a, b: Vec2, r: float32) =
+  ctx.path.arcTo(a, b, r)
+
+proc closePath*(ctx: Context) {.inline.} =
+  ctx.path.closePath()
+
+proc fill*(ctx: Context) {.inline.} =
+  ctx.fillPath(ctx.path)
+
+proc stroke*(ctx: Context) {.inline.} =
+  ctx.strokePath(ctx.path)

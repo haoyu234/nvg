@@ -1,11 +1,9 @@
-import ./fontstash
-
 type
   Vec2* = array[2, float32]
   Vec4* = array[4, float32]
   Mat3* = array[9, float32]
 
-  FontId* = distinct FonsFontId
+  FontId* = distinct uint32
 
   LineCap* = enum
     ButtCap
@@ -63,7 +61,7 @@ type
   SomePaint* = Paint | Color
 
 proc isNil*(fontId: FontId): bool {.inline.} =
-  FonsFontId(fontId).isNil
+  uint32(fontId) == 0
 
 proc vec2*(v1, v2: float32): Vec2 {.inline.} =
   [v1, v2]
