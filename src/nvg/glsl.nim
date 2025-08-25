@@ -1,4 +1,3 @@
-import sokol/gfx as sg
 #
 #    #version:1# (machine generated, don't edit!)
 #

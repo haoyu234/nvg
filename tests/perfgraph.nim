@@ -46,7 +46,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   var p = default(Path)
 
   let
-    w = float32(380)
+    w = float32(290)
     h = float32(80)
 
   ctx.save()

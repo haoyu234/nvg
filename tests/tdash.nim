@@ -1,37 +1,15 @@
-import pkg/sokol/app
-import pkg/sokol/gfx
-import pkg/sokol/glue
-import pkg/sokol/log
+import nvg
 
-import nvg/context
-import nvg/sokol
-import nvg/core
-import nvg/path
-
-import std/strformat
-import std/monotimes
 import std/unicode
 
+import ./app
 import ./fonts
-import ./perfgraph
 
-const action = PassAction(
-  colors: [
-    ColorAttachmentAction(
-      loadAction: loadActionClear,
-      clearValue: gfx.Color(r: 1.0, g: 1.0, b: 1.0, a: 1.0),
-    )
-  ]
-)
+proc initImpl(ctx: Context) =
+  discard
 
-var ctx = default(Context)
-var fpsGraph = initGraph("fps", PERF_GRAPH_RENDER_FPS)
-
-proc frame() {.cdecl.} =
-  let t1 = getMonoTime()
-  beginPass(Pass(action: action, swapchain: swapchain()))
-
-  ctx.begin(vec2(float32(width()), float32(height())), dpiScale())
+proc frameImpl(ctx: Context) =
+  ctx.resetTransform()
 
   let
     size = 68f
@@ -91,53 +69,8 @@ proc frame() {.cdecl.} =
     if lastIdx >= len(text):
       break
 
-  ctx.resetTransform()
-  ctx.renderGraph(vec2(padding, float32(height()) - padding - 80), fpsGraph)
-
-  ctx.flush()
-
-  endPass()
-  commit()
-
-  let t2 = getMonoTime()
-  fpsGraph.updateGraph(t2 - t1)
-
-proc init() {.cdecl.} =
-  gfx.setup(
-    gfx.Desc(
-      environment: environment(),
-      logger: gfx.Logger(fn: fn),
-      pipelinePoolSize: 128, # d3d11ShaderDebugging: true,
-    )
-  )
-
-  case queryBackend()
-  of backendGlcore:
-    echo "using GLCORE backend"
-  of backendD3d11:
-    echo "using D3D11 backend"
-  of backendMetalMacos:
-    echo "using Metal backend"
-  else:
-    echo "using untested backend"
-
-  setWindowTitle(fmt"tdash.nim {queryBackend()}".cstring)
-
-  ctx = newContext()
-
-proc cleanup() {.cdecl.} =
-  shutdown()
-
-app.run(
-  app.Desc(
-    initCb: init,
-    frameCb: frame,
-    cleanupCb: cleanup,
-    swapInterval: 0,
-    sampleCount: 4,
-    width: 600,
-    height: 400,
-    icon: IconDesc(sokol_default: true),
-    logger: app.Logger(fn: log.fn),
-  )
-)
+launch(800, 600, App(
+  name: "tdash.nim",
+  initImpl: initImpl,
+  frameImpl: frameImpl,
+))

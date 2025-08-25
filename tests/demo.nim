@@ -1,71 +1,18 @@
-import nvg/context
-import nvg/core
-import nvg/path
+import nvg
 
-import ./perfgraph
 import ./fonts
 
-import std/monotimes
-import std/strformat
-import std/times
+# proc dump*() =
+#   let us = totalTime.inMicroseconds
 
-var
-  frameCount = 0
-  frameStartTime = default(MonoTime)
-
-  totalTime = default(Duration)
-  graph = default(PerfGraph)
-
-proc initDemo*(ctx: Context) =
-  graph = initGraph("Frame ", PERF_GRAPH_RENDER_FPS)
-
-proc renderPerfGraph*(ctx: Context, pos: Vec2) =
-  ctx.renderGraph(pos, graph)
-
-proc frameStart*() =
-  frameStartTime = getMonoTime()
-
-proc frameEnd*() =
-  inc frameCount, 1
-  let diff = getMonoTime() - frameStartTime
-  totalTime = totalTime + diff
-
-  graph.updateGraph(diff)
-
-proc dump*() =
-  let us = totalTime.inMicroseconds
-
-  echo ""
-  echo fmt"nim version: {NimVersion}"
-  echo fmt"times: {frameCount}"
-  echo fmt"total time: {us} usecs"
-  echo fmt"average time: {float(us) / float(frameCount)} usecs"
-  echo ""
+#   echo ""
+#   echo fmt"nim version: {NimVersion}"
+#   echo fmt"times: {frameCount}"
+#   echo fmt"total time: {us} usecs"
+#   echo fmt"average time: {float(us) / float(frameCount)} usecs"
+#   echo ""
 
 proc renderDemo1*(ctx: Context) =
-  ctx.save()
-
-  ctx.fillStyle = color(1, 0, 0, 0.50)
-  ctx.strokeStyle = color(0, 1, 0, 0.50)
-
-  var p = default(Path)
-  p.moveTo([float32(100), 100])
-
-  p.arc(vec2(250, 170), 20, 40, 50, true)
-  p.arc(vec2(250, 170), 20, 40, 50, false)
-  p.arc(vec2(-340, -219), 170, -9, 181, true)
-  p.arc(vec2(-340, -219), 170, -9, 181, false)
-  p.arc(vec2(162, -219), 76, 610, -991, true)
-  p.arc(vec2(162, -219), 76, 610, -991, false)
-
-  p.quadCurveTo(vec2(250, 170), vec2(230, 20))
-
-  ctx.fillPath(p)
-  ctx.strokePath(p)
-
-  ctx.restore()
-
-proc renderDemo2*(ctx: Context) =
   ctx.save()
 
   ctx.fontId = ctx.getDefaultFont()

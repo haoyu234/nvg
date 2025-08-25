@@ -10,6 +10,11 @@ srcDir = "src"
 
 requires "nim >= 2.2.0"
 
-requires "sokol >= 0.6.0"
-requires "opengl >= 1.2.9"
-requires "sdl2 >= 2.0.5"
+feature "sokol":
+  requires "sokol >= 0.6.0"
+
+feature "opengl":
+  requires "opengl >= 1.2.9"
+
+feature "dev":
+  requires "sdl2 >= 2.0.5"
