@@ -19,7 +19,9 @@ type
     shader: Shader
     smpDummy: Sampler
     texDummy: Image
-    texEdges: Image
+    texDummyView: View
+    texEdge: Image
+    texEdgeView: View
     texLayerCount: int32
 
     vertBuf: Buffer
@@ -107,26 +109,26 @@ proc getShader(): Shader =
     s.uniformBlocks[6].glslUniforms[0].type = uniformTypeFloat4
     s.uniformBlocks[6].glslUniforms[0].arrayCount = 7
     s.uniformBlocks[6].glslUniforms[0].glslName = "paint"
-    s.images[1].stage = shaderStageFragment
-    s.images[1].multisampled = false
-    s.images[1].imageType = imageType2d
-    s.images[1].sampleType = imageSampleTypeFloat
-    s.images[2].stage = shaderStageFragment
-    s.images[2].multisampled = false
-    s.images[2].imageType = imageTypeArray
-    s.images[2].sampleType = imageSampleTypeFloat
+    s.views[1].texture.stage = shaderStageFragment
+    s.views[1].texture.multisampled = false
+    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.sampleType = imageSampleTypeFloat
+    s.views[2].texture.stage = shaderStageFragment
+    s.views[2].texture.multisampled = false
+    s.views[2].texture.imageType = imageTypeArray
+    s.views[2].texture.sampleType = imageSampleTypeFloat
     s.samplers[3].stage = shaderStageFragment
     s.samplers[3].samplerType = samplerTypeFiltering
     s.samplers[4].stage = shaderStageFragment
     s.samplers[4].samplerType = samplerTypeFiltering
-    s.imageSamplerPairs[0].stage = shaderStageFragment
-    s.imageSamplerPairs[0].imageSlot = 2
-    s.imageSamplerPairs[0].samplerSlot = 4
-    s.imageSamplerPairs[0].glslName = "edgeTex_smp2"
-    s.imageSamplerPairs[1].stage = shaderStageFragment
-    s.imageSamplerPairs[1].imageSlot = 1
-    s.imageSamplerPairs[1].samplerSlot = 3
-    s.imageSamplerPairs[1].glslName = "imageTex_smp1"
+    s.textureSamplerPairs[0].stage = shaderStageFragment
+    s.textureSamplerPairs[0].viewSlot = 2
+    s.textureSamplerPairs[0].samplerSlot = 4
+    s.textureSamplerPairs[0].glslName = "edgeTex_smp2"
+    s.textureSamplerPairs[1].stage = shaderStageFragment
+    s.textureSamplerPairs[1].viewSlot = 1
+    s.textureSamplerPairs[1].samplerSlot = 3
+    s.textureSamplerPairs[1].glslName = "imageTex_smp1"
   of backendGles3:
     s.vertexFunc.source = cast[cstring](vsSourceGlsl300es[0].addr)
     s.vertexFunc.entry = "main"
@@ -154,26 +156,26 @@ proc getShader(): Shader =
     s.uniformBlocks[6].glslUniforms[0].type = uniformTypeFloat4
     s.uniformBlocks[6].glslUniforms[0].arrayCount = 7
     s.uniformBlocks[6].glslUniforms[0].glslName = "paint"
-    s.images[1].stage = shaderStageFragment
-    s.images[1].multisampled = false
-    s.images[1].imageType = imageType2d
-    s.images[1].sampleType = imageSampleTypeFloat
-    s.images[2].stage = shaderStageFragment
-    s.images[2].multisampled = false
-    s.images[2].imageType = imageTypeArray
-    s.images[2].sampleType = imageSampleTypeFloat
+    s.views[1].texture.stage = shaderStageFragment
+    s.views[1].texture.multisampled = false
+    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.sampleType = imageSampleTypeFloat
+    s.views[2].texture.stage = shaderStageFragment
+    s.views[2].texture.multisampled = false
+    s.views[2].texture.imageType = imageTypeArray
+    s.views[2].texture.sampleType = imageSampleTypeFloat
     s.samplers[3].stage = shaderStageFragment
     s.samplers[3].samplerType = samplerTypeFiltering
     s.samplers[4].stage = shaderStageFragment
     s.samplers[4].samplerType = samplerTypeFiltering
-    s.imageSamplerPairs[0].stage = shaderStageFragment
-    s.imageSamplerPairs[0].imageSlot = 2
-    s.imageSamplerPairs[0].samplerSlot = 4
-    s.imageSamplerPairs[0].glslName = "edgeTex_smp2"
-    s.imageSamplerPairs[1].stage = shaderStageFragment
-    s.imageSamplerPairs[1].imageSlot = 1
-    s.imageSamplerPairs[1].samplerSlot = 3
-    s.imageSamplerPairs[1].glslName = "imageTex_smp1"
+    s.textureSamplerPairs[0].stage = shaderStageFragment
+    s.textureSamplerPairs[0].viewSlot = 2
+    s.textureSamplerPairs[0].samplerSlot = 4
+    s.textureSamplerPairs[0].glslName = "edgeTex_smp2"
+    s.textureSamplerPairs[1].stage = shaderStageFragment
+    s.textureSamplerPairs[1].viewSlot = 1
+    s.textureSamplerPairs[1].samplerSlot = 3
+    s.textureSamplerPairs[1].glslName = "imageTex_smp1"
   of backendD3d11:
     s.vertexFunc.source = cast[cstring](vsSourceHlsl5[0].addr)
     s.vertexFunc.d3d11Target = "vs_5_0"
@@ -194,33 +196,33 @@ proc getShader(): Shader =
     s.uniformBlocks[5].stage = shaderStageFragment
     s.uniformBlocks[5].layout = uniformLayoutStd140
     s.uniformBlocks[5].size = 16
-    s.uniformBlocks[5].hlslRegisterBN = 1
+    s.uniformBlocks[5].hlslRegisterBN = 5
     s.uniformBlocks[6].stage = shaderStageFragment
     s.uniformBlocks[6].layout = uniformLayoutStd140
     s.uniformBlocks[6].size = 112
-    s.uniformBlocks[6].hlslRegisterBN = 0
-    s.images[1].stage = shaderStageFragment
-    s.images[1].multisampled = false
-    s.images[1].imageType = imageType2d
-    s.images[1].sampleType = imageSampleTypeFloat
-    s.images[1].hlslRegisterTN = 1
-    s.images[2].stage = shaderStageFragment
-    s.images[2].multisampled = false
-    s.images[2].imageType = imageTypeArray
-    s.images[2].sampleType = imageSampleTypeFloat
-    s.images[2].hlslRegisterTN = 0
+    s.uniformBlocks[6].hlslRegisterBN = 6
+    s.views[1].texture.stage = shaderStageFragment
+    s.views[1].texture.multisampled = false
+    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.sampleType = imageSampleTypeFloat
+    s.views[1].texture.hlslRegisterTN = 0
+    s.views[2].texture.stage = shaderStageFragment
+    s.views[2].texture.multisampled = false
+    s.views[2].texture.imageType = imageTypeArray
+    s.views[2].texture.sampleType = imageSampleTypeFloat
+    s.views[2].texture.hlslRegisterTN = 1
     s.samplers[3].stage = shaderStageFragment
     s.samplers[3].samplerType = samplerTypeFiltering
-    s.samplers[3].hlslRegisterSN = 0
+    s.samplers[3].hlslRegisterSN = 3
     s.samplers[4].stage = shaderStageFragment
     s.samplers[4].samplerType = samplerTypeFiltering
-    s.samplers[4].hlslRegisterSN = 1
-    s.imageSamplerPairs[0].stage = shaderStageFragment
-    s.imageSamplerPairs[0].imageSlot = 2
-    s.imageSamplerPairs[0].samplerSlot = 4
-    s.imageSamplerPairs[1].stage = shaderStageFragment
-    s.imageSamplerPairs[1].imageSlot = 1
-    s.imageSamplerPairs[1].samplerSlot = 3
+    s.samplers[4].hlslRegisterSN = 4
+    s.textureSamplerPairs[0].stage = shaderStageFragment
+    s.textureSamplerPairs[0].viewSlot = 2
+    s.textureSamplerPairs[0].samplerSlot = 4
+    s.textureSamplerPairs[1].stage = shaderStageFragment
+    s.textureSamplerPairs[1].viewSlot = 1
+    s.textureSamplerPairs[1].samplerSlot = 3
   of backendWgpu:
     s.vertexFunc.source = cast[cstring](vsSourceWgsl[0].addr)
     s.vertexFunc.entry = "main"
@@ -235,33 +237,33 @@ proc getShader(): Shader =
     s.uniformBlocks[5].stage = shaderStageFragment
     s.uniformBlocks[5].layout = uniformLayoutStd140
     s.uniformBlocks[5].size = 16
-    s.uniformBlocks[5].wgslGroup0BindingN = 9
+    s.uniformBlocks[5].wgslGroup0BindingN = 13
     s.uniformBlocks[6].stage = shaderStageFragment
     s.uniformBlocks[6].layout = uniformLayoutStd140
     s.uniformBlocks[6].size = 112
-    s.uniformBlocks[6].wgslGroup0BindingN = 8
-    s.images[1].stage = shaderStageFragment
-    s.images[1].multisampled = false
-    s.images[1].imageType = imageType2d
-    s.images[1].sampleType = imageSampleTypeFloat
-    s.images[1].wgslGroup1BindingN = 65
-    s.images[2].stage = shaderStageFragment
-    s.images[2].multisampled = false
-    s.images[2].imageType = imageTypeArray
-    s.images[2].sampleType = imageSampleTypeFloat
-    s.images[2].wgslGroup1BindingN = 64
+    s.uniformBlocks[6].wgslGroup0BindingN = 14
+    s.views[1].texture.stage = shaderStageFragment
+    s.views[1].texture.multisampled = false
+    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.sampleType = imageSampleTypeFloat
+    s.views[1].texture.wgslGroup1BindingN = 64
+    s.views[2].texture.stage = shaderStageFragment
+    s.views[2].texture.multisampled = false
+    s.views[2].texture.imageType = imageTypeArray
+    s.views[2].texture.sampleType = imageSampleTypeFloat
+    s.views[2].texture.wgslGroup1BindingN = 65
     s.samplers[3].stage = shaderStageFragment
     s.samplers[3].samplerType = samplerTypeFiltering
-    s.samplers[3].wgslGroup1BindingN = 80
+    s.samplers[3].wgslGroup1BindingN = 66
     s.samplers[4].stage = shaderStageFragment
     s.samplers[4].samplerType = samplerTypeFiltering
-    s.samplers[4].wgslGroup1BindingN = 81
-    s.imageSamplerPairs[0].stage = shaderStageFragment
-    s.imageSamplerPairs[0].imageSlot = 2
-    s.imageSamplerPairs[0].samplerSlot = 4
-    s.imageSamplerPairs[1].stage = shaderStageFragment
-    s.imageSamplerPairs[1].imageSlot = 1
-    s.imageSamplerPairs[1].samplerSlot = 3
+    s.samplers[4].wgslGroup1BindingN = 67
+    s.textureSamplerPairs[0].stage = shaderStageFragment
+    s.textureSamplerPairs[0].viewSlot = 2
+    s.textureSamplerPairs[0].samplerSlot = 4
+    s.textureSamplerPairs[1].stage = shaderStageFragment
+    s.textureSamplerPairs[1].viewSlot = 1
+    s.textureSamplerPairs[1].samplerSlot = 3
   else:
     discard
 
@@ -270,7 +272,7 @@ proc getShader(): Shader =
 proc createImpl(): pointer =
   let ctx = create(OpenglBackendContextObj)
 
-  ctx.texEdges = allocImage()
+  ctx.texEdge = allocImage()
   ctx.vertBuf = allocBuffer()
   ctx.shader = getShader()
   ctx.smpDummy = makeSampler(
@@ -302,6 +304,14 @@ proc createImpl(): pointer =
     )
   )
 
+  ctx.texDummyView = makeView(
+    ViewDesc(
+      texture: TextureViewDesc(
+        image: ctx.texDummy
+      )
+    )
+  )
+
   ctx
 
 proc destroyImpl(ctx: pointer) =
@@ -309,8 +319,10 @@ proc destroyImpl(ctx: pointer) =
 
   destroyShader(ctx.shader)
   destroySampler(ctx.smpDummy)
-  destroyImage(ctx.texEdges)
+  destroyImage(ctx.texEdge)
   destroyImage(ctx.texDummy)
+  destroyView(ctx.texEdgeView)
+  destroyView(ctx.texDummyView)
   destroyBuffer(ctx.vertBuf)
 
   for idx in low(CallType) .. high(CallType):
@@ -369,10 +381,13 @@ proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
 
   if ctx.texLayerCount != layerCount:
     if ctx.texLayerCount > 0:
-      ctx.texEdges.uninitImage()
+      ctx.texEdge.uninitImage()
+
+      destroyView(ctx.texEdgeView)
+
     ctx.texLayerCount = int32(layerCount)
 
-    ctx.texEdges.initImage(
+    ctx.texEdge.initImage(
       ImageDesc(
         type: imageTypeArray,
         width: TILE_IMAGE_WIDTH,
@@ -381,11 +396,19 @@ proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
         pixelFormat: pixelFormatRgba32f,
         numMipmaps: 0,
         numSlices: int32(layerCount),
-        label: "nvg.texEdges",
+        label: "nvg.texEdge",
       )
     )
 
-  ctx.texEdges.updateImage(imageData)
+    ctx.texEdgeView = makeView(
+      ViewDesc(
+        texture: TextureViewDesc(
+          image: ctx.texEdge
+        )
+      )
+    )
+
+  ctx.texEdge.updateImage(imageData)
 
 proc updatePipeline(
     ctx: ptr OpenglBackendContextObj, callType: CallType,
@@ -473,10 +496,10 @@ proc flushImpl(ctx: pointer) =
 
       bindings.vertexBuffers[0] = ctx.vertBuf
 
-      bindings.images[1] = ctx.texDummy
+      bindings.views[1] = ctx.texDummyView
       bindings.samplers[3] = ctx.smpDummy
 
-      bindings.images[2] = ctx.texEdges
+      bindings.views[2] = ctx.texEdgeView
       bindings.samplers[4] = ctx.smpDummy
 
       applyBindings(bindings)
