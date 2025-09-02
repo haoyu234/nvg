@@ -8,14 +8,24 @@ import ./renderdata
 
 import std/math
 
+const TILE_IMAGE_WIDTH = 256
+
 type
-  Blend = object
+  SokolBlend = object
     srcRGB: BlendFactor
     dstRGB: BlendFactor
     srcAlpha: BlendFactor
     dstAlpha: BlendFactor
 
-  OpenglBackendContextObj = object
+  SokolTexture = ref object of Texture
+    storage: seq[byte]
+    pixels: ptr UncheckedArray[byte]
+    texImage: Image
+    texImageView: View
+    smp: Sampler
+    dirty: bool
+
+  SokolBackendContextObj = object
     shader: Shader
     smpDummy: Sampler
     texDummy: Image
@@ -32,51 +42,6 @@ type
 
     viewBounds: Vec2
     renderData: RenderData
-
-proc toBlend(op: CompositeOperation): Blend {.inline.} =
-  type BlendOp = object
-    src: BlendFactor
-    dst: BlendFactor
-
-  const blendOpTbl: array[CompositeOperation, BlendOp] = [
-    BlendOp(src: blendFactorOne, dst: blendFactorOneMinusSrcAlpha),
-    BlendOp(src: blendFactorDstAlpha, dst: blendFactorZero),
-    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorZero),
-    BlendOp(src: blendFactorDstAlpha, dst: blendFactorOneMinusSrcAlpha),
-    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorOne),
-    BlendOp(src: blendFactorZero, dst: blendFactorSrcAlpha),
-    BlendOp(src: blendFactorZero, dst: blendFactorOneMinusSrcAlpha),
-    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorSrcAlpha),
-    BlendOp(src: blendFactorOne, dst: blendFactorOne),
-    BlendOp(src: blendFactorOne, dst: blendFactorZero),
-    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorOneMinusSrcAlpha),
-  ]
-
-  let blendOp = blendOpTbl[op]
-  Blend(
-    srcRGB: blendOp.src,
-    dstRGB: blendOp.dst,
-    srcAlpha: blendOp.src,
-    dstAlpha: blendOp.dst,
-  )
-
-proc fillImpl(
-    ctx: pointer,
-    paint: Paint,
-    compositeOperation: CompositeOperation,
-    contourFlags: set[ContourFlags],
-    bounds: Vec4,
-    contours: openArray[Contour],
-) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-  ctx.renderData.buildCall(
-    ctx.viewBounds,
-    paint,
-    compositeOperation,
-    contourFlags,
-    bounds,
-    contours,
-  )
 
 proc getShader(): Shader =
   var s = ShaderDesc(label: "nvg.shader")
@@ -270,11 +235,32 @@ proc getShader(): Shader =
   makeShader(s)
 
 proc createImpl(): pointer =
-  let ctx = create(OpenglBackendContextObj)
+  let ctx = create(SokolBackendContextObj)
 
-  ctx.texEdge = allocImage()
-  ctx.vertBuf = allocBuffer()
   ctx.shader = getShader()
+  ctx.vertBuf = allocBuffer()
+
+  ctx.texEdge = makeImage(
+    ImageDesc(
+      type: imageTypeArray,
+      width: TILE_IMAGE_WIDTH,
+      height: TILE_IMAGE_WIDTH,
+      usage: ImageUsage(dynamicUpdate: true),
+      pixelFormat: pixelFormatRgba32f,
+      numMipmaps: 0,
+      numSlices: 0,
+      label: "nvg.texEdge",
+    )
+  )
+
+  ctx.texEdgeView = makeView(
+    ViewDesc(
+      texture: TextureViewDesc(
+        image: ctx.texEdge
+    )
+  )
+  )
+
   ctx.smpDummy = makeSampler(
     SamplerDesc(
       minFilter: filterNearest,
@@ -288,7 +274,9 @@ proc createImpl(): pointer =
   for idx in low(CallType) .. high(CallType):
     ctx.pipeline[idx] = allocPipeline()
 
-  const dummyPixels = [color(1, 1, 1, 1)]
+  let
+    data = [color(1, 1, 1, 1)]
+    dataRange = Range(addr: data[0].addr, size: sizeof(Color))
 
   ctx.texDummy = makeImage(
     ImageDesc(
@@ -300,22 +288,22 @@ proc createImpl(): pointer =
       numMipmaps: 1,
       label: "nvg.texDummy",
       data:
-        ImageData(subimage: [[Range(addr: dummyPixels[0].addr, size: sizeof(Color))]]),
-    )
+    ImageData(subimage: [[dataRange]]),
+  )
   )
 
   ctx.texDummyView = makeView(
     ViewDesc(
       texture: TextureViewDesc(
         image: ctx.texDummy
-      )
     )
+  )
   )
 
   ctx
 
 proc destroyImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   destroyShader(ctx.shader)
   destroySampler(ctx.smpDummy)
@@ -332,17 +320,17 @@ proc destroyImpl(ctx: pointer) =
   dealloc(ctx)
 
 proc cancelImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   ctx.renderData.clear()
 
 proc viewportImpl(ctx: pointer, viewBounds: Vec2, devicePixelRatio: float32) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   ctx.viewBounds = viewBounds
   cancelImpl(ctx)
 
-proc updateVertBuf(ctx: ptr OpenglBackendContextObj) =
+proc updateVertBuf(ctx: ptr SokolBackendContextObj) =
   if ctx.vertBufSize < ctx.renderData.verts.len:
     if ctx.vertBufSize > 0:
       ctx.vertBuf.uninitBuffer()
@@ -358,12 +346,11 @@ proc updateVertBuf(ctx: ptr OpenglBackendContextObj) =
     )
 
   ctx.vertBuf.updateBuffer(
-    Range(addr: ctx.renderData.verts[0].addr, size: sizeof(Vec4) * ctx.vertBufSize)
+    Range(addr: ctx.renderData.verts[0].addr, size: sizeof(Vec4) *
+        ctx.vertBufSize)
   )
 
-proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
-  const TILE_IMAGE_WIDTH = 256
-
+proc updateTexEdges(ctx: ptr SokolBackendContextObj) =
   let
     layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
     layerCount = block:
@@ -375,15 +362,9 @@ proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
   if capacity(ctx.renderData.edges) < size:
     ctx.renderData.edges.setLen(size)
 
-  let
-    data = Range(addr: ctx.renderData.edges[0].addr, size: size * sizeof(Vec4))
-    imageData = ImageData(subimage: [[data]])
-
   if ctx.texLayerCount != layerCount:
-    if ctx.texLayerCount > 0:
-      ctx.texEdge.uninitImage()
-
-      destroyView(ctx.texEdgeView)
+    ctx.texEdge.uninitImage()
+    ctx.texEdgeView.uninitView()
 
     ctx.texLayerCount = int32(layerCount)
 
@@ -400,18 +381,46 @@ proc updateTexEdges(ctx: ptr OpenglBackendContextObj) =
       )
     )
 
-    ctx.texEdgeView = makeView(
+    ctx.texEdgeView.initView(
       ViewDesc(
         texture: TextureViewDesc(
           image: ctx.texEdge
-        )
       )
     )
+    )
 
-  ctx.texEdge.updateImage(imageData)
+  let data = Range(addr: ctx.renderData.edges[0].addr, size: size * sizeof(Vec4))
+  ctx.texEdge.updateImage(ImageData(subimage: [[data]]))
+
+proc toSokolBlend(op: CompositeOperation): SokolBlend {.inline.} =
+  type BlendOp = object
+    src: BlendFactor
+    dst: BlendFactor
+
+  const blendOpTbl: array[CompositeOperation, BlendOp] = [
+    BlendOp(src: blendFactorOne, dst: blendFactorOneMinusSrcAlpha),
+    BlendOp(src: blendFactorDstAlpha, dst: blendFactorZero),
+    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorZero),
+    BlendOp(src: blendFactorDstAlpha, dst: blendFactorOneMinusSrcAlpha),
+    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorOne),
+    BlendOp(src: blendFactorZero, dst: blendFactorSrcAlpha),
+    BlendOp(src: blendFactorZero, dst: blendFactorOneMinusSrcAlpha),
+    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorSrcAlpha),
+    BlendOp(src: blendFactorOne, dst: blendFactorOne),
+    BlendOp(src: blendFactorOne, dst: blendFactorZero),
+    BlendOp(src: blendFactorOneMinusDstAlpha, dst: blendFactorOneMinusSrcAlpha),
+  ]
+
+  let blendOp = blendOpTbl[op]
+  SokolBlend(
+    srcRGB: blendOp.src,
+    dstRGB: blendOp.dst,
+    srcAlpha: blendOp.src,
+    dstAlpha: blendOp.dst,
+  )
 
 proc updatePipeline(
-    ctx: ptr OpenglBackendContextObj, callType: CallType,
+    ctx: ptr SokolBackendContextObj, callType: CallType,
         blend: CompositeOperation
 ) =
   const
@@ -427,7 +436,7 @@ proc updatePipeline(
       ctx.pipeline[callType].uninitPipeline()
     ctx.blend[callType] = newBlend or ACTIVE_MASK
 
-    let blend = toBlend(blend)
+    let blend = toSokolBlend(blend)
 
     let blendState = BlendState(
       enabled: true,
@@ -453,11 +462,11 @@ proc updatePipeline(
           attrs: [
             VertexAttrState(format: vertexFormatFloat2),
             VertexAttrState(format: vertexFormatFloat2),
-          ]
-        ),
+      ]
+    ),
         stencil: StencilState(enabled: false),
         colors: [ColorTargetState(writeMask: colorMaskRgba, blend: blendState)],
-        primitive_type: primitiveType,
+        primitiveType: primitiveType,
         indexType: indexTypeNone,
         cullMode: cullModeBack,
         faceWinding: faceWindingCcw,
@@ -465,12 +474,213 @@ proc updatePipeline(
       ),
     )
 
+proc fillImpl(
+    ctx: pointer,
+    paint: Paint,
+    compositeOperation: CompositeOperation,
+    contourFlags: set[ContourFlags],
+    bounds: Vec4,
+    contours: openArray[Contour],
+) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+  ctx.renderData.fillCall(
+    ctx.viewBounds,
+    paint,
+    compositeOperation,
+    contourFlags,
+    bounds,
+    contours,
+  )
+
+proc trianglesImpl(
+  ctx: pointer,
+  paint: Paint,
+  compositeOperation: CompositeOperation,
+  verts: openArray[Vec4],
+) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+  ctx.renderData.trianglesCall(
+    ctx.viewBounds,
+    paint,
+    compositeOperation,
+    verts
+  )
+
+proc toSokolPixelFormat(typ: TextureType): PixelFormat =
+  case typ
+    of TextureRgba:
+      pixelFormatRgba32f
+
+    of TextureAlpha:
+      pixelFormatR8
+
+    of TextureFloat:
+      pixelFormatR32f
+
+proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
+    imageFlags: set[ImageFlags], data: pointer): ImageId =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  var tex = SokolTexture()
+  tex.width = w
+  tex.height = h
+  tex.typ = typ
+  tex.imageFlags = imageFlags
+
+  var
+    wrapX = wrapClampToEdge
+    wrapY = wrapClampToEdge
+    minFilter = filterDefault
+    magFilter = filterDefault
+    mipmapFilter = filterDefault
+
+    dataRange = default(Range)
+    imageUsage = default(ImageUsage)
+
+  if ImageRepeatX in imageFlags:
+    wrapX = wrapRepeat
+
+  if ImageRepeatY in imageFlags:
+    wrapY = wrapRepeat
+
+  if ImageNearest in imageFlags:
+    minFilter = filterNearest
+    magFilter = filterNearest
+    mipmapFilter = filterNearest
+  else:
+    minFilter = filterLinear
+    magFilter = filterLinear
+    mipmapFilter = filterLinear
+
+  if ImageGenerateMipmaps in imageFlags:
+    minFilter = filterDefault
+  else:
+    mipmapFilter = filterDefault
+
+  if not data.isNil and ImageGenerateMipmaps in imageFlags:
+    imageUsage.immutable = true
+  else:
+    imageUsage.dynamicUpdate = true
+
+  let
+    size = w * h * typ.bytePerPixel
+
+  if ImageExternalStorage in imageFlags:
+    tex.pixels = cast[ptr UncheckedArray[byte]](data)
+  else:
+    tex.storage.setLenUninit(size)
+    tex.pixels = cast[ptr UncheckedArray[byte]](tex.storage[0].addr)
+
+    if not data.isNil:
+      copyMem(tex.pixels, data, size)
+
+  if not tex.pixels.isNil and imageUsage.immutable:
+    dataRange = Range(addr: tex.pixels[0].addr, size: size)
+
+  tex.texImage = makeImage(
+      ImageDesc(
+        type: imageType2d,
+        width: w,
+        height: h,
+        usage: imageUsage,
+        data: ImageData(subimage: [[dataRange]]),
+        pixelFormat: typ.toSokolPixelFormat,
+        numMipmaps: 1,
+        label: "nvg.image",
+    )
+  )
+
+  tex.smp = makeSampler(
+    SamplerDesc(
+      minFilter: minFilter,
+      magFilter: magFilter,
+      mipmapFilter: mipmapFilter,
+      wrapU: wrapX,
+      wrapV: wrapY,
+    )
+  )
+
+  tex.texImageView = makeView(
+    ViewDesc(
+      texture: TextureViewDesc(
+        image: tex.texImage
+    )
+  )
+  )
+
+  ctx.renderData.addTexture(tex)
+
+proc updateTexture(tex: SokolTexture, x, y, w, h, strideBytes: int32,
+    data: ptr UncheckedArray[byte]) =
+  let
+    bytePerPixel = tex.typ.bytePerPixel
+    lineBytes1 = tex.width * bytePerPixel
+    lineBytes2 = w * bytePerPixel
+
+    offset = x * bytePerPixel + y * lineBytes1
+    dstPixelBytes = cast[ptr UncheckedArray[byte]](tex.pixels[offset].addr)
+
+  for idx in 0 ..< h:
+    copyMem(dstPixelBytes[idx * lineBytes1].addr, data[idx * strideBytes].addr, lineBytes2)
+
+proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h,
+    strideBytes: int32, data: pointer) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  let tex = ctx.renderData.getTexture(imageId)
+  if not tex.isNil:
+    let tex = SokolTexture(tex)
+
+    tex.dirty = true
+    tex.updateTexture(x, y, w, h, strideBytes, cast[
+        ptr UncheckedArray[byte]](data))
+
+proc markTextureDirtyImpl(ctx: pointer, imageId: ImageId, x, y, w, h: int32) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  let tex = ctx.renderData.getTexture(imageId)
+  if not tex.isNil:
+    let tex = SokolTexture(tex)
+
+    if ImageExternalStorage in tex.imageFlags and not tex.pixels.isNil:
+      discard
+
+    tex.dirty = true
+
+proc getTextureSizeImpl(ctx: pointer, imageId: ImageId): Vec2 =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  let tex = ctx.renderData.getTexture(imageId)
+  if not tex.isNil:
+    result = vec2(float32(tex.width), float32(tex.height))
+
+proc deleteTextureImpl(ctx: pointer, imageId: ImageId) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  let tex = ctx.renderData.getTexture(imageId)
+  if not tex.isNil:
+    let tex = SokolTexture(tex)
+
+    destroySampler(tex.smp)
+    destroyImage(tex.texImage)
+
+    ctx.renderData.removeTexture(imageId)
+
+proc updateTexImage(ctx: ptr SokolBackendContextObj, tex: SokolTexture) =
+  let
+    data = Range(addr: tex.pixels[0].addr, size: tex.width * tex.height *
+        tex.typ.bytePerPixel)
+
+  tex.texImage.updateImage(ImageData(subimage: [[data]]))
+
 proc flushImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   if ctx.renderData.verts.len > 0:
     ctx.updateVertBuf()
-    ctx.updateTexEdges()
+
+    if ctx.renderData.edges.len > 0:
+      ctx.updateTexEdges()
 
     var bindings = default(Bindings)
 
@@ -496,8 +706,17 @@ proc flushImpl(ctx: pointer) =
 
       bindings.vertexBuffers[0] = ctx.vertBuf
 
-      bindings.views[1] = ctx.texDummyView
-      bindings.samplers[3] = ctx.smpDummy
+      if call.texture.isNil:
+        bindings.views[1] = ctx.texDummyView
+        bindings.samplers[3] = ctx.smpDummy
+      else:
+        let tex = SokolTexture(call.texture)
+        if tex.dirty:
+          ctx.updateTexImage(tex)
+          tex.dirty = false
+
+        bindings.views[1] = tex.texImageView
+        bindings.samplers[3] = tex.smp
 
       bindings.views[2] = ctx.texEdgeView
       bindings.samplers[4] = ctx.smpDummy
@@ -512,7 +731,12 @@ proc newContext*(): Context =
       createImpl: createImpl,
       destroyImpl: destroyImpl,
       fillImpl: fillImpl,
-      trianglesImpl: nil,
+      trianglesImpl: trianglesImpl,
+      createTextureImpl: createTextureImpl,
+      updateTextureImpl: updateTextureImpl,
+      markTextureDirtyImpl: markTextureDirtyImpl,
+      getTextureSizeImpl: getTextureSizeImpl,
+      deleteTextureImpl: deleteTextureImpl,
       viewportImpl: viewportImpl,
       cancelImpl: cancelImpl,
       flushImpl: flushImpl,

@@ -29,7 +29,8 @@ when defined(feature.nvg.opengl):
       name = fmt"{app.name} SDL2"
       window = createWindow(name.cstring, 100, 100, cint(w), cint(h),
           SDL_WINDOW_SHOWN or SDL_WINDOW_OPENGL)
-      glContext = window.glCreateContext()
+
+    discard window.glCreateContext()
 
     loadExtensions()
 

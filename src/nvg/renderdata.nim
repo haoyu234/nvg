@@ -5,11 +5,20 @@ import ./pieces
 import ./tiles
 
 import std/math
+import std/tables
 
 type
   ShaderType* = enum
-    FillSolid = 1
-    FillGradient
+    Solid = 1
+    Gradient
+    Image
+    Text
+
+  Texture* = ref object of RootObj
+    width*: int32
+    height*: int32
+    typ*: TextureType
+    imageFlags*: set[ImageFlags]
 
   CallType* = enum
     FillCall = 1
@@ -23,10 +32,11 @@ type
     triangleOffset*: uint32
     triangleCount*: uint32
     uniformOffset*: uint32
+    texture*: Texture
     blend*: CompositeOperation
 
   FragmentUniform* = object
-    transform: Mat3
+    transform: array[9, float32]
     pad1: array[12, uint8]
     innerColor: Color
     outerColor: Color
@@ -38,11 +48,33 @@ type
     pad2: array[4, uint8]
 
   RenderData* = object
+    idgen: uint32
+
     tiles: Tiles
     calls*: seq[Call]
     verts*: seq[Vec4]
     edges*: seq[Vec4]
     uniforms*: seq[FragmentUniform]
+    images: Table[ImageId, Texture]
+
+proc addTexture*(
+    ctx: var RenderData,
+    texture: Texture): ImageId =
+  inc ctx.idgen, 1
+  let imageId = cast[ImageId](ctx.idgen)
+  ctx.images[imageId] = texture
+  imageId
+
+proc getTexture*(
+    ctx: var RenderData,
+    imageId: ImageId): Texture =
+  ctx.images.withValue(imageId, tex):
+    result = tex[]
+
+proc removeTexture*(
+    ctx: var RenderData,
+    imageId: ImageId) =
+  ctx.images.del(imageId)
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
   verts.add(vec4(bounds[2], bounds[3], 0, 0))
@@ -70,11 +102,10 @@ proc toFillType(contourFlags: set[ContourFlags]): uint32 {.inline.} =
   if Convex in contourFlags:
     result = result or (1 shl 2)
 
-proc toUniform(
-    paint: Paint, contourFlags: set[ContourFlags]
-): FragmentUniform {.inline.} =
+proc addUniform(
+    ctx: var RenderData, call: var Call,
+    paint: Paint, shaderType: ShaderType, contourFlags: set[ContourFlags]) =
   var
-    shaderType = FillSolid
     texType = default(uint32)
     fillType = toFillType(contourFlags)
     uniform = default(FragmentUniform)
@@ -83,14 +114,45 @@ proc toUniform(
   uniform.outerColor = paint.outerColor
   uniform.extent = paint.extent
 
-  if paint.innerColor != paint.outerColor:
-    shaderType = FillGradient
+  uniform.transform[0] = paint.transform[0]
+  uniform.transform[1] = paint.transform[1]
+  uniform.transform[2] = 0.0f
+
+  uniform.transform[3] = paint.transform[2]
+  uniform.transform[4] = paint.transform[3]
+  uniform.transform[5] = 0.0f
+
+  uniform.transform[6] = paint.transform[4]
+  uniform.transform[7] = paint.transform[5]
+  uniform.transform[8] = 1.0f
+
+  if shaderType == Gradient:
     uniform.radius = paint.radius
     uniform.feather = paint.feather
 
+  if not paint.image.isNil:
+    let tex = ctx.getTexture(paint.image)
+    if not tex.isNil:
+      case tex.typ
+      of TextureRgba:
+        if ImagePremultiplied in tex.imageFlags:
+          texType = 3
+        else:
+          texType = 1
+
+      of TextureAlpha, TextureFloat:
+        texType = 2
+
+      uniform.texSize = vec2(float32(tex.width), float32(tex.height))
+      call.texture = tex
+
   uniform.compressed3Type =
     float32(uint32(shaderType) or (texType shl 8) or (fillType shl 16))
-  uniform
+
+  if ctx.uniforms.len <= 0 or ctx.uniforms[ctx.uniforms.len - 1] != uniform:
+    ctx.uniforms.add(uniform)
+
+  call.uniformOffset = uint32(ctx.uniforms.len) - 1
 
 proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
   let
@@ -98,8 +160,8 @@ proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
     c = n + s.len
 
   if capacity(s) < c:
-    s.setLenUninit(c)
-    s.setLenUninit(l)
+    s.setLen(c)
+    s.setLen(l)
 
 proc clear*(ctx: var RenderData) =
   ctx.verts.setLen(0)
@@ -107,7 +169,7 @@ proc clear*(ctx: var RenderData) =
   ctx.calls.setLen(0)
   ctx.uniforms.setLen(0)
 
-proc buildCall*(
+proc fillCall*(
     ctx: var RenderData,
     view: Vec2,
     paint: Paint,
@@ -154,13 +216,7 @@ proc buildCall*(
 
   call.callType = FillCall
   call.blend = compositeOperation
-
-  let uniform = toUniform(paint, contourFlags)
-  if ctx.uniforms.len > 0 and ctx.uniforms[ctx.uniforms.len - 1] == uniform:
-    call.uniformOffset = uint32(ctx.uniforms.len) - 1
-  else:
-    call.uniformOffset = uint32(ctx.uniforms.len)
-    ctx.uniforms.add(uniform)
+  ctx.addUniform(call, paint, Solid, contourFlags)
 
   const tileSize = 32
 
@@ -172,6 +228,7 @@ proc buildCall*(
     call.triangleOffset = uint32(ctx.verts.len)
 
     ctx.verts.add(contours[0].fill.toOpenArray)
+
   elif ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
     ltrb[0] = floor(ltrb[0])
     ltrb[1] = floor(ltrb[1])
@@ -264,6 +321,7 @@ proc buildCall*(
 
         ctx.verts.addQuad(tileBounds)
         ctx.calls.add(call)
+
   elif ncalls == 1:
     call.fillOffset = uint32(ctx.edges.len)
     call.fillCount = uint32(nedges)
@@ -275,6 +333,7 @@ proc buildCall*(
 
     ctx.verts.addQuad(ltrb, 0.5)
     ctx.calls.add(call)
+
   else:
     var
       lastIdx = 0
@@ -317,3 +376,23 @@ proc buildCall*(
           ctx.calls.add(call)
 
         callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
+
+proc trianglesCall*(
+    ctx: var RenderData,
+    view: Vec2,
+    paint: Paint,
+    compositeOperation: CompositeOperation,
+    verts: openArray[Vec4],
+) =
+  var
+    call = default(Call)
+
+  call.callType = TrianglesCall
+  call.blend = compositeOperation
+  call.triangleOffset = uint32(ctx.verts.len)
+  call.triangleCount = uint32(verts.len)
+
+  ctx.addUniform(call, paint, Text, {})
+
+  ctx.verts.add(verts)
+  ctx.calls.add(call)

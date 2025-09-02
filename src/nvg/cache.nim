@@ -105,7 +105,7 @@ proc updateBounds(c: var Cache, distTolSq: float32) =
     c.bounds[3] = max(p.bounds[3], c.bounds[3])
 
 proc flattenPaths*(
-    c: var Cache, path: Path, matrix: Mat3, tessTolSq, distTolSq: float32
+    c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
 ) =
   if c.contours.len > 0:
     c.curPath = nil

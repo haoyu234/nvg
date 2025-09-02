@@ -15,29 +15,15 @@ type
     convex*: bool
     bounds*: Vec4
 
+  TextureType* = enum
+    TextureRgba
+    TextureAlpha
+    TextureFloat
+
   BackendContextParams* = object
     createImpl*: proc(): pointer {.nimcall.}
-    destroyImpl*: proc(ctx: pointer) {.nimcall.}
+    destroyImpl*: proc(ctx: pointer) {.nimcall, raises: [].}
 
-    # createTextureImpl*: proc(
-    #   ctx: pointer,
-    #   tp: TextureType,
-    #   size: IVec2,
-    #   imageFlags: ImageFlags,
-    #   data: openArray[byte],
-    # ): ImageId {.nimcall.}
-
-    # deleteTextureImpl*: proc(ctx: pointer, image: ImageId) {.nimcall.}
-
-    # updateTextureImpl*: proc(
-    #   ctx: pointer,
-    #   image: ImageId,
-    #   size: IVec4,
-    #   imageFlags: ImageFlags,
-    #   data: openArray[byte],
-    # ) {.nimcall.}
-
-    # getTextureSizeImpl*: proc(ctx: pointer, image: ImageId): IVec2 {.nimcall.}
     fillImpl*: proc(
       ctx: pointer,
       paint: Paint,
@@ -54,8 +40,32 @@ type
       verts: openArray[Vec4],
     ) {.nimcall.}
 
-    viewportImpl*: proc(ctx: pointer, view: Vec2, devicePixelRatio: float32) {.nimcall.}
+    createTextureImpl*: proc(ctx: pointer, typ: TextureType, w, h: int32,
+        imageFlags: set[ImageFlags], data: pointer): ImageId {.nimcall.}
+
+    updateTextureImpl*: proc(ctx: pointer, imageId: ImageId, x, y, w, h,
+      stride: int32, data: pointer) {.nimcall.}
+
+    markTextureDirtyImpl*: proc(ctx: pointer, imageId: ImageId, x, y, w, h: int32) {.nimcall.}
+
+    getTextureSizeImpl*: proc(ctx: pointer, imageId: ImageId): Vec2 {.nimcall.}
+
+    deleteTextureImpl*: proc(ctx: pointer, imageId: ImageId) {.nimcall.}
+
+    viewportImpl*: proc(ctx: pointer, view: Vec2,
+        devicePixelRatio: float32) {.nimcall.}
 
     cancelImpl*: proc(ctx: pointer) {.nimcall.}
 
     flushImpl*: proc(ctx: pointer) {.nimcall.}
+
+proc bytePerPixel*(typ: TextureType): int32 =
+  case typ
+  of TextureRgba:
+    int32(sizeof(Vec4))
+
+  of TextureAlpha:
+    int32(sizeof(byte))
+
+  of TextureFloat:
+    int32(sizeof(float32))
