@@ -121,13 +121,15 @@ proc inverse*(matrix: var Mat2d) {.inline.} =
     m1 = matrix[1]
     m2 = matrix[2]
     m3 = matrix[3]
+    m4 = matrix[4]
+    m5 = matrix[5]
 
   matrix[0] = m3 * invDet
   matrix[1] = -m1 * invDet
   matrix[2] = -m2 * invDet
   matrix[3] = m0 * invDet
-  matrix[4] = (m2 * matrix[5] - m3 * matrix[4]) * invDet
-  matrix[5] = (m1 * matrix[4] - m0 * matrix[5]) * invDet
+  matrix[4] = (m2 * matrix[5] - m3 * m4) * invDet
+  matrix[5] = (m1 * matrix[4] - m0 * m5) * invDet
 
 proc inversed*(matrix: Mat2d): Mat2d {.inline.} =
   let
@@ -148,13 +150,15 @@ proc multiply*(matrix: var Mat2d, matrix2: Mat2d) {.inline.} =
     m1 = matrix[1]
     m2 = matrix[2]
     m3 = matrix[3]
+    m4 = matrix[4]
+    m5 = matrix[5]
 
   matrix[0] = m0 * matrix2[0] + m2 * matrix2[1]
   matrix[1] = m1 * matrix2[0] + m3 * matrix2[1]
   matrix[2] = m0 * matrix2[2] + m2 * matrix2[3]
   matrix[3] = m1 * matrix2[2] + m3 * matrix2[3]
-  matrix[4] = m0 * matrix2[4] + m2 * matrix2[5] + matrix[4]
-  matrix[5] = m1 * matrix2[4] + m3 * matrix2[5] + matrix[5]
+  matrix[4] = m0 * matrix2[4] + m2 * matrix2[5] + m4
+  matrix[5] = m1 * matrix2[4] + m3 * matrix2[5] + m5
 
 proc multiplied*(matrix, matrix2: Mat2d): Mat2d {.inline.} =
   [

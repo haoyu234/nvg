@@ -35,40 +35,21 @@ proc appendCommands*(path: var Path, values: openArray[float32]) {.inline.} =
 
   path.commands.add(values)
 
-proc rectXYWH*(path: var Path, rect: Vec4) {.inline.} =
+proc rect*(path: var Path, xywh: Vec4) {.inline.} =
   path.appendCommands(
     [
       float32(PathCommand.MOVE),
-      rect[0],
-      rect[1],
+      xywh[0],
+      xywh[1],
       float32(PathCommand.LINE),
-      rect[0],
-      rect[1] + rect[3],
+      xywh[0],
+      xywh[1] + xywh[3],
       float32(PathCommand.LINE),
-      rect[0] + rect[2],
-      rect[1] + rect[3],
+      xywh[0] + xywh[2],
+      xywh[1] + xywh[3],
       float32(PathCommand.LINE),
-      rect[0] + rect[2],
-      rect[1],
-      float32(PathCommand.CLOSE),
-    ]
-  )
-
-proc rectLTRB*(path: var Path, rect: Vec4) {.inline.} =
-  path.appendCommands(
-    [
-      float32(PathCommand.MOVE),
-      rect[0],
-      rect[1],
-      float32(PathCommand.LINE),
-      rect[0],
-      rect[3],
-      float32(PathCommand.LINE),
-      rect[2],
-      rect[3],
-      float32(PathCommand.LINE),
-      rect[2],
-      rect[1],
+      xywh[0] + xywh[2],
+      xywh[1],
       float32(PathCommand.CLOSE),
     ]
   )

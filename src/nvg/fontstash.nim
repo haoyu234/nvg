@@ -1,87 +1,79 @@
-import ./altas
+import ./atlas
+import ./core
 import ./opentype
+import ./params
 
 import std/tables
 import std/unicode
 
-const
-  FONS_ZERO_TOP_LEFT* = uint32(1 shl 0)
-  FONS_ZERO_BOTTOM_LEFT* = uint32(1 shl 1)
-
-  FONS_ALIGN_LEFT* = uint32(1 shl 0)
-  FONS_ALIGN_CENTER* = uint32(1 shl 1)
-  FONS_ALIGN_RIGHT* = uint32(1 shl 2)
-  FONS_ALIGN_TOP* = uint32(1 shl 3)
-  FONS_ALIGN_MIDDLE* = uint32(1 shl 4)
-  FONS_ALIGN_BOTTOM* = uint32(1 shl 5)
-  FONS_ALIGN_BASELINE* = uint32(1 shl 6)
-
 type
-  FonsFontId* = distinct uint32
+  Origin* = enum
+    TopLeftOrigin
+    BottomLeftOrigin
 
-  FonsQuad* = object
+  Quad* = object
     x1*, y1*, x2*, y2*: float32
     s1*, t1*, s2*, t2*: float32
 
-  FonsGlyph* = object
-    fontId*: FonsFontId
+  Glyph* = object
+    fontId*: FontId
     unicodeCodepoint*: uint32
     glyphId*: GlyphId
     advance: int32
-    glyphBox48: GlyphBox
+    sdfGlyphBox*: GlyphBox
     shape: seq[GlyphVertex]
 
-  FonsFont* = ref FonsFontObj
-  FonsFontObj = object
-    fontId: FonsFontId
+  Font* = ref FontObj
+  FontObj = object
+    fontId: FontId
     openType*: OpenTypeObj
     metrics*: FontMetrics
-    glyphs: Table[uint32, FonsGlyph]
+    glyphs: Table[uint32, Glyph]
     sdfPixelScale: float32
     storage: seq[byte]
 
   FonsStash* = ref FonsStashObj
   FonsStashObj = object
-    flags: uint32 = FONS_ZERO_TOP_LEFT
-    sdfPadding: uint32
-    fonts: seq[FonsFont]
+    origin: Origin
+    signY: float32
+    sdfFontSize: int32
+    sdfPadding: int32
+    fonts: seq[Font]
+    atlas: Atlas
 
-proc isNil*(fontId: FonsFontId): bool {.inline.} =
-  uint32(fontId) == 0
-
-proc getPixelHeightScale*(font: FonsFont, size: float32): float32 =
+proc getPixelHeightScale*(font: Font, size: float32): float32 =
   size / float32(font.metrics.ascender - font.metrics.descender)
 
-proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FonsFontId =
+proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FontId =
   let
-    p = FonsFont()
-    fontId = FonsFontId(succ(fons.fonts.len))
+    p = Font()
+    fontId = cast[FontId](succ(fons.fonts.len))
 
   p.storage = move data
   p.openType = parseOpenType(p.storage, 0)
   p.metrics = p.openType.getFontMetrics()
   p.fontId = fontId
-  p.sdfPixelScale = p.getPixelHeightScale(96)
+  p.sdfPixelScale = p.getPixelHeightScale(float32(fons.sdfFontSize))
 
   fons.fonts.add(p)
 
   fontId
 
-proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FonsFontId =
+proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FontId =
   let
-    p = FonsFont()
-    fontId = FonsFontId(succ(fons.fonts.len))
+    p = Font()
+    fontId = cast[FontId](succ(fons.fonts.len))
 
   p.openType = parseOpenType(data, 0)
   p.metrics = p.openType.getFontMetrics()
   p.fontId = fontId
-  p.sdfPixelScale = p.getPixelHeightScale(96)
+  p.sdfPixelScale = p.getPixelHeightScale(float32(fons.sdfFontSize))
 
   fons.fonts.add(p)
 
   fontId
 
-proc getFont*(fons: FonsStash, fontId: FonsFontId): FonsFont =
+proc getFont*(fons: FonsStash, fontId: FontId): Font =
   let n = min(len(fons.fonts), int(fontId))
 
   for idx in 0 ..< n:
@@ -90,14 +82,14 @@ proc getFont*(fons: FonsStash, fontId: FonsFontId): FonsFont =
       return p
 
 proc getGlyph*(
-    fons: FonsStash, font: FonsFont, unicodeCodepoint: uint32
-): ptr FonsGlyph =
+    fons: FonsStash, font: Font, unicodeCodepoint: uint32
+): ptr Glyph =
   if not font.glyphs.contains(unicodeCodepoint):
     let glyphId = font.openType.getGlyphId(unicodeCodepoint)
     if glyphId.isNil:
       return
 
-    var glyph = default(FonsGlyph)
+    var glyph = default(Glyph)
     glyph.fontId = font.fontId
     glyph.unicodeCodepoint = unicodeCodepoint
     glyph.glyphId = glyphId
@@ -107,8 +99,7 @@ proc getGlyph*(
   font.glyphs[unicodeCodepoint].addr
 
 proc measureText*(
-    fons: FonsStash, font: FonsFont, text: openArray[char], size,
-        spacing: float32
+    fons: FonsStash, font: Font, text: openArray[char], size, spacing: float32
 ): float32 =
   var prevGlyphId = default(GlyphId)
   let scale = font.getPixelHeightScale(size)
@@ -128,23 +119,24 @@ proc measureText*(
 
 iterator arrange*(
     fons: FonsStash,
-    font: FonsFont,
+    font: Font,
     text: openArray[char],
     x, y: float32,
-    align: uint32,
+    textAlign: HorizontalAlignment,
+    textBaseline: BaselineAlignment,
     size, spacing: float32,
-): (float32, float32, ptr FonsGlyph) =
+): (float32, float32, ptr Glyph) =
   var
     x = x
     y = y
     prevGlyphId = default(GlyphId)
 
   # x align
-  if (align and FONS_ALIGN_LEFT) > 0:
+  if textAlign == LeftAlign:
     discard
-  elif (align and FONS_ALIGN_RIGHT) > 0:
+  elif textAlign == RightAlign:
     x = x - measureText(fons, font, text, size, spacing)
-  elif (align and FONS_ALIGN_CENTER) > 0:
+  elif textAlign == CenterAlign:
     x = x - measureText(fons, font, text, size, spacing) / 2
 
   let
@@ -153,19 +145,14 @@ iterator arrange*(
     ascender = float32(font.metrics.ascender + font.metrics.lineGap) / h
     descender = float32(font.metrics.descender) / h
     scale = font.getPixelHeightScale(size)
-    sign =
-      if (fons.flags and FONS_ZERO_TOP_LEFT) > 0:
-        float32(1)
-      else:
-        float32(-1)
 
   # y align
-  if (align and FONS_ALIGN_TOP) > 0:
-    y = y + sign * ascender * size
-  elif (align and FONS_ALIGN_MIDDLE) > 0:
-    y = y + sign * (ascender + descender) / float32(2) * size
-  elif (align and FONS_ALIGN_BOTTOM) > 0:
-    y = y + sign * descender * size
+  if textBaseline == TopBaseline:
+    y = y + fons.signY * ascender * size
+  elif textBaseline == MiddleBaseline:
+    y = y + fons.signY * (ascender + descender) / float32(2) * size
+  elif textBaseline == BottomBaseline:
+    y = y + fons.signY * descender * size
 
   for r in runes(text):
     let glyph = fons.getGlyph(font, uint32(r))
@@ -182,7 +169,7 @@ iterator arrange*(
 
     x = x + scale * float32(glyph.advance)
 
-proc getGlyphShape*(fons: FonsStash, glyph: ptr FonsGlyph): lent seq[GlyphVertex] =
+proc getGlyphShape*(fons: FonsStash, glyph: ptr Glyph): lent seq[GlyphVertex] =
   if glyph.shape.len <= 0:
     let font = fons.getFont(glyph.fontId)
     if font.isNil:
@@ -191,59 +178,88 @@ proc getGlyphShape*(fons: FonsStash, glyph: ptr FonsGlyph): lent seq[GlyphVertex
     glyph.shape = font.openType.getGlyphShape(glyph.glyphId)
   glyph.shape
 
-proc addGlyphToAltas*(fons: FonsStash, glyph: ptr FonsGlyph,
-    atlas: Altas): AltasCell =
+proc updateCell(fons: FonsStash, glyph: ptr Glyph): AtlasCell =
   let font = fons.getFont(glyph.fontId)
   if font.isNil:
     return
 
-  if glyph.glyphBox48.x2 <= 0 and glyph.glyphBox48.y2 <= 0:
-    glyph.glyphBox48 = font.openType.getGlyphBox(glyph.glyphId,
+  if glyph.sdfGlyphBox.x2 <= 0 and glyph.sdfGlyphBox.y2 <= 0:
+    glyph.sdfGlyphBox = font.openType.getGlyphBox(glyph.glyphId,
         font.sdfPixelScale, font.sdfPixelScale, 0, 0)
 
   let
     pad = fons.sdfPadding + 1
-    w = glyph.glyphBox48.x2 - glyph.glyphBox48.x1 + int32(2 * pad)
-    h = glyph.glyphBox48.y2 - glyph.glyphBox48.y1 + int32(2 * pad)
+    w = glyph.sdfGlyphBox.x2 - glyph.sdfGlyphBox.x1
+    h = glyph.sdfGlyphBox.y2 - glyph.sdfGlyphBox.y1
 
   let
-    cell = atlas.allocCell(w, h)
-    sdf = font.openType.getGlyphSDF(glyph.glyphId, font.sdfPixelScale, 0, 127, 32)
+    fontId32 = cast[uint32](glyph.fontId)
+    glyphId32 = cast[uint32](glyph.glyphId)
+    id = fontId32 or (glyphId32 shl 16)
 
-  atlas.updateCell(cell, sdf.w, sdf.h, sdf.w, sdf.data)
+  if fons.atlas.hasCell(id):
+    result = fons.atlas.getCell(id)
+  else:
+    let
+      padw = w + 2 * pad
+      padh = h + 2 * pad
 
-  cell
+    result = fons.atlas.allocCell(id, padw, padh, TextureAlpha)
+    if result.isNil:
+      return
 
-proc getGlyphQuad*(fons: FonsStash, glyph: ptr FonsGlyph, x, y: float32,
-    atlas: Altas, cell: AltasCell, size, blur: float32): FonsQuad =
+    let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.sdfPixelScale, 0,
+        127, 32)
+    fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
+
+proc getGlyphQuad*(fons: FonsStash, glyph: ptr Glyph, x, y, size: float32): (
+    ImageId, Quad) =
+  let cell = fons.updateCell(glyph)
+  if cell.isNil:
+    return
+
   let
-    pad = int32(fons.sdfPadding + 1)
+    pad = fons.sdfPadding + 1
+    w = glyph.sdfGlyphBox.x2 - glyph.sdfGlyphBox.x1
+    h = glyph.sdfGlyphBox.y2 - glyph.sdfGlyphBox.y1
+
+  let
+    blur = default(float32)
     expand = min(blur, float32(fons.sdfPadding)) + 1
-    xoff = float32(glyph.glyphBox48.x1) - expand
-    yoff = float32(glyph.glyphBox48.y1) - expand
-
-    w = glyph.glyphBox48.x2 - glyph.glyphBox48.x1
-    h = glyph.glyphBox48.y2 - glyph.glyphBox48.y1
+    xoff = float32(glyph.sdfGlyphBox.x1) - expand
+    yoff = float32(glyph.sdfGlyphBox.y1) - expand
 
     x1 = float32(cell.x + pad) - expand
     y1 = float32(cell.y + pad) - expand
     x2 = float32(cell.x + pad + w) + expand
-    y2 = float32(cell.x + pad + h) + expand
+    y2 = float32(cell.y + pad + h) + expand
 
-    sign =
-      if (fons.flags and FONS_ZERO_TOP_LEFT) > 0:
-        float32(1)
-      else:
-        float32(-1)
+    scale = size / float32(fons.sdfFontSize)
 
-    scale = size / float32(96)
+  result[0] = cell.imageId
 
-  result.x1 = x + scale * xoff
-  result.y1 = y + scale * yoff * sign
-  result.x2 = result.x1 + scale * float32(x2 - x1)
-  result.y2 = result.y1 + scale * float32(y2 - y1) * sign
+  result[1].x1 = x + scale * xoff
+  result[1].y1 = y + scale * yoff * fons.signY
+  result[1].x2 = result[1].x1 + scale * float32(x2 - x1)
+  result[1].y2 = result[1].y1 + scale * float32(y2 - y1) * fons.signY
 
-  result.s1 = x1 / float32(atlas.width)
-  result.t1 = y1 / float32(atlas.height)
-  result.s2 = x2 / float32(atlas.width)
-  result.t2 = y2 / float32(atlas.height)
+  result[1].s1 = x1 * cell.scaleX
+  result[1].t1 = y1 * cell.scaleY
+  result[1].s2 = x2 * cell.scaleX
+  result[1].t2 = y2 * cell.scaleY
+
+proc createFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
+  result = FonsStash()
+  result.atlas = atlas
+  result.origin = origin
+
+  case origin
+  of TopLeftOrigin:
+    result.signY = float32(1)
+
+  of BottomLeftOrigin:
+    result.signY = float32(-1)
+
+  # SDF
+  result.sdfPadding = 1
+  result.sdfFontSize = 48 * 2

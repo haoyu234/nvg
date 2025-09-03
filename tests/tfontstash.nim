@@ -1,11 +1,11 @@
 import nvg/fontstash
-import nvg/altas
+import nvg/atlas
 
 const FONT = staticRead("../msyh.ttf")
 
 proc main() =
   var
-    altas = Altas()
+    atlas = Atlas()
     fons = FonsStash()
     fontId = fons.loadFontFromMemory(cast[seq[byte]](FONT))
     text = "你好世界"
@@ -16,8 +16,8 @@ proc main() =
     echo x, y
 
     let
-      cell = fons.addGlyphToAltas(glyph, altas)
-      quad = fons.getQuad(glyph, x, y, altas, cell)
+      cell = fons.addGlyphToAtlas(glyph, atlas)
+      quad = fons.getQuad(glyph, x, y, atlas, cell)
 
     echo quad
 

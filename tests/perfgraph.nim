@@ -43,8 +43,6 @@ proc average*(p: PerfGraph): float32 =
   sum / float32(n)
 
 proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
-  return
-
   var p = default(Path)
 
   let
@@ -54,7 +52,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   ctx.save()
 
   p.clear()
-  p.rectXYWH(vec4(pos[0], pos[1], w, h))
+  p.rect(vec4(pos[0], pos[1], w, h))
 
   ctx.fillStyle = color(0, 0, 0, 0.75)
   ctx.fillPath(p)

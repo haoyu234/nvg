@@ -1,23 +1,23 @@
+import std/hashes
+
 type
   Vec2* = array[2, float32]
   Vec4* = array[4, float32]
   Mat2d* = array[6, float32]
 
-  FontId* {.size: 4.} = enum
-    _
+  FontId* = distinct uint32
 
-  ImageId* {.size: 4.} = enum
-    _
+  ImageId* = distinct uint32
 
   ImageFlags* = enum
-    ImageDefault = 0
-    ImageGenerateMipmaps = 1 shl 0
-    ImageRepeatX = 1 shl 1
-    ImageRepeatY = 1 shl 2
-    ImageFlipY = 1 shl 3
-    ImagePremultiplied = 1 shl 4
-    ImageNearest = 1 shl 5
-    ImageExternalStorage = 1 shl 6
+    ImageDefault
+    ImageGenerateMipmaps
+    ImageRepeatX
+    ImageRepeatY
+    ImageFlipY
+    ImagePremultiplied
+    ImageNearest
+    ImageExternalStorage
 
   LineCap* = enum
     ButtCap
@@ -80,6 +80,14 @@ proc isNil*(fontId: FontId): bool {.inline.} =
 
 proc isNil*(imageId: ImageId): bool {.inline.} =
   cast[uint32](imageId) == 0
+
+proc `==`*(v1, v2: FontId): bool {.borrow, inline.}
+
+proc `hash`*(v: FontId): Hash {.borrow, inline.}
+
+proc `==`*(v1, v2: ImageId): bool {.borrow, inline.}
+
+proc `hash`*(v: ImageId): Hash {.borrow, inline.}
 
 proc vec2*(v1, v2: float32): Vec2 {.inline.} =
   [v1, v2]

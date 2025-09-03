@@ -16,7 +16,7 @@ proc frameImpl(ctx: Context) =
     padding = 5f
 
   var p1 = Path()
-  p1.rectXYWH(vec4(0, 0, size, size))
+  p1.rect(vec4(0, 0, size, size))
 
   var p2 = Path()
   p2.moveTo(vec2(size / 2, padding))
@@ -58,9 +58,9 @@ proc frameImpl(ctx: Context) =
     ctx.fillStyle = color(51f / 255f, 51f / 255f, 51f / 255f, 1)
     ctx.textAlign = CenterAlign
     ctx.textBaseline = MiddleBaseline
-    let p4 = ctx.textToPath(text.toOpenArray(lastIdx, lastIdx + n - 1), vec2(
+
+    ctx.text(text.toOpenArray(lastIdx, lastIdx + n - 1), vec2(
         size / 2, size / 2))
-    ctx.fillPath(p4)
 
     inc lastIdx, n
 
@@ -68,7 +68,7 @@ proc frameImpl(ctx: Context) =
 
     if lastIdx >= len(text):
       break
-
+  
 launch(800, 600, App(
   name: "tdash.nim",
   initImpl: initImpl,

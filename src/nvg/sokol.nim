@@ -610,21 +610,21 @@ proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
 
   ctx.renderData.addTexture(tex)
 
-proc updateTexture(tex: SokolTexture, x, y, w, h, strideBytes: int32,
+proc updateTexture(tex: SokolTexture, x, y, w, h, stride: int32,
     data: ptr UncheckedArray[byte]) =
   let
     bytePerPixel = tex.typ.bytePerPixel
-    lineBytes1 = tex.width * bytePerPixel
-    lineBytes2 = w * bytePerPixel
-
-    offset = x * bytePerPixel + y * lineBytes1
-    dstPixelBytes = cast[ptr UncheckedArray[byte]](tex.pixels[offset].addr)
+    offset = x + y * tex.width
+    lineBytes = w * bytePerPixel
+    sourceStrideBytes = stride * bytePerPixel
+    destinationStrideBytes = tex.width * bytePerPixel
+    destinationPixels = cast[ptr UncheckedArray[byte]](tex.storage[offset * bytePerPixel].addr)
 
   for idx in 0 ..< h:
-    copyMem(dstPixelBytes[idx * lineBytes1].addr, data[idx * strideBytes].addr, lineBytes2)
+    copyMem(destinationPixels[idx * destinationStrideBytes].addr, data[idx * sourceStrideBytes].addr, lineBytes)
 
 proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h,
-    strideBytes: int32, data: pointer) =
+    stride: int32, data: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   let tex = ctx.renderData.getTexture(imageId)
@@ -632,7 +632,7 @@ proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h,
     let tex = SokolTexture(tex)
 
     tex.dirty = true
-    tex.updateTexture(x, y, w, h, strideBytes, cast[
+    tex.updateTexture(x, y, w, h, stride, cast[
         ptr UncheckedArray[byte]](data))
 
 proc markTextureDirtyImpl(ctx: pointer, imageId: ImageId, x, y, w, h: int32) =

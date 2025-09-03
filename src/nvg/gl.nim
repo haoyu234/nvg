@@ -277,15 +277,12 @@ proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
 
   ctx.renderData.addTexture(tex)
 
-proc updateTexture(tex: OpenglTexture, x, y, w, h, strideBytes: int32,
+proc updateTexture(tex: OpenglTexture, x, y, w, h, stride: int32,
     data: ptr UncheckedArray[byte]) =
   glBindTexture(GL_TEXTURE_2D, tex.texImage)
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, tex.width)
-  glPixelStorei(GL_UNPACK_SKIP_PIXELS, x)
-  glPixelStorei(GL_UNPACK_SKIP_ROWS, y)
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, stride * tex.typ.bytePerPixel)
 
   case tex.typ
   of TextureRgba:
@@ -299,21 +296,17 @@ proc updateTexture(tex: OpenglTexture, x, y, w, h, strideBytes: int32,
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
-  glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0)
-  glPixelStorei(GL_UNPACK_SKIP_ROWS, 0)
 
   glBindTexture(GL_TEXTURE_2D, 0)
 
-proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h,
-    strideBytes: int32, data: pointer) =
+proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h, stride: int32, data: pointer) =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
   let tex = ctx.renderData.getTexture(imageId)
   if not tex.isNil:
     let tex = OpenglTexture(tex)
 
-    tex.updateTexture(x, y, w, h, strideBytes, cast[
-        ptr UncheckedArray[byte]](data))
+    tex.updateTexture(x, y, w, h, stride, cast[ptr UncheckedArray[byte]](data))
 
 proc markTextureDirtyImpl(ctx: pointer, imageId: ImageId, x, y, w, h: int32) =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
@@ -324,10 +317,10 @@ proc markTextureDirtyImpl(ctx: pointer, imageId: ImageId, x, y, w, h: int32) =
     if ImageExternalStorage in tex.imageFlags and not tex.pixels.isNil:
       let
         bytePerPixel = tex.typ.bytePerPixel
-        data = tex.pixels[(x + y * tex.width) * bytePerPixel].addr
+        offset = x + y * tex.width
+        data = tex.pixels[offset * bytePerPixel].addr
 
-      tex.updateTexture(x, y, w, h, tex.width * bytePerPixel, cast[
-          ptr UncheckedArray[byte]](data))
+      tex.updateTexture(x, y, w, h, tex.width, cast[ptr UncheckedArray[byte]](data))
 
 proc getTextureSizeImpl(ctx: pointer, imageId: ImageId): Vec2 =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)

@@ -1,3 +1,4 @@
+import ./core
 import ./pieces
 
 import std/math
@@ -28,11 +29,15 @@ type
     w*, h*: int32
     data*: seq[byte]
 
+  GlyphLayer* = object
+    glyphId*: GlyphId
+    color*: Color
+
   OpenTypeObj* = object
     data: Piece[byte]
     fontStart: uint32
     numGlyphs: uint32
-    loca, head, glyf, hhea, hmtx, kern, gpos: uint32
+    colr, cpal, glyf, gpos, head, hhea, hmtx, kern, loca: uint32
     indexMap: uint32
     indexToLocFormat: uint32
 
@@ -40,11 +45,14 @@ proc isNil*(glyphId: GlyphId): bool {.inline.} =
   uint32(glyphId) == 0
 
 proc calcTag(data: static array[4, char]): uint32 {.raises: [].} =
-  (uint32(data[0]) shl 24) + (uint32(data[1]) shl 16) + (uint32(data[2]) shl 8) +
+  (uint32(data[0]) shl 24) + (uint32(data[1]) shl 16) + (uint32(data[
+      2]) shl 8) +
     (uint32(data[3]) shl 0)
 
 const
   TAG_CMAP = calcTag(['c', 'm', 'a', 'p'])
+  TAG_CPAL = calcTag(['C', 'P', 'A', 'L'])
+  TAG_COLR = calcTag(['C', 'O', 'L', 'R'])
   TAG_LOCA = calcTag(['l', 'o', 'c', 'a'])
   TAG_HEAD = calcTag(['h', 'e', 'a', 'd'])
   TAG_GLYF = calcTag(['g', 'l', 'y', 'f'])
@@ -103,13 +111,15 @@ proc parseOpenType*(data: openArray[byte], fontStart: uint32): OpenTypeObj =
   let
     data = piece(cast[ptr UncheckedArray[byte]](data[0].addr), data.len)
     cmap = getTable(data, fontStart, TAG_CMAP)
-    loca = getTable(data, fontStart, TAG_LOCA)
-    head = getTable(data, fontStart, TAG_HEAD)
+    colr = getTable(data, fontStart, TAG_COLR)
+    cpal = getTable(data, fontStart, TAG_CPAL)
     glyf = getTable(data, fontStart, TAG_GLYF)
+    head = getTable(data, fontStart, TAG_HEAD)
     hhea = getTable(data, fontStart, TAG_HHEA)
     hmtx = getTable(data, fontStart, TAG_HMTX)
+    loca = getTable(data, fontStart, TAG_LOCA)
 
-  if cmap <= 0 or head <= 0 or hhea <= 0 or hmtx <= 0 or glyf <= 0 or loca <= 0:
+  if cmap <= 0 or glyf <= 0 or head <= 0 or hhea <= 0 or hmtx <= 0 or loca <= 0:
     return
 
   let n = data.toInt(cmap + 2, 2, uint32)
@@ -145,13 +155,15 @@ proc parseOpenType*(data: openArray[byte], fontStart: uint32): OpenTypeObj =
   result.data = data
   result.fontStart = fontStart
   result.numGlyphs = numGlyphs
-  result.loca = loca
-  result.head = head
+  result.colr = colr
+  result.cpal = cpal
   result.glyf = glyf
+  result.gpos = gpos
+  result.head = head
   result.hhea = hhea
   result.hmtx = hmtx
   result.kern = kern
-  result.gpos = gpos
+  result.loca = loca
   result.indexMap = indexMap
   result.indexToLocFormat = indexToLocFormat
 
@@ -227,7 +239,8 @@ proc getGlyphId*(font: OpenTypeObj, unicodeCodepoint: uint32): GlyphId =
     let offset = font.data.toInt(endCountIdx + segCount * 6 + 2 + item, 2, uint32)
     if offset > 0:
       let glyphId = font.data.toInt(
-        endCountIdx + segCount * 6 + 2 + item + offset + (unicodeCodepoint - movePos) * 2,
+        endCountIdx + segCount * 6 + 2 + item + offset + (unicodeCodepoint -
+            movePos) * 2,
         2,
         uint32,
       )
@@ -253,19 +266,19 @@ proc getGlyphId*(font: OpenTypeObj, unicodeCodepoint: uint32): GlyphId =
     return
   elif format == 12 or format == 13: # Segmented coverage, Many-to-one range mappings
     var
-      movePos = default(uint32)
-      stop = font.data.toInt(font.indexMap + 12, 4, uint32)
+      i = default(uint32)
+      j = font.data.toInt(font.indexMap + 12, 4, uint32)
 
-    while movePos < stop:
+    while i < j:
       let
-        mid = movePos + (stop - movePos) shr 1
+        mid = i + (j - i) shr 1
         glyphCharStart = font.data.toInt(font.indexMap + 16 + mid * 12, 4, uint32)
         glyphCharEnd = font.data.toInt(font.indexMap + 16 + mid * 12 + 4, 4, uint32)
 
       if unicodeCodepoint < glyphCharStart:
-        stop = mid
+        j = mid
       elif unicodeCodepoint > glyphCharEnd:
-        movePos = mid + 1
+        i = mid + 1
       else:
         let
           glyphStart = font.data.toInt(font.indexMap + 16 + mid * 12 + 8, 4, uint32)
@@ -278,7 +291,7 @@ proc getGlyphId*(font: OpenTypeObj, unicodeCodepoint: uint32): GlyphId =
         result = GlyphId(glyphId)
         return
 
-proc getGlyphGlyfOffset*(font: OpenTypeObj, glyphId: GlyphId): uint32 =
+proc getGlyphGlyfOffset(font: OpenTypeObj, glyphId: GlyphId): uint32 =
   if uint32(glyphId) >= font.numGlyphs or font.indexToLocFormat >= 2:
     return
 
@@ -290,7 +303,8 @@ proc getGlyphGlyfOffset*(font: OpenTypeObj, glyphId: GlyphId): uint32 =
     offset1 =
       font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 2, 2, uint32) * 2
     offset2 =
-      font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 2 + 2, 2, uint32) * 2
+      font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 2 + 2, 2,
+          uint32) * 2
   else:
     offset1 = font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 4, 4, uint32)
     offset2 =
@@ -577,8 +591,10 @@ proc getGlyphShape*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphVertex] =
             v2 = result[oldLen + idx].addr
 
           v2.tp = v1.tp
-          v2.x = int16(m * (mtx[0] * float32(v1.x) + mtx[2] * float32(v1.y) + mtx[4]))
-          v2.y = int16(n * (mtx[1] * float32(v1.x) + mtx[3] * float32(v1.y) + mtx[5]))
+          v2.x = int16(m * (mtx[0] * float32(v1.x) + mtx[2] * float32(v1.y) +
+              mtx[4]))
+          v2.y = int16(n * (mtx[1] * float32(v1.x) + mtx[3] * float32(v1.y) +
+              mtx[5]))
           v2.cx =
             int16(m * (mtx[0] * float32(v1.cx) + mtx[2] * float32(v1.cy) + mtx[4]))
           v2.cy =
@@ -887,8 +903,8 @@ proc getGlyphSDF*(
             bx2 = max(max(x1, x2), x3)
             by2 = max(max(y1, y2), y3)
 
-          if sx > (bx1 - minDist) and sx < (bx2 + minDist) and sy > (by1 - minDist) and
-              sy < (by2 + minDist):
+          if sx > (bx1 - minDist) and sx < (bx2 + minDist) and sy > (by1 -
+              minDist) and sy < (by2 + minDist):
             let
               ax = x2 - x1
               ay = y2 - y1
@@ -966,53 +982,57 @@ proc getCoverageIndex(
   if coverageFormat == 1:
     let glyphCount = font.data.toInt(coverageTable + 2, 2, uint32)
 
-    var
-      l = uint32(0)
-      r = glyphCount - 1
-      mid = default(uint32)
+    if glyphCount >= 1:
+      var
+        l = uint32(0)
+        r = glyphCount - 1
+        mid = default(uint32)
 
-    while l <= r:
-      mid = (l + r) shr 1
+      while l <= r:
+        mid = (l + r) shr 1
 
-      let
-        glyphArray = coverageTable + 4
-        glyphId2 = font.data.toInt(glyphArray + 2 * mid, 2, uint32)
+        let
+          glyphArray = coverageTable + 4
+          glyphId2 = font.data.toInt(glyphArray + 2 * mid, 2, uint32)
 
-      if uint32(glyphId) < glyphId2:
-        r = mid - 1
-      elif uint32(glyphId) > glyphId2:
-        r = mid + 1
-      else:
-        result = mid
-        return
+        if uint32(glyphId) < glyphId2:
+          r = mid - 1
+        elif uint32(glyphId) > glyphId2:
+          r = mid + 1
+        else:
+          result = mid
+          return
+
   elif coverageFormat == 2:
     let
       rangeCount = font.data.toInt(coverageTable + 2, 2, uint32)
       rangeArray = coverageTable + 4
 
-    var
-      l = uint32(0)
-      r = rangeCount - 1
-      mid = default(uint32)
+    if rangeCount >= 1:
+      var
+        l = uint32(0)
+        r = rangeCount - 1
+        mid = default(uint32)
 
-    while l <= r:
-      mid = (l + r) shr 1
-      let
-        rangeRecord = rangeArray + 6 * mid
-        glyphIdStart = font.data.toInt(rangeRecord, 2, uint32)
-        glyphIdEnd = font.data.toInt(rangeRecord + 2, 2, uint32)
-      if uint32(glyphId) < glyphIdStart:
-        r = mid - 1
-      elif uint32(glyphId) > glyphIdEnd:
-        l = mid + 1
-      else:
-        let startCoverageIndex = font.data.toInt(rangeRecord + 4, 2, uint32)
-        result = startCoverageIndex + uint32(glyphId) - glyphIdStart
-        return
+      while l <= r:
+        mid = (l + r) shr 1
+        let
+          rangeRecord = rangeArray + 6 * mid
+          glyphIdStart = font.data.toInt(rangeRecord, 2, uint32)
+          glyphIdEnd = font.data.toInt(rangeRecord + 2, 2, uint32)
+        if uint32(glyphId) < glyphIdStart:
+          r = mid - 1
+        elif uint32(glyphId) > glyphIdEnd:
+          l = mid + 1
+        else:
+          let startCoverageIndex = font.data.toInt(rangeRecord + 4, 2, uint32)
+          result = startCoverageIndex + uint32(glyphId) - glyphIdStart
+          return
 
   high(uint32)
 
-proc getGlyphClass(font: OpenTypeObj, classDefTable: uint32, glyphId: GlyphId): uint32 =
+proc getGlyphClass(font: OpenTypeObj, classDefTable: uint32,
+    glyphId: GlyphId): uint32 =
   let classDefFormat = font.data.toInt(classDefTable, 2, uint32)
   if classDefFormat == 1:
     let
@@ -1029,29 +1049,31 @@ proc getGlyphClass(font: OpenTypeObj, classDefTable: uint32, glyphId: GlyphId): 
       classRangeCount = font.data.toInt(classDefTable + 2, 2, uint32)
       classRangeRecords = classDefTable + 4
 
-    var
-      l = default(uint32)
-      r = classRangeCount - 1
-      mid = default(uint32)
+    if classRangeCount >= 1:
+      var
+        l = default(uint32)
+        r = classRangeCount - 1
+        mid = default(uint32)
 
-    while l <= r:
-      mid = (l + r) shr 1
-      let
-        classRangeRecord = classRangeRecords + 6 * mid
-        glyphIdStart = font.data.toInt(classRangeRecord, 2, uint32)
-        glyphIdEnd = font.data.toInt(classRangeRecord + 2, 2, uint32)
+      while l <= r:
+        mid = (l + r) shr 1
+        let
+          classRangeRecord = classRangeRecords + 6 * mid
+          glyphIdStart = font.data.toInt(classRangeRecord, 2, uint32)
+          glyphIdEnd = font.data.toInt(classRangeRecord + 2, 2, uint32)
 
-      if uint32(glyphId) < glyphIdStart:
-        r = mid - 1
-      elif uint32(glyphId) > glyphIdEnd:
-        l = mid + 1
-      else:
-        result = font.data.toInt(classRangeRecord + 4, 2, uint32)
-        return
+        if uint32(glyphId) < glyphIdStart:
+          r = mid - 1
+        elif uint32(glyphId) > glyphIdEnd:
+          l = mid + 1
+        else:
+          result = font.data.toInt(classRangeRecord + 4, 2, uint32)
+          return
 
   high(uint32)
 
-proc getGlyphGposInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): uint32 =
+proc getGlyphGposInfoAdvance(font: OpenTypeObj, glyphId1,
+    glyphId2: GlyphId): uint32 =
   let
     major = font.data.toInt(font.gpos + 0, 2, uint32)
     minor = font.data.toInt(font.gpos + 2, 2, uint32)
@@ -1100,7 +1122,7 @@ proc getGlyphGposInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): ui
             pairValueCount = font.data.toInt(pairValueTable, 2, uint32)
             pairValueArray = pairValueTable + 2
 
-          if coverageIndex >= pairSetCount:
+          if pairValueCount < 1 or coverageIndex >= pairSetCount:
             return
 
           var
@@ -1122,6 +1144,7 @@ proc getGlyphGposInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): ui
             else:
               result = font.data.toInt(val + 2, 2, uint32)
               return
+
       elif posFormat == 2:
         let
           valueFormat1 = font.data.toInt(table + 4, 2, uint32)
@@ -1149,7 +1172,8 @@ proc getGlyphGposInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): ui
           result = font.data.toInt(class2Records + 2 * glyph2Class, 2, uint32)
           return
 
-proc getGlyphKernInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): uint32 =
+proc getGlyphKernInfoAdvance(font: OpenTypeObj, glyphId1,
+    glyphId2: GlyphId): uint32 =
   let
     n = font.data.toInt(2, 2, uint32)
     format = font.data.toInt(8, 2, uint32)
@@ -1174,7 +1198,8 @@ proc getGlyphKernInfoAdvance(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): ui
       result = font.data.toInt(22 + (mid * 6), 2, uint32)
       return
 
-proc getGlyphKernAdvance*(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): uint32 =
+proc getGlyphKernAdvance*(font: OpenTypeObj, glyphId1,
+    glyphId2: GlyphId): uint32 =
   if font.gpos > 0:
     result = font.getGlyphGposInfoAdvance(glyphId1, glyphId2)
     if result != 0:
@@ -1182,3 +1207,83 @@ proc getGlyphKernAdvance*(font: OpenTypeObj, glyphId1, glyphId2: GlyphId): uint3
 
   if font.kern > 0:
     result = font.getGlyphKernInfoAdvance(glyphId1, glyphId2)
+
+proc getGlyphColrOffset(font: OpenTypeObj, glyphId: GlyphId): uint32 =
+  let
+    numBaseGlyphRecords = font.data.toInt(font.colr + 2, 2, uint32)
+    baseGlyphRecordsOffset = font.colr + font.data.toInt(font.colr + 4, 4, uint32)
+
+  if numBaseGlyphRecords <= 0:
+    return
+
+  var
+    l = default(uint32)
+    r = numBaseGlyphRecords - 1
+    mid = default(uint32)
+
+  while l <= r:
+    mid = (l + r) shr 1
+
+    let
+      baseGlyphRecord = baseGlyphRecordsOffset + 6 * mid
+      glyphId2 = font.data.toInt(baseGlyphRecord, 2, uint32)
+
+    if uint32(glyphId) < glyphId2:
+      r = mid - 1
+    elif uint32(glyphId) > glyphId2:
+      l = mid + 1
+    else:
+      result = baseGlyphRecord
+      return
+
+proc getPaletteColor(font: OpenTypeObj, colorIndex: uint32,
+    paletteId: uint32): uint32 =
+  let
+    numPaletteEntries = font.data.toInt(font.cpal + 2, 2, uint32)
+    numPalettes = font.data.toInt(font.cpal + 4, 2, uint32)
+    numColorRecords = font.data.toInt(font.cpal + 6, 2, uint32)
+    colorRecordsArrayOffset = font.cpal + font.data.toInt(font.cpal + 8, 4, uint32)
+
+  if colorIndex >= numPaletteEntries or paletteId >= numPalettes:
+    return
+
+  let
+    colorRecordIndicesOffset = font.cpal + 12
+    colorRecordIndex = colorIndex + font.data.toInt(colorRecordIndicesOffset +
+        2 * paletteId, 2, uint32)
+  if colorRecordIndex >= numColorRecords:
+    return
+
+  font.data.toInt(colorRecordsArrayOffset + 4 * colorRecordIndex, 4, uint32)
+
+proc getGlyphLayers*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphLayer] =
+  let glyphBasGlyphRecord = font.getGlyphColrOffset(glyphId)
+  if glyphBasGlyphRecord > 0:
+    let
+      firstLayerIndex = font.data.toInt(glyphBasGlyphRecord + 2, 2, uint32)
+      numLayers = font.data.toInt(glyphBasGlyphRecord + 4, 2, uint32)
+      layerRecordsOffset = font.data.toInt(font.colr + 8, 4, uint32)
+
+    if numLayers >= 1:
+      let
+        glyphLayerRecordStart = font.colr + layerRecordsOffset + 4 * firstLayerIndex
+
+      result.setLen(numLayers)
+
+      for idx in 0 ..< numLayers:
+        let
+          glyphId2 = font.data.toInt(glyphLayerRecordStart + idx * 4, 2, uint32)
+          colorIndex = font.data.toInt(glyphLayerRecordStart + idx * 4 + 2, 2, uint32)
+          paletteColor = font.getPaletteColor(colorIndex, 0)
+
+        var layer = default(GlyphLayer)
+        layer.glyphId = GlyphId(glyphId2)
+        layer.color.a = float32((paletteColor shr 0) and 0xFF) / 255
+        layer.color.r = float32((paletteColor shr 8) and 0xFF) / 255
+        layer.color.g = float32((paletteColor shr 16) and 0xFF) / 255
+        layer.color.b = float32((paletteColor shr 24) and 0xFF) / 255
+        result[idx] = layer
+
+proc hasColor*(font: OpenTypeObj, glyphId: GlyphId): bool =
+  if font.colr > 0 and font.cpal > 0:
+    result = font.getGlyphColrOffset(glyphId) > 0

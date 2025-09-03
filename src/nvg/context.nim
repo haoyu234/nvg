@@ -1,4 +1,4 @@
-import ./altas
+import ./atlas
 import ./cache
 import ./core
 import ./fontstash
@@ -62,8 +62,7 @@ type
     params: BackendContextParams
 
     fons*: FonsStash
-    altas*: Altas
-    altasImages: seq[ImageId]
+    atlas*: Atlas
 
     tessTol: float32
     tessTolSq: float32
@@ -76,15 +75,8 @@ type
 
     path: Path
 
-    # stats
-    drawCallCount: int
-
-    # flush texture
-    textureDirty: bool
-
 proc `=destroy`(ctx: ContextObj) =
   ctx.params.destroyImpl(ctx.ctx)
-  echo "here"
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
@@ -179,6 +171,9 @@ proc createInternal*(params: BackendContextParams): Context =
   result.resetState()
   result.setDevicePixelRatio(1)
 
+  result.atlas = createAtlas(result.ctx, params)
+  result.fons = createFonsStash(TopLeftOrigin, result.atlas)
+
 proc translate*(ctx: Context, v: Vec2) =
   ctx.transform.translate(v)
 
@@ -195,17 +190,9 @@ proc getTransform*(ctx: Context): Mat2d =
   ctx.transform
 
 proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId =
-  if ctx.fons.isNil:
-    ctx.fons = FonsStash()
-    ctx.altas = Altas()
-
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
 proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId =
-  if ctx.fons.isNil:
-    ctx.fons = FonsStash()
-    ctx.altas = Altas()
-
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
 proc fillPath*(ctx: Context, path: Path) =
@@ -222,9 +209,6 @@ proc fillPath*(ctx: Context, path: Path) =
     ctx.cache.bounds,
     ctx.cache.contours,
   )
-
-  for idx in 0 ..< ctx.cache.contours.len:
-    inc ctx.drawCallCount, 2
 
 proc getAverageScale(t: Mat2d): float32 {.inline.} =
   let
@@ -261,9 +245,6 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.cache.contours,
   )
 
-  for idx in 0 ..< ctx.cache.contours.len:
-    inc ctx.drawCallCount, 2
-
 proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
   ctx.states.setLen(0)
   ctx.resetState()
@@ -272,20 +253,16 @@ proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
 
   ctx.params.viewportImpl(ctx.ctx, view, devicePixelRatio)
 
-  ctx.drawCallCount = 0
+  ctx.atlas.compact()
 
 proc flush*(ctx: Context) =
   ctx.params.flushImpl(ctx.ctx)
-  ctx.altas.clear()
 
 proc beginPath*(ctx: Context) {.inline.} =
   ctx.path.clear()
 
-proc rectXYWH*(ctx: Context, rect: Vec4) {.inline.} =
-  ctx.path.rectXYWH(rect)
-
-proc rectLTRB*(ctx: Context, rect: Vec4) {.inline.} =
-  ctx.path.rectLTRB(rect)
+proc rect*(ctx: Context, xywh: Vec4) {.inline.} =
+  ctx.path.rect(xywh)
 
 proc arc*(ctx: Context, cp: Vec2, r, a0, a1: float32, ccw: bool) =
   ctx.path.arc(cp, r, a0, a1, ccw)
@@ -320,30 +297,11 @@ proc fill*(ctx: Context) {.inline.} =
 proc stroke*(ctx: Context) {.inline.} =
   ctx.strokePath(ctx.path)
 
-proc fonsAlign(ctx: Context): uint32 {.inline.} =
-  case ctx.textAlign
-  of LeftAlign:
-    result = result or FONS_ALIGN_LEFT
-  of CenterAlign:
-    result = result or FONS_ALIGN_CENTER
-  of RightAlign:
-    result = result or FONS_ALIGN_RIGHT
-
-  case ctx.textBaseline
-  of TopBaseline:
-    result = result or FONS_ALIGN_TOP
-  of MiddleBaseline:
-    result = result or FONS_ALIGN_MIDDLE
-  of AlphabeticBaseline:
-    result = result or FONS_ALIGN_BASELINE
-  of BottomBaseline:
-    result = result or FONS_ALIGN_BOTTOM
-
 proc measureText*(ctx: Context, text: openArray[char]): float32 =
   if ctx.fons.isNil:
     return
 
-  let font = ctx.fons.getFont(FonsFontId(ctx.fontId))
+  let font = ctx.fons.getFont(ctx.fontId)
   if font.isNil:
     return
 
@@ -353,14 +311,15 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
   if ctx.fons.isNil:
     return
 
-  let font = ctx.fons.getFont(FonsFontId(ctx.fontId))
+  let font = ctx.fons.getFont(ctx.fontId)
   if font.isNil:
     return
 
   let scale = font.getPixelHeightScale(ctx.fontSize)
 
   for x, y, glyph in ctx.fons.arrange(
-    font, text, pos[0], pos[1], ctx.fonsAlign, ctx.fontSize, ctx.letterSpacing
+    font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
+        ctx.letterSpacing
   ):
     let points = ctx.fons.getGlyphShape(glyph)
     if len(points) <= 0:
@@ -394,47 +353,50 @@ proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:
     return
 
-  let font = ctx.fons.getFont(FonsFontId(ctx.fontId))
+  let font = ctx.fons.getFont(ctx.fontId)
   if font.isNil:
     return
 
   let
-    altas = ctx.altas
     scale = 96 / ctx.fontSize
-
-  if altas.storage.len <= 0:
-    altas.expand(512, 512)
 
   var
     rev = default(int32)
-    image = default(ImageId)
     verts = newSeqOfCap[Vec4](text.len * 6)
 
     vertBuf: array[6, Vec4]
 
-  if ctx.altasImages.len > 0:
-    image = ctx.altasImages[0]
-  else:
-    image = ctx.params.createTextureImpl(
-      ctx.ctx,
-      TextureAlpha,
-      altas.width,
-      altas.height,
-      {ImageExternalStorage},
-      altas.storage[0].addr
-    )
-
-    ctx.altasImages.add(image)
-
   if ctx.transform[0] * ctx.transform[3] < 0:
     rev = 1
 
+  var paint = ctx.fillStyle
+  paint.transform[0] = length(vec2(ctx.transform[0], ctx.transform[2])) / scale
+  paint.transform[3] = length(vec2(ctx.transform[1], ctx.transform[3])) / scale
+  paint.extent = vec2(96, 96)
+  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
+  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
+  paint.radius = ctx.fontBlur
+
   for x, y, glyph in ctx.fons.arrange(
-    font, text, pos[0], pos[1], ctx.fonsAlign, ctx.fontSize, ctx.letterSpacing
+    font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
+        ctx.letterSpacing
   ):
-    let
-      cell = ctx.fons.addGlyphToAltas(glyph, altas)
-      quad = ctx.fons.getGlyphQuad(glyph, x, y, altas, cell, ctx.fontSize, 0)
+    let (imageId, quad) = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
+    if imageId.isNil:
+      continue
+
+    if not paint.image.isNil:
+      if paint.image != imageId:
+        ctx.params.trianglesImpl(
+          ctx.ctx,
+          paint,
+          ctx.compositeOperation,
+          verts,
+        )
+
+        verts.setLen(0)
+
+    paint.image = imageId
 
     let
       p1 = ctx.transform * vec2(quad.x1, quad.y1)
@@ -451,31 +413,10 @@ proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
 
     verts.add(vertBuf)
 
-  var paint = ctx.fillStyle
-  paint.transform[0] = length(vec2(ctx.transform[0], ctx.transform[2])) / scale
-  paint.transform[3] = length(vec2(ctx.transform[1], ctx.transform[3])) / scale
-  paint.extent = vec2(96, 96)
-  paint.image = image
-  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
-  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
-  paint.radius = ctx.fontBlur
-
-  let
-    x = altas.dirtyRect[0]
-    y = altas.dirtyRect[1]
-    w = altas.dirtyRect[2] - x
-    h = altas.dirtyRect[3] - y
-
-  if w > 0 and h > 0:
-    ctx.params.markTextureDirtyImpl(
+  if verts.len > 0:
+    ctx.params.trianglesImpl(
       ctx.ctx,
-      image,
-      x, y, w, h,
+      paint,
+      ctx.compositeOperation,
+      verts,
     )
-
-  ctx.params.trianglesImpl(
-    ctx.ctx,
-    paint,
-    ctx.compositeOperation,
-    verts,
-  )
