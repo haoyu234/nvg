@@ -1,9 +1,7 @@
 import nvg/rectpack
 
-var p = RectPack(
-  height: 1024,
-  width: 1024,
-)
+var p = default(RectPack)
+p.expand(400, 400)
 
 let
   r1 = p.allocRect(32, 32)

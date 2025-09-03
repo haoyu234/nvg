@@ -273,7 +273,7 @@ proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32, data: pointer) 
 proc evictCells(a: Atlas, duration: int32) =
   var
     idx = a.lru.tail
-
+  
   while idx != high(uint32):
     let
       cell = a.cells[idx].addr
@@ -283,6 +283,7 @@ proc evictCells(a: Atlas, duration: int32) =
       break
 
     let
+      prevIdx = cell.lru.prev
       image = a.images[cell.imageIdx].addr
 
     a.lookup.del(cell.id)
@@ -292,6 +293,8 @@ proc evictCells(a: Atlas, duration: int32) =
 
     cell.lru.next = a.cellFreeList
     a.cellFreeList = idx
+
+    idx = prevIdx
 
 proc compact*(a: Atlas) =
   inc a.nowStamp, 1

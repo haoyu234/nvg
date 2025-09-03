@@ -59,7 +59,7 @@ proc frameImpl(ctx: Context) =
     ctx.textAlign = CenterAlign
     ctx.textBaseline = MiddleBaseline
 
-    ctx.text(text.toOpenArray(lastIdx, lastIdx + n - 1), vec2(
+    ctx.fillText(text.toOpenArray(lastIdx, lastIdx + n - 1), vec2(
         size / 2, size / 2))
 
     inc lastIdx, n

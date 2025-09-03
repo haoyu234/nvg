@@ -35,9 +35,9 @@ type
     RightAlign
 
   BaselineAlignment* = enum
+    AlphabeticBaseline
     TopBaseline
     MiddleBaseline
-    AlphabeticBaseline
     BottomBaseline
 
   FillRule* = enum

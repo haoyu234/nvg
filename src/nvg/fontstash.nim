@@ -20,7 +20,7 @@ type
     unicodeCodepoint*: uint32
     glyphId*: GlyphId
     advance: int32
-    sdfGlyphBox*: GlyphBox
+    atlasGlyphBox*: GlyphBox
     shape: seq[GlyphVertex]
 
   Font* = ref FontObj
@@ -29,15 +29,15 @@ type
     openType*: OpenTypeObj
     metrics*: FontMetrics
     glyphs: Table[uint32, Glyph]
-    sdfPixelScale: float32
+    atlasPixelScale: float32
     storage: seq[byte]
 
   FonsStash* = ref FonsStashObj
   FonsStashObj = object
-    origin: Origin
+    origin*: Origin
     signY: float32
-    sdfFontSize: int32
-    sdfPadding: int32
+    atlasFontSize*: int32
+    atlasPadding*: int32
     fonts: seq[Font]
     atlas: Atlas
 
@@ -53,7 +53,7 @@ proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FontId =
   p.openType = parseOpenType(p.storage, 0)
   p.metrics = p.openType.getFontMetrics()
   p.fontId = fontId
-  p.sdfPixelScale = p.getPixelHeightScale(float32(fons.sdfFontSize))
+  p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
   fons.fonts.add(p)
 
@@ -67,7 +67,7 @@ proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FontId =
   p.openType = parseOpenType(data, 0)
   p.metrics = p.openType.getFontMetrics()
   p.fontId = fontId
-  p.sdfPixelScale = p.getPixelHeightScale(float32(fons.sdfFontSize))
+  p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
   fons.fonts.add(p)
 
@@ -183,14 +183,14 @@ proc updateCell(fons: FonsStash, glyph: ptr Glyph): AtlasCell =
   if font.isNil:
     return
 
-  if glyph.sdfGlyphBox.x2 <= 0 and glyph.sdfGlyphBox.y2 <= 0:
-    glyph.sdfGlyphBox = font.openType.getGlyphBox(glyph.glyphId,
-        font.sdfPixelScale, font.sdfPixelScale, 0, 0)
+  if glyph.atlasGlyphBox.x2 <= 0 and glyph.atlasGlyphBox.y2 <= 0:
+    glyph.atlasGlyphBox = font.openType.getGlyphBox(glyph.glyphId,
+        font.atlasPixelScale, font.atlasPixelScale, 0, 0)
 
   let
-    pad = fons.sdfPadding + 1
-    w = glyph.sdfGlyphBox.x2 - glyph.sdfGlyphBox.x1
-    h = glyph.sdfGlyphBox.y2 - glyph.sdfGlyphBox.y1
+    pad = fons.atlasPadding + 1
+    w = glyph.atlasGlyphBox.x2 - glyph.atlasGlyphBox.x1
+    h = glyph.atlasGlyphBox.y2 - glyph.atlasGlyphBox.y1
 
   let
     fontId32 = cast[uint32](glyph.fontId)
@@ -208,9 +208,9 @@ proc updateCell(fons: FonsStash, glyph: ptr Glyph): AtlasCell =
     if result.isNil:
       return
 
-    let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.sdfPixelScale, 0,
+    let atlas = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale, 0,
         127, 32)
-    fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
+    fons.atlas.updateCell(result, atlas.w, atlas.h, atlas.w, atlas.data[0].addr)
 
 proc getGlyphQuad*(fons: FonsStash, glyph: ptr Glyph, x, y, size: float32): (
     ImageId, Quad) =
@@ -219,22 +219,22 @@ proc getGlyphQuad*(fons: FonsStash, glyph: ptr Glyph, x, y, size: float32): (
     return
 
   let
-    pad = fons.sdfPadding + 1
-    w = glyph.sdfGlyphBox.x2 - glyph.sdfGlyphBox.x1
-    h = glyph.sdfGlyphBox.y2 - glyph.sdfGlyphBox.y1
+    pad = fons.atlasPadding + 1
+    w = glyph.atlasGlyphBox.x2 - glyph.atlasGlyphBox.x1
+    h = glyph.atlasGlyphBox.y2 - glyph.atlasGlyphBox.y1
 
   let
     blur = default(float32)
-    expand = min(blur, float32(fons.sdfPadding)) + 1
-    xoff = float32(glyph.sdfGlyphBox.x1) - expand
-    yoff = float32(glyph.sdfGlyphBox.y1) - expand
+    expand = min(blur, float32(fons.atlasPadding)) + 1
+    xoff = float32(glyph.atlasGlyphBox.x1) - expand
+    yoff = float32(glyph.atlasGlyphBox.y1) - expand
 
     x1 = float32(cell.x + pad) - expand
     y1 = float32(cell.y + pad) - expand
     x2 = float32(cell.x + pad + w) + expand
     y2 = float32(cell.y + pad + h) + expand
 
-    scale = size / float32(fons.sdfFontSize)
+    scale = size / float32(fons.atlasFontSize)
 
   result[0] = cell.imageId
 
@@ -261,5 +261,5 @@ proc createFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
     result.signY = float32(-1)
 
   # SDF
-  result.sdfPadding = 1
-  result.sdfFontSize = 48 * 2
+  result.atlasPadding = 1
+  result.atlasFontSize = 48 * 2

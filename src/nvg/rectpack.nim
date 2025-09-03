@@ -64,9 +64,9 @@ iterator rows(p: RectPack): ptr Row =
 
   while nextIdx != high(uint32):
     let row = p.getRow(nextIdx)
-    yield row
-
     nextIdx = row.nextIdx
+
+    yield row
 
 iterator items(p: RectPack, row: ptr Row): ptr Item =
   var
@@ -74,9 +74,9 @@ iterator items(p: RectPack, row: ptr Row): ptr Item =
 
   while nextIdx != high(uint32):
     let item = p.getItem(nextIdx)
-    yield item
-
     nextIdx = item.nextIdx
+
+    yield item
 
 proc allocRow(p: var RectPack): ptr Row {.inline.} =
   if p.rowFreeList != high(uint32):
@@ -315,7 +315,7 @@ proc freeRect*(p: var RectPack, itemId: RectId) =
     prevItem.nextIdx = targetItem.nextIdx
     p.freeItem(targetItem)
     targetItem = prevItem
-
+  
   if targetItem.nextIdx != high(uint32):
     let
       nextItem = p.getItem(targetItem.nextIdx)

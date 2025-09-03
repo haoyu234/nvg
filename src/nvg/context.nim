@@ -349,7 +349,7 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
 
         result.quadCurveTo(p2, p1)
 
-proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
+proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:
     return
 
