@@ -95,20 +95,16 @@ proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
   verts.add(vec4(v0, v3, 0, 0))
   verts.add(vec4(v0, v1, 0, 0))
 
-proc toFillType(contourFlags: set[ContourFlags]): uint32 {.inline.} =
-  if EvenOdd in contourFlags:
-    result = result or (1 shl 0)
-
-  if Convex in contourFlags:
-    result = result or (1 shl 2)
-
 proc addUniform(
     ctx: var RenderData, call: var Call,
-    paint: Paint, shaderType: ShaderType, contourFlags: set[ContourFlags]) =
+    paint: Paint, shaderType: ShaderType, renderFlags: set[RenderFlags]) =
   var
     texType = default(uint32)
-    fillType = toFillType(contourFlags)
+    fillType = default(uint32)
     uniform = default(FragmentUniform)
+  
+  if EvenOdd in renderFlags:
+    fillType = fillType or (1 shl 0)
 
   uniform.innerColor = paint.innerColor
   uniform.outerColor = paint.outerColor
@@ -174,7 +170,7 @@ proc fillCall*(
     view: Vec2,
     paint: Paint,
     compositeOperation: CompositeOperation,
-    contourFlags: set[ContourFlags],
+    renderFlags: set[RenderFlags],
     bounds: Vec4,
     contours: openArray[Contour],
 ) =
@@ -207,29 +203,14 @@ proc fillCall*(
   if callw <= 0 or callh <= 0:
     return
 
-  var
-    contourFlags = contourFlags
-    call = default(Call)
-
-  if contours.len == 1 and contours[0].convex and contours[0].fill.len > 2:
-    contourFlags.incl(ContourFlags.Convex)
-
+  var call = default(Call)
   call.callType = FillCall
   call.blend = compositeOperation
-  ctx.addUniform(call, paint, Solid, contourFlags)
+  ctx.addUniform(call, paint, Solid, renderFlags)
 
   const tileSize = 32
 
-  if ContourFlags.Convex in contourFlags:
-    call.callType = ConvexFillCall
-    call.fillOffset = 0
-    call.fillCount = 0
-    call.triangleCount = uint32(contours[0].fill.len)
-    call.triangleOffset = uint32(ctx.verts.len)
-
-    ctx.verts.add(contours[0].fill.toOpenArray)
-
-  elif ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
+  if ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
     ltrb[0] = floor(ltrb[0])
     ltrb[1] = floor(ltrb[1])
     ltrb[2] = ceil(ltrb[2])
@@ -382,6 +363,7 @@ proc trianglesCall*(
     view: Vec2,
     paint: Paint,
     compositeOperation: CompositeOperation,
+    renderFlags: set[RenderFlags],
     verts: openArray[Vec4],
 ) =
   var

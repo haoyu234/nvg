@@ -80,7 +80,6 @@ layout (location = 0) out vec4 outColor;
 #define fillType ((int(dummy[6].z) >> 16) & 0xFF)
 
 #define NVG_PATH_EVENODD 0x1
-#define NVG_PATH_CONVEX 0x2
 #define NVG_IMAGE_TILE_WIDTH 256
 
 // unlike areaEdge(), this assumes pixel center is (0, 0), not (0.5, 0.5)
@@ -158,8 +157,6 @@ vec4 edgeFetch(uint idx)
 
 float coverage(float W)
 {
-  if((fillType & NVG_PATH_CONVEX) != 0)
-    return 1.0f;
   if((fillType & NVG_PATH_EVENODD) != 0)
     return 1.0f - abs(mod(W, 2.0f) - 1.0f);
   return min(abs(W), 1.0f);  // non-zero fill

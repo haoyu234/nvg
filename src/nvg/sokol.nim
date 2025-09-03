@@ -478,7 +478,7 @@ proc fillImpl(
     ctx: pointer,
     paint: Paint,
     compositeOperation: CompositeOperation,
-    contourFlags: set[ContourFlags],
+    renderFlags: set[RenderFlags],
     bounds: Vec4,
     contours: openArray[Contour],
 ) =
@@ -487,7 +487,7 @@ proc fillImpl(
     ctx.viewBounds,
     paint,
     compositeOperation,
-    contourFlags,
+    renderFlags,
     bounds,
     contours,
   )
@@ -496,6 +496,7 @@ proc trianglesImpl(
   ctx: pointer,
   paint: Paint,
   compositeOperation: CompositeOperation,
+  renderFlags: set[RenderFlags],
   verts: openArray[Vec4],
 ) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
@@ -503,6 +504,7 @@ proc trianglesImpl(
     ctx.viewBounds,
     paint,
     compositeOperation,
+    renderFlags,
     verts
   )
 

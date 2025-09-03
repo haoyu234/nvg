@@ -200,12 +200,12 @@ proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
 
-  var contourFlags = default(set[ContourFlags])
+  var renderFlags = default(set[RenderFlags])
   if ctx.fillRule == FillRule.EvenOdd:
-    contourFlags.incl(ContourFlags.EvenOdd)
+    renderFlags.incl(RenderFlags.EvenOdd)
 
   ctx.params.fillImpl(
-    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, contourFlags,
+    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, renderFlags,
     ctx.cache.bounds,
     ctx.cache.contours,
   )
@@ -240,7 +240,7 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.ctx,
     ctx.strokeStyle,
     ctx.compositeOperation,
-    default(set[ContourFlags]),
+    default(set[RenderFlags]),
     ctx.cache.bounds,
     ctx.cache.contours,
   )
@@ -391,6 +391,7 @@ proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
           ctx.ctx,
           paint,
           ctx.compositeOperation,
+          default(set[RenderFlags]),
           verts,
         )
 
@@ -418,5 +419,6 @@ proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
       ctx.ctx,
       paint,
       ctx.compositeOperation,
+      default(set[RenderFlags]),
       verts,
     )

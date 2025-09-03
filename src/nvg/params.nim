@@ -2,9 +2,8 @@ import ./core
 import ./pieces
 
 type
-  ContourFlags* = enum
+  RenderFlags* = enum
     EvenOdd
-    Convex
 
   Contour* = object
     offset*: int32
@@ -12,7 +11,6 @@ type
     fill*: Piece[Vec4]
     closed*: bool
     restart*: bool
-    convex*: bool
     bounds*: Vec4
 
   TextureType* = enum
@@ -28,7 +26,7 @@ type
       ctx: pointer,
       paint: Paint,
       compositeOperation: CompositeOperation,
-      contourFlags: set[ContourFlags],
+      renderFlags: set[RenderFlags],
       bounds: Vec4,
       contours: openArray[Contour],
     ) {.nimcall.}
@@ -37,6 +35,7 @@ type
       ctx: pointer,
       paint: Paint,
       compositeOperation: CompositeOperation,
+      renderFlags: set[RenderFlags],
       verts: openArray[Vec4],
     ) {.nimcall.}
 

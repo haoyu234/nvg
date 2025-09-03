@@ -12,7 +12,7 @@ proc fillImpl(
     ctx: pointer,
     paint: Paint,
     compositeOperation: CompositeOperation,
-    contourFlags: set[ContourFlags],
+    renderFlags: set[RenderFlags],
     bounds: Vec4,
     contours: openArray[Contour],
 ) =
@@ -22,6 +22,7 @@ proc trianglesImpl(
     ctx: pointer,
     paint: Paint,
     compositeOperation: CompositeOperation,
+    renderFlags: set[RenderFlags],
     verts: openArray[Vec4],
 ) =
   discard
