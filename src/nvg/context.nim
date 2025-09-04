@@ -58,8 +58,8 @@ type
     fontId*: FontId
 
     #
-    ctx: pointer
-    params: BackendContextParams
+    ctx*: pointer
+    params*: BackendContextParams
 
     fons*: FonsStash
     atlas*: Atlas
@@ -171,7 +171,7 @@ proc createInternal*(params: BackendContextParams): Context =
   result.resetState()
   result.setDevicePixelRatio(1)
 
-  result.atlas = createAtlas(result.ctx, params)
+  result.atlas = createAtlas(2048, 2048, result.ctx, params)
   result.fons = createFonsStash(TopLeftOrigin, result.atlas)
 
 proc translate*(ctx: Context, v: Vec2) =
@@ -186,7 +186,7 @@ proc rotate*(ctx: Context, v: float32) =
 proc resetTransform*(ctx: Context) =
   ctx.transform = mat2d()
 
-proc getTransform*(ctx: Context): Mat2d =
+proc getTransform*(ctx: Context): lent Mat2d =
   ctx.transform
 
 proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId =
@@ -317,11 +317,15 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
 
   let scale = font.getPixelHeightScale(ctx.fontSize)
 
-  for x, y, glyph in ctx.fons.arrange(
+  for x, y, glyphId in ctx.fons.arrange(
     font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
         ctx.letterSpacing
   ):
-    let points = ctx.fons.getGlyphShape(glyph)
+    let glyph = font.getGlyph(glyphId)
+    if glyph.isNil:
+      continue
+
+    let points = font.getGlyphShape(glyph)
     if len(points) <= 0:
       continue
 
@@ -358,7 +362,7 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
     return
 
   let
-    scale = 96 / ctx.fontSize
+    scale = float32(ctx.fons.atlasFontSize) / ctx.fontSize
 
   var
     rev = default(int32)
@@ -372,21 +376,26 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   var paint = ctx.fillStyle
   paint.transform[0] = length(vec2(ctx.transform[0], ctx.transform[2])) / scale
   paint.transform[3] = length(vec2(ctx.transform[1], ctx.transform[3])) / scale
-  paint.extent = vec2(96, 96)
+  paint.extent = vec2(float32(ctx.fons.atlasFontSize), float32(
+      ctx.fons.atlasFontSize))
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
   paint.radius = ctx.fontBlur
 
-  for x, y, glyph in ctx.fons.arrange(
+  for x, y, glyphId in ctx.fons.arrange(
     font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
         ctx.letterSpacing
   ):
-    let (imageId, quad) = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
-    if imageId.isNil:
+    let glyph = font.getGlyph(glyphId)
+    if glyph.isNil:
+      continue
+
+    let quad = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
+    if quad.imageId.isNil:
       continue
 
     if not paint.image.isNil:
-      if paint.image != imageId:
+      if paint.image != quad.imageId:
         ctx.params.trianglesImpl(
           ctx.ctx,
           paint,
@@ -397,7 +406,7 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
         verts.setLen(0)
 
-    paint.image = imageId
+    paint.image = quad.imageId
 
     let
       p1 = ctx.transform * vec2(quad.x1, quad.y1)

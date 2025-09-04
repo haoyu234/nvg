@@ -17,7 +17,10 @@ proc deleteTextureImpl(ctx: pointer, imageId: ImageId) =
 
 proc main() =
   let
-    atlas = createAtlas(nil, 
+    atlas = createAtlas(
+      2048,
+      2048,
+      nil,
       BackendContextParams(
         createTextureImpl: createTextureImpl,
         markTextureDirtyImpl: markTextureDirtyImpl,
@@ -33,8 +36,12 @@ proc main() =
     font = fons.getFont(fontId)
     fontSize = 18.4775391f
 
-  for x, y, glyph in fons.arrange(font, text, 0, 0, default(
-      HorizontalAlignment), default(BaselineAlignment), fontSize, 0):
+  for x, y, glyphId in fons.arrange(font, text, 0, 0, LeftAlign,
+      AlphabeticBaseline, fontSize, 0):
+    let glyph = font.getGlyph(glyphId)
+    if glyph.isNil:
+      continue
+
     discard fons.getGlyphQuad(glyph, x, y, fontSize)
 
   for idx in 0 ..< 100:

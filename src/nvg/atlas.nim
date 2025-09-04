@@ -5,10 +5,6 @@ import ./rectpack
 import std/hashes
 import std/tables
 
-const
-  DEFAULT_WIDTH = 2096
-  DEFAULT_HEIGHT = 2096
-
 type
   LruItem = object
     prev: uint32
@@ -48,6 +44,10 @@ type
 
   Atlas* = ref AtlasObj
   AtlasObj = object
+    ctx: pointer
+    params: BackendContextParams
+    atlasWidth: int32
+    atlasHeight: int32
     images: seq[Image]
     nowStamp: uint32
     lastEvictedStamp: uint32
@@ -55,8 +55,6 @@ type
     cells: seq[Cell]
     cellFreeList: uint32
     lookup: Table[uint32, uint32]
-    ctx: pointer
-    params: BackendContextParams
 
 proc `=destroy`(a: AtlasObj) =
   for idx in 0 ..< a.images.len:
@@ -157,7 +155,7 @@ proc allocRectOrGrow(a: Atlas, w, h: int32, typ: TextureType): tuple[id: RectId,
       result.cell.scaleY = image.scaleY
       return
 
-  let image = a.allocImage(DEFAULT_WIDTH, DEFAULT_HEIGHT, typ)
+  let image = a.allocImage(a.atlasWidth, a.atlasHeight, typ)
   if image.isNil:
     return
 
@@ -316,10 +314,12 @@ proc compact*(a: Atlas) =
 
   a.evictCells(duration)
 
-proc createAtlas*(ctx: pointer, params: BackendContextParams): Atlas =
+proc createAtlas*(width, height: int32, ctx: pointer, params: BackendContextParams): Atlas =
   result = Atlas()
   result.ctx = ctx
   result.params = params
+  result.atlasWidth = width
+  result.atlasHeight = height
   result.nowStamp = 1
   result.cellFreeList = high(uint32)
 

@@ -12,23 +12,22 @@ type
     BottomLeftOrigin
 
   Quad* = object
+    imageId*: ImageId
     x1*, y1*, x2*, y2*: float32
     s1*, t1*, s2*, t2*: float32
 
-  Glyph* = object
+  Glyph* = ref object
     fontId*: FontId
-    unicodeCodepoint*: uint32
     glyphId*: GlyphId
-    advance: int32
-    atlasGlyphBox*: GlyphBox
+    atlasGlyphBox: GlyphBox
     shape: seq[GlyphVertex]
 
   Font* = ref FontObj
   FontObj = object
-    fontId: FontId
+    fontId*: FontId
     openType*: OpenTypeObj
     metrics*: FontMetrics
-    glyphs: Table[uint32, Glyph]
+    glyphs: Table[GlyphId, Glyph]
     atlasPixelScale: float32
     storage: seq[byte]
 
@@ -81,41 +80,51 @@ proc getFont*(fons: FonsStash, fontId: FontId): Font =
     if uint32(p.fontId) == uint32(fontId):
       return p
 
-proc getGlyph*(
-    fons: FonsStash, font: Font, unicodeCodepoint: uint32
-): ptr Glyph =
-  if not font.glyphs.contains(unicodeCodepoint):
-    let glyphId = font.openType.getGlyphId(unicodeCodepoint)
-    if glyphId.isNil:
-      return
+proc getGlyphId*(font: Font, unicodeCodepoint: uint32): GlyphId {.inline.} =
+  font.openType.getGlyphId(unicodeCodepoint)
 
-    var glyph = default(Glyph)
+proc getGlyph*(font: Font, glyphId: GlyphId): Glyph =
+  var glyph = default(Glyph)
+  font.glyphs.withValue(glyphId, val):
+    glyph = val[]
+
+  if glyph.isNil:
+    glyph = Glyph()
     glyph.fontId = font.fontId
-    glyph.unicodeCodepoint = unicodeCodepoint
     glyph.glyphId = glyphId
-    glyph.advance = font.openType.getGlyphAdvance(glyphId)
-    font.glyphs[unicodeCodepoint] = glyph
 
-  font.glyphs[unicodeCodepoint].addr
+    font.glyphs[glyphId] = glyph
+  glyph
+
+proc getGlyphShape*(font: Font, glyph: Glyph): lent seq[GlyphVertex] {.inline.} =
+  if glyph.shape.len <= 0:
+    glyph.shape = font.openType.getGlyphShape(glyph.glyphId)
+  glyph.shape
 
 proc measureText*(
     fons: FonsStash, font: Font, text: openArray[char], size, spacing: float32
 ): float32 =
-  var prevGlyphId = default(GlyphId)
+  var
+    x = default(float32)
+    prevGlyphId = default(GlyphId)
   let scale = font.getPixelHeightScale(size)
 
   for r in runes(text):
-    let glyph = fons.getGlyph(font, uint32(r))
-    if glyph.isNil:
+    let glyphId = font.getGlyphId(uint32(r))
+    if glyphId.isNil:
       prevGlyphId = default(GlyphId)
       continue
 
     if not prevGlyphId.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyph.glyphId)
-      result = result + scale * float32(adv) + spacing
-    prevGlyphId = glyph.glyphId
+      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyphId)
+      x = x + scale * float32(adv) + spacing
 
-    result = result + scale * float32(glyph.advance)
+    prevGlyphId = glyphId
+
+    let advance = font.openType.getGlyphAdvance(glyphId)
+    x = x + scale * float32(advance)
+  
+  x
 
 iterator arrange*(
     fons: FonsStash,
@@ -125,7 +134,7 @@ iterator arrange*(
     textAlign: HorizontalAlignment,
     textBaseline: BaselineAlignment,
     size, spacing: float32,
-): (float32, float32, ptr Glyph) =
+): (float32, float32, GlyphId) =
   var
     x = x
     y = y
@@ -155,30 +164,23 @@ iterator arrange*(
     y = y + fons.signY * descender * size
 
   for r in runes(text):
-    let glyph = fons.getGlyph(font, uint32(r))
-    if glyph.isNil:
+    let glyphId = font.getGlyphId(uint32(r))
+    if glyphId.isNil:
       prevGlyphId = default(GlyphId)
       continue
 
     if not prevGlyphId.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyph.glyphId)
+      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyphId)
       x = x + scale * float32(adv) + spacing
-    prevGlyphId = glyph.glyphId
 
-    yield (x, y, glyph)
+    prevGlyphId = glyphId
 
-    x = x + scale * float32(glyph.advance)
+    yield (x, y, glyphId)
 
-proc getGlyphShape*(fons: FonsStash, glyph: ptr Glyph): lent seq[GlyphVertex] =
-  if glyph.shape.len <= 0:
-    let font = fons.getFont(glyph.fontId)
-    if font.isNil:
-      return
+    let advance = font.openType.getGlyphAdvance(glyphId)
+    x = x + scale * float32(advance)
 
-    glyph.shape = font.openType.getGlyphShape(glyph.glyphId)
-  glyph.shape
-
-proc updateCell(fons: FonsStash, glyph: ptr Glyph): AtlasCell =
+proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
   let font = fons.getFont(glyph.fontId)
   if font.isNil:
     return
@@ -208,12 +210,12 @@ proc updateCell(fons: FonsStash, glyph: ptr Glyph): AtlasCell =
     if result.isNil:
       return
 
-    let atlas = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale, 0,
-        127, 32)
-    fons.atlas.updateCell(result, atlas.w, atlas.h, atlas.w, atlas.data[0].addr)
+    let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale,
+        0, 127, 32)
+    fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
 
-proc getGlyphQuad*(fons: FonsStash, glyph: ptr Glyph, x, y, size: float32): (
-    ImageId, Quad) =
+proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
+    size: float32): Quad =
   let cell = fons.updateCell(glyph)
   if cell.isNil:
     return
@@ -236,17 +238,17 @@ proc getGlyphQuad*(fons: FonsStash, glyph: ptr Glyph, x, y, size: float32): (
 
     scale = size / float32(fons.atlasFontSize)
 
-  result[0] = cell.imageId
+  result.imageId = cell.imageId
 
-  result[1].x1 = x + scale * xoff
-  result[1].y1 = y + scale * yoff * fons.signY
-  result[1].x2 = result[1].x1 + scale * float32(x2 - x1)
-  result[1].y2 = result[1].y1 + scale * float32(y2 - y1) * fons.signY
+  result.x1 = x + scale * xoff
+  result.y1 = y + scale * yoff * fons.signY
+  result.x2 = result.x1 + scale * float32(x2 - x1)
+  result.y2 = result.y1 + scale * float32(y2 - y1) * fons.signY
 
-  result[1].s1 = x1 * cell.scaleX
-  result[1].t1 = y1 * cell.scaleY
-  result[1].s2 = x2 * cell.scaleX
-  result[1].t2 = y2 * cell.scaleY
+  result.s1 = x1 * cell.scaleX
+  result.t1 = y1 * cell.scaleY
+  result.s2 = x2 * cell.scaleX
+  result.t2 = y2 * cell.scaleY
 
 proc createFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
   result = FonsStash()

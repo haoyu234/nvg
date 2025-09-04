@@ -80,6 +80,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
         vy = default(float32)
 
       lineTo(float32(20))
+
   of PERF_GRAPH_RENDER_FPS:
     for idx in 0 ..< GRAPH_HISTORY_COUNT:
       var
@@ -90,6 +91,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
         vy = default(float32)
 
       lineTo(float32(80))
+
   of PERF_GRAPH_RENDER_PERCENT:
     for idx in 0 ..< GRAPH_HISTORY_COUNT:
       var
@@ -114,19 +116,16 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
 
   case perfGraph.renderStyle
   of PERF_GRAPH_RENDER_FPS:
-    let path1 = ctx.textToPath(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
-    ctx.fillPath(path1)
+    ctx.fillText(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fontSize = 30
     ctx.fillStyle = color(0.58, 0.25, 1, 0.9)
     ctx.textBaseline = BottomBaseline
-    let path2 =
-      ctx.textToPath(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
-    ctx.fillPath(path2)
+    ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
+
   of PERF_GRAPH_RENDER_PERCENT:
-    let path1 = ctx.textToPath(fmt"{v:.1f} %", vec2(pos[0] + w - 3, pos[1] + 1))
-    ctx.fillPath(path1)
+    ctx.fillText(fmt"{v:.1f} %", vec2(pos[0] + w - 3, pos[1] + 1))
+
   of PERF_GRAPH_RENDER_MS:
-    let path1 = ctx.textToPath(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + 1))
-    ctx.fillPath(path1)
+    ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + 1))
 
   ctx.restore()

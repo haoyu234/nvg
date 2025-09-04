@@ -3,6 +3,7 @@ import ./pieces
 
 import std/math
 import std/endians
+import std/hashes
 
 type
   GlyphId* = distinct uint32
@@ -31,7 +32,7 @@ type
 
   GlyphLayer* = object
     glyphId*: GlyphId
-    color*: Color
+    paletteIdx*: uint32
 
   OpenTypeObj* = object
     data: Piece[byte]
@@ -43,6 +44,12 @@ type
 
 proc isNil*(glyphId: GlyphId): bool {.inline.} =
   uint32(glyphId) == 0
+
+proc `$`*(glyphId: GlyphId): string {.borrow.}
+
+proc hash*(glyphId: GlyphId): Hash {.borrow.}
+
+proc `==`*(glyphId1, glyphId2: GlyphId): bool {.borrow.}
 
 proc calcTag(data: static array[4, char]): uint32 {.raises: [].} =
   (uint32(data[0]) shl 24) + (uint32(data[1]) shl 16) + (uint32(data[
@@ -301,20 +308,20 @@ proc getGlyphGlyfOffset(font: OpenTypeObj, glyphId: GlyphId): uint32 =
 
   if font.indexToLocFormat == 0:
     offset1 =
-      font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 2, 2, uint32) * 2
+      font.data.toInt(font.loca + uint32(glyphId) * 2, 2, uint32) * 2
     offset2 =
-      font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 2 + 2, 2,
+      font.data.toInt(font.loca + uint32(glyphId) * 2 + 2, 2,
           uint32) * 2
   else:
-    offset1 = font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 4, 4, uint32)
+    offset1 = font.data.toInt(font.loca + uint32(glyphId) * 4, 4, uint32)
     offset2 =
-      font.glyf + font.data.toInt(font.loca + uint32(glyphId) * 4 + 4, 4, uint32)
+      font.data.toInt(font.loca + uint32(glyphId) * 4 + 4, 4, uint32)
 
   # if a glyph has no outline or instructions, then loca[n] = loca[n+1]
   if offset1 == offset2:
     return
 
-  offset1
+  font.glyf + offset1
 
 proc getGlyphBox*(
     font: OpenTypeObj, glyphId: GlyphId, scaleX, scaleY, shiftX, shiftY: float32
@@ -830,6 +837,7 @@ proc getGlyphSDF*(
 
       if dist >= eps:
         data[i] = float32(1) / dist
+
     elif v1.tp == uint8(GlyphShapeCommand.BEZIER):
       let
         x3 = float32(v2.x) * scaleX
@@ -1236,25 +1244,28 @@ proc getGlyphColrOffset(font: OpenTypeObj, glyphId: GlyphId): uint32 =
       result = baseGlyphRecord
       return
 
-proc getPaletteColor(font: OpenTypeObj, colorIndex: uint32,
-    paletteId: uint32): uint32 =
+proc getPaletteColor*(font: OpenTypeObj, paletteIdx: uint32, palette: uint32): Color =
   let
     numPaletteEntries = font.data.toInt(font.cpal + 2, 2, uint32)
     numPalettes = font.data.toInt(font.cpal + 4, 2, uint32)
     numColorRecords = font.data.toInt(font.cpal + 6, 2, uint32)
     colorRecordsArrayOffset = font.cpal + font.data.toInt(font.cpal + 8, 4, uint32)
 
-  if colorIndex >= numPaletteEntries or paletteId >= numPalettes:
+  if paletteIdx >= numPaletteEntries or palette >= numPalettes:
     return
 
   let
     colorRecordIndicesOffset = font.cpal + 12
-    colorRecordIndex = colorIndex + font.data.toInt(colorRecordIndicesOffset +
-        2 * paletteId, 2, uint32)
+    colorRecordIndex = paletteIdx + font.data.toInt(colorRecordIndicesOffset +
+        2 * palette, 2, uint32)
   if colorRecordIndex >= numColorRecords:
     return
 
-  font.data.toInt(colorRecordsArrayOffset + 4 * colorRecordIndex, 4, uint32)
+  let hexColor = font.data.toInt(colorRecordsArrayOffset + 4 * colorRecordIndex, 4, uint32)
+  result.a = float32((hexColor shr 0) and 0xFF) / 255
+  result.r = float32((hexColor shr 8) and 0xFF) / 255
+  result.g = float32((hexColor shr 16) and 0xFF) / 255
+  result.b = float32((hexColor shr 24) and 0xFF) / 255
 
 proc getGlyphLayers*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphLayer] =
   let glyphBasGlyphRecord = font.getGlyphColrOffset(glyphId)
@@ -1273,16 +1284,11 @@ proc getGlyphLayers*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphLayer] =
       for idx in 0 ..< numLayers:
         let
           glyphId2 = font.data.toInt(glyphLayerRecordStart + idx * 4, 2, uint32)
-          colorIndex = font.data.toInt(glyphLayerRecordStart + idx * 4 + 2, 2, uint32)
-          paletteColor = font.getPaletteColor(colorIndex, 0)
+          paletteIdx = font.data.toInt(glyphLayerRecordStart + idx * 4 + 2, 2, uint32)
 
-        var layer = default(GlyphLayer)
+        let layer = result[idx].addr
         layer.glyphId = GlyphId(glyphId2)
-        layer.color.a = float32((paletteColor shr 0) and 0xFF) / 255
-        layer.color.r = float32((paletteColor shr 8) and 0xFF) / 255
-        layer.color.g = float32((paletteColor shr 16) and 0xFF) / 255
-        layer.color.b = float32((paletteColor shr 24) and 0xFF) / 255
-        result[idx] = layer
+        layer.paletteIdx = paletteIdx
 
 proc hasColor*(font: OpenTypeObj, glyphId: GlyphId): bool =
   if font.colr > 0 and font.cpal > 0:
