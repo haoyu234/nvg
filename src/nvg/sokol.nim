@@ -234,8 +234,8 @@ proc getShader(): Shader =
 
   makeShader(s)
 
-proc createImpl(): pointer =
-  let ctx = create(SokolBackendContextObj)
+proc initImpl(ctx: pointer) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   ctx.shader = getShader()
   ctx.vertBuf = allocBuffer()
@@ -299,8 +299,6 @@ proc createImpl(): pointer =
     )
   )
   )
-
-  ctx
 
 proc destroyImpl(ctx: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
@@ -728,9 +726,12 @@ proc flushImpl(ctx: pointer) =
       draw(int32(call.triangleOffset), int32(call.triangleCount), 1)
 
 proc newContext*(): Context =
+  let ctx = create(SokolBackendContextObj)
+
   createInternal(
+    ctx,
     BackendContextParams(
-      createImpl: createImpl,
+      initImpl: initImpl,
       destroyImpl: destroyImpl,
       fillImpl: fillImpl,
       trianglesImpl: trianglesImpl,

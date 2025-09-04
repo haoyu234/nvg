@@ -19,7 +19,7 @@ type
     TextureFloat
 
   BackendContextParams* = object
-    createImpl*: proc(): pointer {.nimcall.}
+    initImpl*: proc(ctx: pointer) {.nimcall.}
     destroyImpl*: proc(ctx: pointer) {.nimcall, raises: [].}
 
     fillImpl*: proc(

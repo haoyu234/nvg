@@ -97,8 +97,8 @@ proc createShaderProgram(vs, fs: cstring): OpenglShaderProgram =
   result.fillLoc = glGetUniformLocation(program, "fill")
   result.paintLoc = glGetUniformLocation(program, "paint")
 
-proc createImpl(): pointer =
-  let ctx = create(OpenglBackendContextObj)
+proc initImpl(ctx: pointer) =
+  let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
   when NVG_USE_GLCORE:
     ctx.shaderProgram = createShaderProgram(
@@ -118,8 +118,6 @@ proc createImpl(): pointer =
   glSamplerParameteri(ctx.smpDummy, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 
   glFinish()
-
-  ctx
 
 proc destroyImpl(ctx: pointer) {.raises: [].} =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
@@ -512,9 +510,12 @@ proc flushImpl(ctx: pointer) =
   glBindSampler(0, 0)
 
 proc newContext*(): Context =
+  let ctx = create(OpenglBackendContextObj)
+
   createInternal(
+    ctx,
     BackendContextParams(
-      createImpl: createImpl,
+      initImpl: initImpl,
       destroyImpl: destroyImpl,
       fillImpl: fillImpl,
       trianglesImpl: trianglesImpl,

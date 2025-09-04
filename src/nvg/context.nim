@@ -76,7 +76,8 @@ type
     path: Path
 
 proc `=destroy`(ctx: ContextObj) =
-  ctx.params.destroyImpl(ctx.ctx)
+  if not ctx.params.destroyImpl.isNil:
+    ctx.params.destroyImpl(ctx.ctx)
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
@@ -131,7 +132,7 @@ proc state(ctx: Context): ContextState =
   result.textBaseline = ctx.textBaseline
   result.fontId = ctx.fontId
 
-proc save*(ctx: Context) =
+proc save*(ctx: Context) {.inline.} =
   ctx.states.add(ctx.state)
 
 proc restore*(ctx: Context) =
@@ -162,37 +163,38 @@ proc restore*(ctx: Context) =
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(params: BackendContextParams): Context =
-  assert(params.createImpl != nil)
+proc createInternal*(ctx: pointer, params: BackendContextParams): Context =
+  if not params.initImpl.isNil:
+    params.initImpl(ctx)
 
   result = Context()
   result.params = params
-  result.ctx = params.createImpl()
+  result.ctx = ctx
   result.resetState()
   result.setDevicePixelRatio(1)
 
   result.atlas = createAtlas(2048, 2048, result.ctx, params)
   result.fons = createFonsStash(TopLeftOrigin, result.atlas)
 
-proc translate*(ctx: Context, v: Vec2) =
+proc translate*(ctx: Context, v: Vec2) {.inline.} =
   ctx.transform.translate(v)
 
-proc scale*(ctx: Context, v: Vec2) =
+proc scale*(ctx: Context, v: Vec2) {.inline.} =
   ctx.transform.scale(v)
 
-proc rotate*(ctx: Context, v: float32) =
+proc rotate*(ctx: Context, v: float32) {.inline.} =
   ctx.transform.rotate(v)
 
-proc resetTransform*(ctx: Context) =
+proc resetTransform*(ctx: Context) {.inline.} =
   ctx.transform = mat2d()
 
-proc getTransform*(ctx: Context): lent Mat2d =
+proc getTransform*(ctx: Context): lent Mat2d {.inline.} =
   ctx.transform
 
-proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId =
+proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId {.inline.} =
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
-proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId =
+proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId {.inline.} =
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
 proc fillPath*(ctx: Context, path: Path) =
@@ -204,11 +206,12 @@ proc fillPath*(ctx: Context, path: Path) =
   if ctx.fillRule == FillRule.EvenOdd:
     renderFlags.incl(RenderFlags.EvenOdd)
 
-  ctx.params.fillImpl(
-    ctx.ctx, ctx.fillStyle, ctx.compositeOperation, renderFlags,
-    ctx.cache.bounds,
-    ctx.cache.contours,
-  )
+  if not ctx.params.fillImpl.isNil:
+    ctx.params.fillImpl(
+      ctx.ctx, ctx.fillStyle, ctx.compositeOperation, renderFlags,
+      ctx.cache.bounds,
+      ctx.cache.contours,
+    )
 
 proc getAverageScale(t: Mat2d): float32 {.inline.} =
   let
@@ -236,14 +239,15 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit, ctx.tessTol, ctx.distTolSq
   )
 
-  ctx.params.fillImpl(
-    ctx.ctx,
-    ctx.strokeStyle,
-    ctx.compositeOperation,
-    default(set[RenderFlags]),
-    ctx.cache.bounds,
-    ctx.cache.contours,
-  )
+  if not ctx.params.fillImpl.isNil:
+    ctx.params.fillImpl(
+      ctx.ctx,
+      ctx.strokeStyle,
+      ctx.compositeOperation,
+      default(set[RenderFlags]),
+      ctx.cache.bounds,
+      ctx.cache.contours,
+    )
 
 proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
   ctx.states.setLen(0)
@@ -251,12 +255,14 @@ proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
 
   ctx.setDevicePixelRatio(devicePixelRatio)
 
-  ctx.params.viewportImpl(ctx.ctx, view, devicePixelRatio)
+  if not ctx.params.viewportImpl.isNil:
+    ctx.params.viewportImpl(ctx.ctx, view, devicePixelRatio)
 
   ctx.atlas.compact()
 
 proc flush*(ctx: Context) =
-  ctx.params.flushImpl(ctx.ctx)
+  if not ctx.params.flushImpl.isNil:
+    ctx.params.flushImpl(ctx.ctx)
 
 proc beginPath*(ctx: Context) {.inline.} =
   ctx.path.clear()
@@ -396,15 +402,16 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
     if not paint.image.isNil:
       if paint.image != quad.imageId:
-        ctx.params.trianglesImpl(
-          ctx.ctx,
-          paint,
-          ctx.compositeOperation,
-          default(set[RenderFlags]),
-          verts,
-        )
+        if not ctx.params.trianglesImpl.isNil:
+          ctx.params.trianglesImpl(
+            ctx.ctx,
+            paint,
+            ctx.compositeOperation,
+            default(set[RenderFlags]),
+            verts,
+          )
 
-        verts.setLen(0)
+          verts.setLen(0)
 
     paint.image = quad.imageId
 
@@ -424,10 +431,11 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
     verts.add(vertBuf)
 
   if verts.len > 0:
-    ctx.params.trianglesImpl(
-      ctx.ctx,
-      paint,
-      ctx.compositeOperation,
-      default(set[RenderFlags]),
-      verts,
-    )
+    if not ctx.params.trianglesImpl.isNil:
+      ctx.params.trianglesImpl(
+        ctx.ctx,
+        paint,
+        ctx.compositeOperation,
+        default(set[RenderFlags]),
+        verts,
+      )
