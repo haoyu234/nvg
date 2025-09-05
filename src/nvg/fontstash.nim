@@ -211,7 +211,7 @@ proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
       return
 
     let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale,
-        0, 127, 32)
+        pad, 127, 32)
     fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
 
 proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
@@ -226,15 +226,13 @@ proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
     h = glyph.atlasGlyphBox.y2 - glyph.atlasGlyphBox.y1
 
   let
-    blur = default(float32)
-    expand = min(blur, float32(fons.atlasPadding)) + 1
-    xoff = float32(glyph.atlasGlyphBox.x1) - expand
-    yoff = float32(glyph.atlasGlyphBox.y1) - expand
+    xoff = float32(glyph.atlasGlyphBox.x1 - pad)
+    yoff = float32(glyph.atlasGlyphBox.y1 - pad)
 
-    x1 = float32(cell.x + pad) - expand
-    y1 = float32(cell.y + pad) - expand
-    x2 = float32(cell.x + pad + w) + expand
-    y2 = float32(cell.y + pad + h) + expand
+    x1 = float32(cell.x)
+    y1 = float32(cell.y)
+    x2 = float32(cell.x + w + pad * 2)
+    y2 = float32(cell.y + h + pad * 2)
 
     scale = size / float32(fons.atlasFontSize)
 
@@ -263,5 +261,5 @@ proc createFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
     result.signY = float32(-1)
 
   # SDF
-  result.atlasPadding = 1
+  result.atlasPadding = 8
   result.atlasFontSize = 48 * 2

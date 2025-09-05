@@ -106,6 +106,7 @@ proc addUniform(
   if EvenOdd in renderFlags:
     fillType = fillType or (1 shl 0)
 
+  uniform.feather = paint.feather
   uniform.innerColor = paint.innerColor
   uniform.outerColor = paint.outerColor
   uniform.extent = paint.extent
@@ -124,7 +125,8 @@ proc addUniform(
 
   if shaderType == Gradient:
     uniform.radius = paint.radius
-    uniform.feather = paint.feather
+  elif shaderType == Text:
+    uniform.radius = paint.radius + 0.5f
 
   if not paint.image.isNil:
     let tex = ctx.getTexture(paint.image)
