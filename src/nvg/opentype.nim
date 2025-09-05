@@ -1,4 +1,5 @@
 import ./core
+import ./math
 import ./pieces
 
 import std/math
@@ -12,6 +13,7 @@ type
     MOVE = 1
     LINE
     BEZIER
+    CLOSE
 
   GlyphBox* = object
     x1*, y1*: int32
@@ -19,7 +21,7 @@ type
 
   GlyphVertex* = object
     x*, y*, cx*, cy*: int16
-    tp*: uint8
+    command*: GlyphShapeCommand
 
   FontMetrics* = object
     ascender*: int32
@@ -75,18 +77,18 @@ proc toInt[T: SomeInteger, O: Natural](
   assert sizeof(T) >= int(SIZE)
   assert s.len >= int(offset) + int(SIZE)
 
-  when SIZE > 1:
-    template RESULT_TYPE(): typedesc =
-      const HAS_SIGN = T is SomeSignedInt
-      when SIZE == 8:
-        when HAS_SIGN: int64 else: uint64
-      elif SIZE == 4:
-        when HAS_SIGN: int32 else: uint32
-      elif SIZE == 2:
-        when HAS_SIGN: int16 else: uint16
-      else:
-        when HAS_SIGN: int8 else: uint8
+  template RESULT_TYPE(): typedesc =
+    const HAS_SIGN = T is SomeSignedInt
+    when SIZE == 8:
+      when HAS_SIGN: int64 else: uint64
+    elif SIZE == 4:
+      when HAS_SIGN: int32 else: uint32
+    elif SIZE == 2:
+      when HAS_SIGN: int16 else: uint16
+    else:
+      when HAS_SIGN: int8 else: uint8
 
+  when SIZE > 1:
     var data = default(RESULT_TYPE())
     when SIZE == 8:
       bigEndian64(data.addr, s[int(offset)].addr)
@@ -98,7 +100,7 @@ proc toInt[T: SomeInteger, O: Natural](
       bigEndian16(data.addr, s[int(offset)].addr)
       T(data)
   else:
-    T(s[int(offset)])
+    T(RESULT_TYPE()(s[int(offset)]))
 
 proc getTable(data: Piece[byte], fontStart: uint32, targetTag: uint32): uint32 =
   let
@@ -339,57 +341,24 @@ proc getGlyphBox*(
     result.x2 = int32(ceil(float32(x2) * scaleX + shiftX))
     result.y2 = int32(ceil(-float32(y1) * scaleY + shiftY))
 
-proc closeShape(
-    verts: var seq[GlyphVertex], wasOff, startOff: bool, sx, sy, scx, scy, cx, cy: int32
-) =
-  var p = default(GlyphVertex)
-
-  if startOff:
-    if wasOff:
-      p.tp = uint8(GlyphShapeCommand.BEZIER)
-      p.x = int16((cx + scx) shr 1)
-      p.y = int16((cy + scy) shr 1)
-      p.cx = int16(cx)
-      p.cy = int16(cy)
-      verts.add(p)
-
-    p.tp = uint8(GlyphShapeCommand.BEZIER)
-    p.x = int16(sx)
-    p.y = int16(sy)
-    p.cx = int16(scx)
-    p.cy = int16(scy)
-    verts.add(p)
-  else:
-    if wasOff:
-      p.tp = uint8(GlyphShapeCommand.BEZIER)
-      p.x = int16(sx)
-      p.y = int16(sy)
-      p.cx = int16(cx)
-      p.cy = int16(cy)
-    else:
-      p.tp = uint8(GlyphShapeCommand.LINE)
-      p.x = int16(sx)
-      p.y = int16(sy)
-      p.cx = 0
-      p.cy = 0
-    verts.add(p)
-
-proc getGlyphShape*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphVertex] =
+proc getGlyphShapeAux(font: OpenTypeObj, glyphId: GlyphId, verts: var seq[GlyphVertex]) =
   let offset = font.getGlyphGlyfOffset(glyphId)
   if offset <= 0:
     return
 
   let count = font.data.toInt(offset, 2, int32)
   if count > 0:
-    result = newSeqOfCap[GlyphVertex](2 * count)
-
     let
       ins = font.data.toInt(offset + 10 + uint32(count) * 2, 2, uint32)
       n = 1 + font.data.toInt(offset + 10 + uint32(count) * 2 - 2, 2, uint32)
 
+    type
+      GlyphPoint = object
+        x, y, cx, cy: int16
+        flags: uint8
+
     var
-      points = newSeq[GlyphVertex](n)
-      rpos = offset + 10 + uint32(count) * 2 + 2 + ins
+      points = newSeq[GlyphPoint](n)
 
     block:
       var
@@ -397,6 +366,7 @@ proc getGlyphShape*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphVertex] =
         y = default(int32)
         flags = default(uint8)
         repeatCount = default(uint8)
+        rpos = offset + 10 + uint32(count) * 2 + 2 + ins
 
       template next(n, T): auto =
         let data = font.data.toInt(rpos, n, T)
@@ -411,202 +381,190 @@ proc getGlyphShape*(font: OpenTypeObj, glyphId: GlyphId): seq[GlyphVertex] =
         else:
           dec repeatCount, 1
 
-        points[idx].tp = flags
+        points[idx].flags = flags
 
       for idx in 0 ..< n:
-        flags = points[idx].tp
-        if (flags and 0x2) != 0:
-          if (flags and 0x10) != 0:
+        let p = points[idx].addr
+        if (p.flags and 0x2) != 0:
+          if (p.flags and 0x10) != 0:
             inc x, next(1, uint8)
           else:
             dec x, next(1, uint8)
         else:
-          if (flags and 0x10) == 0:
+          if (p.flags and 0x10) == 0:
             inc x, next(2, int32)
 
-        points[idx].x = int16(x)
+        p[].x = int16(x)
 
       for idx in 0 ..< n:
-        flags = points[idx].tp
-
-        if (flags and 0x4) != 0:
-          if (flags and 0x20) != 0:
+        let p = points[idx].addr
+        if (p.flags and 0x4) != 0:
+          if (p.flags and 0x20) != 0:
             inc y, next(1, uint8)
           else:
             dec y, next(1, uint8)
         else:
-          if (flags and 0x20) == 0:
+          if (p.flags and 0x20) == 0:
             inc y, next(2, int32)
 
-        points[idx].y = int16(y)
+        p[].y = int16(y)
 
-    var
-      idx = default(uint32)
-      contourIndex = default(uint32)
-      contourStartIndex = default(uint32)
-      vert = default(GlyphVertex)
-      wasOff = default(bool)
-      startOff = default(bool)
-      sx = default(int32)
-      sy = default(int32)
-      scx = default(int32)
-      scy = default(int32)
-      cx = default(int32)
-      cy = default(int32)
+    block:
+      var
+        beginIdx = default(uint32)
+        vert = default(GlyphVertex)
 
-    while idx < n:
-      let
-        v1 = points[idx].addr
+      for idx in 0 ..< uint32(count):
+        let
+          endIdx = font.data.toInt(offset + 10 + idx * 2, 2, uint32)
+          n = endIdx - beginIdx + 1
 
-        v1x = v1.x
-        v1y = v1.y
+        var
+          cur = points[endIdx].addr
+          next = points[beginIdx].addr
 
-      if contourStartIndex == idx:
-        if idx != 0:
-          closeShape(result, wasOff, startOff, sx, sy, scx, scy, cx, cy)
+        if (cur.flags and 0x1) > 0:
+          vert.x = cur.x
+          vert.y = cur.y
 
-        startOff = (v1.tp and 0x1) == 0
+        elif (next.flags and 0x1) > 0:
+          vert.x = next.x
+          vert.y = next.y
 
-        if startOff:
-          scx = v1x
-          scy = v1y
-
-          let v2 = points[idx + 1].addr
-          if (v2.tp and 0x1) == 0:
-            sx = (v1x + v2.x) shr 1
-            sy = (v1y + v2.y) shr 1
-          else:
-            sx = v2.x
-            sy = v2.y
-
-            inc idx, 1
         else:
-          sx = v1x
-          sy = v1y
+          vert.x = (cur.x + next.x) div 2
+          vert.y = (cur.y + next.y) div 2
 
-        vert.tp = uint8(GlyphShapeCommand.MOVE)
-        vert.x = int16(sx)
-        vert.y = int16(sy)
+        vert.command = GlyphShapeCommand.MOVE
         vert.cx = 0
         vert.cy = 0
-        result.add(vert)
+        verts.add(vert)
 
-        wasOff = false
-        contourStartIndex =
-          1 + font.data.toInt(offset + 10 + contourIndex * 2, 2, uint16)
-        inc contourIndex, 1
-      else:
-        if (v1.tp and 0x1) == 0:
-          if wasOff:
-            vert.tp = uint8(GlyphShapeCommand.BEZIER)
-            vert.x = int16((cx + v1x) shr 1)
-            vert.y = int16((cy + v1y) shr 1)
-            vert.cx = int16(cx)
-            vert.cy = int16(cy)
-            result.add(vert)
+        for idx in 0 ..< n:
+          cur = next
+          next = points[beginIdx + (idx + 1) mod n].addr
 
-          cx = v1x
-          cy = v1y
-          wasOff = true
-        else:
-          if wasOff:
-            vert.tp = uint8(GlyphShapeCommand.BEZIER)
-            vert.x = int16(v1x)
-            vert.y = int16(v1y)
-            vert.cx = int16(cx)
-            vert.cy = int16(cy)
-          else:
-            vert.tp = uint8(GlyphShapeCommand.LINE)
-            vert.x = int16(v1x)
-            vert.y = int16(v1y)
+          if (cur.flags and 0x1) > 0:
+            vert.command = GlyphShapeCommand.LINE
+            vert.x = cur.x
+            vert.y = cur.y
             vert.cx = 0
             vert.cy = 0
+          else:
+            var
+              x = next.x
+              y = next.y
 
-          wasOff = false
-          result.add(vert)
+            if (next.flags and 0x1) <= 0:
+              x = (cur.x + next.x) div 2
+              y = (cur.y + next.y) div 2
 
-      inc idx, 1
-    closeShape(result, wasOff, startOff, sx, sy, scx, scy, cx, cy)
+            vert.command = GlyphShapeCommand.BEZIER
+            vert.x = x
+            vert.y = y
+            vert.cx = cur.x
+            vert.cy = cur.y
+
+          verts.add(vert)
+
+        vert.command = GlyphShapeCommand.CLOSE
+        vert.x = 0
+        vert.y = 0
+        vert.cx = 0
+        vert.cy = 0
+
+        verts.add(vert)
+
+        beginIdx = endIdx + 1
+
   elif count < 0:
     var
       more = true
-      offset1 = offset + 10
+      rpos = offset + 10
+
+    template next(n, T): auto =
+      let data = font.data.toInt(rpos, n, T)
+      inc rpos, n
+      data
 
     while more:
       let
-        flags = font.data.toInt(offset1, 2, uint32)
-        glyphId2 = GlyphId(font.data.toInt(offset1 + 2, 2, uint32))
-      inc offset1, 4
+        flags = next(2, uint32)
+        glyphId2 = GlyphId(next(2, uint32))
+        oldLen = verts.len
 
-      var mtx = [float32(1), 0, 0, 1, 0, 0]
+      var transform = mat2d()
 
-      if (flags and 0x2) != 0:
-        if (flags and 0x1) != 0:
-          mtx[4] = float32(font.data.toInt(offset1, 2, int32))
-          mtx[5] = float32(font.data.toInt(offset1 + 2, 2, int32))
-          inc offset1, 4
+      if (flags and 0x2) > 0:
+        if (flags and 0x1) > 0:
+          transform[4] = float32(next(2, int32))
+          transform[5] = float32(next(2, int32))
+
         else:
-          mtx[4] = float32(font.data.toInt(offset1, 1, int32))
-          mtx[5] = float32(font.data.toInt(offset1 + 1, 1, int32))
-          inc offset1, 2
-      else:
-        assert false
+          transform[4] = float32(next(1, int32))
+          transform[5] = float32(next(1, int32))
 
-      if (flags and (1 shl 3)) != 0:
-        let v = float32(font.data.toInt(offset1, 2, int32)) / 16384
-        inc offset1, 2
+      if (flags and 0x8) > 0:
+        let v = float32(next(2, int32)) / 16384
 
-        mtx[0] = v
-        mtx[3] = v
-        mtx[1] = 0
-        mtx[2] = 0
-      elif (flags and (1 shl 6)) != 0:
+        transform[0] = v
+        transform[3] = v
+        transform[1] = 0
+        transform[2] = 0
+
+      elif (flags and 0x40) > 0:
         let
-          v1 = float32(font.data.toInt(offset1, 2, int32)) / 16384
-          v2 = float32(font.data.toInt(offset1 + 2, 2, int32)) / 16384
-        inc offset1, 4
+          v1 = float32(next(2, int32)) / 16384
+          v2 = float32(next(2, int32)) / 16384
 
-        mtx[0] = v1
-        mtx[1] = 0
-        mtx[2] = 0
-        mtx[3] = v2
-      elif (flags and (1 shl 7)) != 0:
+        transform[0] = v1
+        transform[1] = 0
+        transform[2] = 0
+        transform[3] = v2
+
+      elif (flags and 0x80) > 0:
         let
-          v1 = float32(font.data.toInt(offset1, 2, int32)) / 16384
-          v2 = float32(font.data.toInt(offset1 + 2, 2, int32)) / 16384
-          v3 = float32(font.data.toInt(offset1 + 4, 2, int32)) / 16384
-          v4 = float32(font.data.toInt(offset1 + 6, 2, int32)) / 16384
-        inc offset1, 8
+          v1 = float32(next(2, int32)) / 16384
+          v2 = float32(next(2, int32)) / 16384
+          v3 = float32(next(2, int32)) / 16384
+          v4 = float32(next(2, int32)) / 16384
 
-        mtx[0] = v1
-        mtx[1] = v2
-        mtx[2] = v3
-        mtx[3] = v4
+        transform[0] = v1
+        transform[1] = v2
+        transform[2] = v3
+        transform[3] = v4
 
-      let
-        m = sqrt(mtx[0] * mtx[0] + mtx[1] * mtx[1])
-        n = sqrt(mtx[2] * mtx[2] + mtx[3] * mtx[3])
-        verts = font.getGlyphShape(glyphId2)
+      font.getGlyphShapeAux(glyphId2, verts)
 
-      if len(verts) > 0:
-        let oldLen = len(result)
-        result.setLen(oldLen + len(verts))
+      for idx in oldLen ..< verts.len:
+        let v = verts[idx].addr
 
-        for idx in 0 ..< len(verts):
+        case v.command
+        of GlyphShapeCommand.MOVE, GlyphShapeCommand.LINE:
           let
-            v1 = verts[idx].addr
-            v2 = result[oldLen + idx].addr
+            p = transform * vec2(float32(v.x), float32(v.y))
 
-          v2.tp = v1.tp
-          v2.x = int16(m * (mtx[0] * float32(v1.x) + mtx[2] * float32(v1.y) +
-              mtx[4]))
-          v2.y = int16(n * (mtx[1] * float32(v1.x) + mtx[3] * float32(v1.y) +
-              mtx[5]))
-          v2.cx =
-            int16(m * (mtx[0] * float32(v1.cx) + mtx[2] * float32(v1.cy) + mtx[4]))
-          v2.cy =
-            int16(n * (mtx[1] * float32(v1.cx) + mtx[3] * float32(v1.cy) + mtx[5]))
-      more = (flags and (1 shl 5)) != 0
+          v.x = int16(p[0])
+          v.y = int16(p[1])
+
+        of GlyphShapeCommand.BEZIER:
+          let
+            p = transform * vec2(float32(v.x), float32(v.y))
+            cp = transform * vec2(float32(v.cx), float32(v.cy))
+
+          v.x = int16(p[0])
+          v.y = int16(p[1])
+          v.cx = int16(cp[0])
+          v.cy = int16(cp[1])
+
+        else:
+          discard
+
+      more = (flags and 0x20) != 0
+
+proc getGlyphShape*(font: OpenTypeObj, glyphId: GlyphId): seq[
+    GlyphVertex] {.inline.} =
+  font.getGlyphShapeAux(glyphId, result)
 
 proc rayBezier(
     orig, ray, q1, q2, q3: array[2, float32], hits: var array[2, array[2, float32]]
@@ -710,9 +668,9 @@ proc computeCrossX(x, y: float32, verts: seq[GlyphVertex]): int32 =
           else:
             dec winding, 1
 
-    if v1.tp == uint8(GlyphShapeCommand.LINE):
+    if v1.command == GlyphShapeCommand.LINE:
       check()
-    elif v1.tp == uint8(GlyphShapeCommand.BEZIER):
+    elif v1.command == GlyphShapeCommand.BEZIER:
       let
         x1 = v2.x
         y1 = v2.y
@@ -824,7 +782,7 @@ proc getGlyphSDF*(
       v1 = verts[i].addr
       v2 = verts[j].addr
 
-    if v1.tp == uint8(GlyphShapeCommand.LINE):
+    if v1.command == GlyphShapeCommand.LINE:
       let
         x1 = float32(v1.x) * scaleX
         y1 = float32(v1.y) * scaleY
@@ -838,7 +796,7 @@ proc getGlyphSDF*(
       if dist >= eps:
         data[i] = float32(1) / dist
 
-    elif v1.tp == uint8(GlyphShapeCommand.BEZIER):
+    elif v1.command == GlyphShapeCommand.BEZIER:
       let
         x3 = float32(v2.x) * scaleX
         y3 = float32(v2.y) * scaleY
@@ -878,7 +836,7 @@ proc getGlyphSDF*(
           x1 = float32(v1.x) * scaleX
           y1 = float32(v1.y) * scaleY
 
-        if v1.tp == uint8(GlyphShapeCommand.LINE) and data[idx] != 0:
+        if v1.command == GlyphShapeCommand.LINE and data[idx] != 0:
           let
             x2 = float32(v2.x) * scaleX
             y2 = float32(v2.y) * scaleY
@@ -898,7 +856,7 @@ proc getGlyphSDF*(
             let t = -(px * dx + py * dy) / (dx * dx + dy * dy)
             if t >= 0 and t <= 1:
               minDist = dist
-        elif v1.tp == uint8(GlyphShapeCommand.BEZIER):
+        elif v1.command == GlyphShapeCommand.BEZIER:
           let
             x3 = float32(v2.x) * scaleX
             y3 = float32(v2.y) * scaleY
@@ -1244,7 +1202,8 @@ proc getGlyphColrOffset(font: OpenTypeObj, glyphId: GlyphId): uint32 =
       result = baseGlyphRecord
       return
 
-proc getPaletteColor*(font: OpenTypeObj, paletteIdx: uint32, palette: uint32): Color =
+proc getPaletteColor*(font: OpenTypeObj, paletteIdx: uint32,
+    palette: uint32): Color =
   let
     numPaletteEntries = font.data.toInt(font.cpal + 2, 2, uint32)
     numPalettes = font.data.toInt(font.cpal + 4, 2, uint32)
@@ -1261,7 +1220,8 @@ proc getPaletteColor*(font: OpenTypeObj, paletteIdx: uint32, palette: uint32): C
   if colorRecordIndex >= numColorRecords:
     return
 
-  let hexColor = font.data.toInt(colorRecordsArrayOffset + 4 * colorRecordIndex, 4, uint32)
+  let hexColor = font.data.toInt(colorRecordsArrayOffset + 4 * colorRecordIndex,
+      4, uint32)
   result.a = float32((hexColor shr 0) and 0xFF) / 255
   result.r = float32((hexColor shr 8) and 0xFF) / 255
   result.g = float32((hexColor shr 16) and 0xFF) / 255

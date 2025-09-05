@@ -6,8 +6,8 @@ import nvg/params
 import ./app
 import ./fonts
 
-proc fillGlyphSdfImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y, fontSize: float32,
-    paint: Paint) =
+proc fillGlyphSdfImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
+    fontSize: float32, paint: Paint) =
   let glyph = font.getGlyph(glyphId)
   if glyph.isNil:
     return
@@ -81,33 +81,37 @@ proc getGlyphPathImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
   if glyph.isNil:
     return
 
-  let points = font.getGlyphShape(glyph)
-  if len(points) <= 0:
+  let verts = font.getGlyphShape(glyph)
+  if len(verts) <= 0:
     return
 
   var matrix = [scale, 0, 0, -scale, x, y]
   matrix.multiply(ctx.getTransform())
 
-  for idx in 0 ..< points.len:
-    let vert = points[idx].addr
+  for idx in 0 ..< verts.len:
+    let v = verts[idx].addr
 
-    if vert.tp == uint8(GlyphShapeCommand.MOVE):
-      let p1 = matrix * vec2(float32(vert.x), float32(vert.y))
-      result.moveTo(p1)
+    case v.command
+    of GlyphShapeCommand.MOVE:
+      let p = matrix * vec2(float32(v.x), float32(v.y))
+      result.moveTo(p)
 
       if idx <= 0:
         result.appendCommands([float32(PathCommand.RESTART)])
 
-    elif vert.tp == uint8(GlyphShapeCommand.LINE):
-      let p1 = matrix * vec2(float32(vert.x), float32(vert.y))
-      result.lineTo(p1)
+    of GlyphShapeCommand.LINE:
+      let p = matrix * vec2(float32(v.x), float32(v.y))
+      result.lineTo(p)
 
-    elif vert.tp == uint8(GlyphShapeCommand.BEZIER):
+    of GlyphShapeCommand.BEZIER:
       let
-        p1 = matrix * vec2(float32(vert.x), float32(vert.y))
-        p2 = matrix * vec2(float32(vert.cx), float32(vert.cy))
+        p = matrix * vec2(float32(v.x), float32(v.y))
+        cp = matrix * vec2(float32(v.cx), float32(v.cy))
 
-      result.quadCurveTo(p2, p1)
+      result.quadCurveTo(cp, p)
+
+    of GlyphShapeCommand.CLOSE:
+      result.closePath()
 
 proc fillGlyphPath(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     fontSize: float32) =
