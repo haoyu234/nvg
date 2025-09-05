@@ -206,9 +206,13 @@ proc fillPath*(ctx: Context, path: Path) =
   if ctx.fillRule == FillRule.EvenOdd:
     renderFlags.incl(RenderFlags.EvenOdd)
 
+  var paint = ctx.fillStyle
+  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
+  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
+
   if not ctx.params.fillImpl.isNil:
     ctx.params.fillImpl(
-      ctx.ctx, ctx.fillStyle, ctx.compositeOperation, renderFlags,
+      ctx.ctx, paint, ctx.compositeOperation, renderFlags,
       ctx.cache.bounds,
       ctx.cache.contours,
     )
