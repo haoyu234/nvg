@@ -212,7 +212,8 @@ proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
 
     let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale,
         pad, 127, 32)
-    fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
+    if sdf.data.len > 0:
+      fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
 
 proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
     size: float32): Quad =
