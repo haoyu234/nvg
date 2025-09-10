@@ -73,12 +73,13 @@ proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FontId =
   fontId
 
 proc getFont*(fons: FonsStash, fontId: FontId): Font =
-  let n = min(len(fons.fonts), int(fontId))
+  let n = min(int32(len(fons.fonts)), int32(fontId))
 
-  for idx in 0 ..< n:
-    let p = fons.fonts[idx]
-    if uint32(p.fontId) == uint32(fontId):
-      return p
+  for idx in countdown(n - 1, 0):
+    let font = fons.fonts[idx]
+    if font.fontId == fontId:
+      result = font
+      break
 
 proc getGlyphId*(font: Font, unicodeCodepoint: uint32): GlyphId {.inline.} =
   font.openType.getGlyphId(unicodeCodepoint)
@@ -123,7 +124,7 @@ proc measureText*(
 
     let advance = font.openType.getGlyphAdvance(glyphId)
     x = x + scale * float32(advance)
-  
+
   x
 
 iterator arrange*(

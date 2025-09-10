@@ -14,10 +14,9 @@ proc frameImpl(ctx: Context) =
   ctx.rect(vec4(10, 10, 90, 90))
   ctx.fill()
 
-  ctx.renderDemo1()
   ctx.renderTiger()
 
-launch(800, 600, App(
+launch(400, 300, App(
   name: "tdemo.nim",
   initImpl: initImpl,
   frameImpl: frameImpl,
