@@ -22,8 +22,7 @@ type
     atlasGlyphBox: GlyphBox
     shape: seq[GlyphVertex]
 
-  Font* = ref FontObj
-  FontObj = object
+  Font* = ref object
     fontId*: FontId
     openType*: OpenTypeObj
     metrics*: FontMetrics
@@ -31,8 +30,7 @@ type
     atlasPixelScale: float32
     storage: seq[byte]
 
-  FonsStash* = ref FonsStashObj
-  FonsStashObj = object
+  FonsStash* = ref object
     origin*: Origin
     signY: float32
     atlasFontSize*: int32

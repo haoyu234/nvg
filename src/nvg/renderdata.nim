@@ -56,7 +56,7 @@ type
     calls*: seq[InstanceCall]
     uniforms*: seq[UniformParam]
     instances*: seq[InstanceParam]
-    images: Table[ImageId, Texture]
+    images*: Table[ImageId, Texture]
 
 proc addTexture*(
     ctx: var RenderData,

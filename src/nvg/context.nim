@@ -75,7 +75,15 @@ type
 
     path: Path
 
-proc `=destroy`(ctx: ContextObj) =
+proc `=destroy`(ctx: var ContextObj) =
+  `=destroy`(ctx.dashArray)
+  `=destroy`(ctx.cache)
+  `=destroy`(ctx.states)
+  `=destroy`(ctx.path)
+
+  reset(ctx.fons)
+  reset(ctx.atlas)
+
   if not ctx.params.destroyImpl.isNil:
     ctx.params.destroyImpl(ctx.ctx)
 

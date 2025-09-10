@@ -7,6 +7,7 @@ import ./params
 import ./renderdata
 
 import std/math
+import std/tables
 
 const TILE_IMAGE_WIDTH = 256
 
@@ -353,6 +354,12 @@ proc destroyImpl(ctx: pointer) =
 
   ctx.texEdge.destroyImage()
   ctx.texVert.destroyImage()
+
+  for image in ctx.renderData.images.values():
+    let tex = SokolTexture(image)
+    destroyView(tex.texImageView)
+    destroyImage(tex.texImage)
+    destroySampler(tex.smp)
 
   destroyPipeline(ctx.pipeline)
 

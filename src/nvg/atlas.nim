@@ -56,12 +56,16 @@ type
     cellFreeList: uint32
     lookup: Table[uint32, uint32]
 
-proc `=destroy`(a: AtlasObj) =
+proc `=destroy`(a: var AtlasObj) {.raises: [].} =
   for idx in 0 ..< a.images.len:
     try:
       a.params.deleteTextureImpl(a.ctx, a.images[idx].imageId)
     except:
       discard
+
+  `=destroy`(a.images)
+  `=destroy`(a.cells)
+  `=destroy`(a.lookup)
 
 proc isNil*(cell: AtlasCell): bool {.inline.} =
   cell.scaleX <= 0 or cell.scaleY <= 0

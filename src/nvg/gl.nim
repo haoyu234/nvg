@@ -7,6 +7,7 @@ import ./params
 import ./renderdata
 
 import std/math
+import std/tables
 
 const
   NVG_USE_GLCORE = true
@@ -55,6 +56,12 @@ type
 
     viewBounds: Vec2
     renderData: RenderData
+
+template tryCall(body: untyped) =
+  try:
+    body
+  except:
+    discard
 
 proc createGlShader(tp: GLenum, source: cstring): GLuint =
   let s = glCreateShader(tp)
@@ -152,36 +159,44 @@ proc initImpl(ctx: pointer) =
 proc destroyImpl(ctx: pointer) {.raises: [].} =
   let ctx = cast[ptr OpenglBackendContextObj](ctx)
 
-  template tryCall(f: untyped, res: varargs[untyped]) =
-    try:
-      f(res)
-    except:
-      discard
-
   if ctx.shaderProgram.vsShader != 0:
-    tryCall(glDeleteShader, ctx.shaderProgram.vsShader)
+    tryCall glDeleteShader(ctx.shaderProgram.vsShader)
 
   if ctx.shaderProgram.fsShader != 0:
-    tryCall(glDeleteShader, ctx.shaderProgram.fsShader)
+    tryCall glDeleteShader(ctx.shaderProgram.fsShader)
+
+  if ctx.shaderProgram.program != 0:
+    tryCall glDeleteProgram(ctx.shaderProgram.program)
 
   when NVG_USE_GLCORE:
     if ctx.vertArr != 0:
-      tryCall(glDeleteVertexArrays, 1, ctx.vertArr.addr)
+      tryCall glDeleteVertexArrays(1, ctx.vertArr.addr)
 
   if ctx.vertDummyBuf != 0:
-    tryCall(glDeleteBuffers, 1, ctx.vertDummyBuf.addr)
+    tryCall glDeleteBuffers(1, ctx.vertDummyBuf.addr)
 
   if ctx.instanceBuf != 0:
-    tryCall(glDeleteBuffers, 1, ctx.instanceBuf.addr)
+    tryCall glDeleteBuffers(1, ctx.instanceBuf.addr)
 
   if ctx.texEdge != 0:
-    tryCall(glDeleteTextures, 1, ctx.texEdge.addr)
+    tryCall glDeleteTextures(1, ctx.texEdge.addr)
 
   if ctx.texVert != 0:
-    tryCall(glDeleteTextures, 1, ctx.texVert.addr)
+    tryCall glDeleteTextures(1, ctx.texVert.addr)
 
   if ctx.texDummy != 0:
-    tryCall(glDeleteTextures, 1, ctx.texDummy.addr)
+    tryCall glDeleteTextures(1, ctx.texDummy.addr)
+
+  if ctx.smpDummy != 0:
+    tryCall glDeleteSamplers(1, ctx.smpDummy.addr)
+
+  for image in ctx.renderData.images.values():
+    let tex = OpenglTexture(image)
+    if tex.texImage != 0:
+      tryCall glDeleteTextures(1, tex.texImage.addr)
+
+    if tex.smp != 0:
+      tryCall glDeleteSamplers(1, tex.smp.addr)
 
   reset(ctx[])
   dealloc(ctx)
@@ -368,8 +383,8 @@ proc deleteTextureImpl(ctx: pointer, imageId: ImageId) =
   if not tex.isNil:
     let tex = OpenglTexture(tex)
 
-    glDeleteSamplers(1, tex.smp.addr)
-    glDeleteTextures(1, tex.texImage.addr)
+    tryCall glDeleteSamplers(1, tex.smp.addr)
+    tryCall glDeleteTextures(1, tex.texImage.addr)
 
     ctx.renderData.removeTexture(imageId)
 
