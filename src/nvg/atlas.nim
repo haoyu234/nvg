@@ -96,6 +96,9 @@ proc removeLru(a: Atlas, idx: uint32) {.inline.} =
   initLru(lru[])
 
 proc moveToFrontLru(a: Atlas, idx: uint32) {.inline.} =
+  if a.lru.head == idx:
+    return
+
   a.removeLru(idx)
   let
     lru = a.getLru(idx)
@@ -105,7 +108,7 @@ proc moveToFrontLru(a: Atlas, idx: uint32) {.inline.} =
 
   if lru.next != high(uint32):
     let next = a.getLru(lru.next)
-    next.prev = lru.prev
+    next.prev = idx
   else:
     a.lru.tail = idx
 
@@ -181,6 +184,8 @@ proc getCell*(a: Atlas, id: uint32): AtlasCell {.inline.} =
     cell = a.cells[idx].addr
     image = a.images[cell.imageIdx].addr
 
+  cell.lastAccessStamp = a.nowStamp
+
   result.imageIdx = cell.imageIdx
   result.imageId = image.imageId
   result.x = cell.x
@@ -240,17 +245,20 @@ proc allocCell*(a: Atlas, id: uint32, w, h: int32,
 
   r.cell
 
-proc updateCell(a: Atlas, image: ptr Image, x, y, w, h, stride: int32, data: ptr UncheckedArray[byte]) =
+proc updateCell(a: Atlas, image: ptr Image, x, y, w, h, stride: int32,
+    data: ptr UncheckedArray[byte]) =
   let
     bytePerPixel = image.typ.bytePerPixel
     offset = x + y * image.width
     lineBytes = w * bytePerPixel
     sourceStrideBytes = stride * bytePerPixel
     destinationStrideBytes = image.width * bytePerPixel
-    destinationPixels = cast[ptr UncheckedArray[byte]](image.storage[offset * bytePerPixel].addr)
+    destinationPixels = cast[ptr UncheckedArray[byte]](image.storage[offset *
+        bytePerPixel].addr)
 
   for idx in 0 ..< h:
-    copyMem(destinationPixels[idx * destinationStrideBytes].addr, data[idx * sourceStrideBytes].addr, lineBytes)
+    copyMem(destinationPixels[idx * destinationStrideBytes].addr, data[idx *
+        sourceStrideBytes].addr, lineBytes)
 
   a.params.markTextureDirtyImpl(
     a.ctx,
@@ -258,7 +266,8 @@ proc updateCell(a: Atlas, image: ptr Image, x, y, w, h, stride: int32, data: ptr
     x, y, w, h,
   )
 
-proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32, data: pointer) =
+proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32,
+    data: pointer) =
   if cell.imageIdx >= uint32(a.images.len):
     return
 
@@ -266,12 +275,13 @@ proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32, data: pointer) 
   if cell.imageId != image.imageId:
     return
 
-  a.updateCell(image, cell.x, cell.y, w, h, stride, cast[ptr UncheckedArray[byte]](data))
+  a.updateCell(image, cell.x, cell.y, w, h, stride, cast[ptr UncheckedArray[
+      byte]](data))
 
 proc evictCells(a: Atlas, duration: int32) =
   var
     idx = a.lru.tail
-  
+
   while idx != high(uint32):
     let
       cell = a.cells[idx].addr
@@ -314,7 +324,8 @@ proc compact*(a: Atlas) =
 
   a.evictCells(duration)
 
-proc createAtlas*(width, height: int32, ctx: pointer, params: BackendContextParams): Atlas =
+proc createAtlas*(width, height: int32, ctx: pointer,
+    params: BackendContextParams): Atlas =
   result = Atlas()
   result.ctx = ctx
   result.params = params
