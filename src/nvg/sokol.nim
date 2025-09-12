@@ -230,10 +230,10 @@ proc getShader(): Shader =
 proc initImage(image: var SokolImage) =
   image.tex = allocImage()
   image.view = allocView()
-  image.layerCount = 0
+  image.layerCount = -1
 
 proc updateImage(image: var SokolImage, name: cstring, data: var seq[Vec4]) =
-  if data.len <= 0:
+  if data.len <= 0 and image.layerCount >= 0:
     return
 
   let
@@ -275,8 +275,9 @@ proc updateImage(image: var SokolImage, name: cstring, data: var seq[Vec4]) =
     )
     )
 
-  let data = Range(addr: data[0].addr, size: size * sizeof(Vec4))
-  image.tex.updateImage(ImageData(subimage: [[data]]))
+  if data.len > 0:
+    let data = Range(addr: data[0].addr, size: size * sizeof(Vec4))
+    image.tex.updateImage(ImageData(subimage: [[data]]))
 
 proc destroyImage(image: SokolImage) =
   destroyView(image.view)
@@ -314,7 +315,6 @@ proc initImpl(ctx: pointer) =
       data: Range(addr: verts[0].addr, size: sizeof(int32) * len(verts)),
     )
   )
-
 
   let
     data = [color(1, 1, 1, 1)]
@@ -704,7 +704,7 @@ proc flushImpl(ctx: pointer) =
         VertexParam = object
           view: Vec2
           triangleOffset: int32
-          pad: array[4, uint]
+          pad: array[4, uint8]
 
       var param = default(VertexParam)
       param.view = ctx.viewBounds
