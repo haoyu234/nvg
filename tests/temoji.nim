@@ -1,7 +1,7 @@
 import nvg
 import nvg/fontstash
-import nvg/opentype
 import nvg/params
+import nvg/truetype
 
 import ./app
 import ./fonts
@@ -61,7 +61,7 @@ proc fillGlyphSdfImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
 
 proc fillGlyphSdf(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     fontSize: float32) =
-  let layers = font.openType.getGlyphLayers(glyphId)
+  let layers = font.trueType.getGlyphLayers(glyphId)
   if layers.len <= 0:
     fillGlyphSdfImpl(ctx, font, glyphId, x, y, fontSize, ctx.fillStyle)
     return
@@ -71,7 +71,7 @@ proc fillGlyphSdf(ctx: Context, font: Font, glyphId: GlyphId, x, y,
   for layer in layers:
     var style = oldStyle
     if layer.paletteIdx != 0xFFFF:
-      style = font.openType.getPaletteColor(layer.paletteIdx, 0)
+      style = font.trueType.getPaletteColor(layer.paletteIdx, 0)
 
     fillGlyphSdfImpl(ctx, font, layer.glyphId, x, y, fontSize, style)
 
@@ -103,21 +103,18 @@ proc getGlyphPathImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
       let p = matrix * vec2(float32(v.x), float32(v.y))
       result.lineTo(p)
 
-    of GlyphShapeCommand.BEZIER:
+    of GlyphShapeCommand.CURVE:
       let
         p = matrix * vec2(float32(v.x), float32(v.y))
         cp = matrix * vec2(float32(v.cx), float32(v.cy))
 
       result.quadCurveTo(cp, p)
 
-    of GlyphShapeCommand.CLOSE:
-      result.closePath()
-
 proc fillGlyphPath(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     fontSize: float32) =
   let scale = font.getPixelHeightScale(fontSize)
 
-  let layers = font.openType.getGlyphLayers(glyphId)
+  let layers = font.trueType.getGlyphLayers(glyphId)
   if layers.len <= 0:
     let p = ctx.getGlyphPathImpl(font, glyphId, x, y, scale)
     ctx.fillPath(p)
@@ -127,7 +124,7 @@ proc fillGlyphPath(ctx: Context, font: Font, glyphId: GlyphId, x, y,
 
   for layer in layers:
     if layer.paletteIdx != 0xFFFF:
-      ctx.fillStyle = font.openType.getPaletteColor(layer.paletteIdx, 0)
+      ctx.fillStyle = font.trueType.getPaletteColor(layer.paletteIdx, 0)
     else:
       ctx.fillStyle = oldStyle
 

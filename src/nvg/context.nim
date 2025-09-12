@@ -3,9 +3,9 @@ import ./cache
 import ./core
 import ./fontstash
 import ./math
-import ./opentype
 import ./params
 import ./path
+import ./truetype
 
 import std/math
 
@@ -365,15 +365,12 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
         let p = matrix * vec2(float32(v.x), float32(v.y))
         result.lineTo(p)
 
-      of GlyphShapeCommand.BEZIER:
+      of GlyphShapeCommand.CURVE:
         let
           p = matrix * vec2(float32(v.x), float32(v.y))
           cp = matrix * vec2(float32(v.cx), float32(v.cy))
 
         result.quadCurveTo(cp, p)
-
-      of GlyphShapeCommand.CLOSE:
-        result.closePath()
 
 proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:

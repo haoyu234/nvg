@@ -90,10 +90,10 @@ proc `==`*(v1, v2: ImageId): bool {.borrow, inline.}
 proc `hash`*(v: ImageId): Hash {.borrow, inline.}
 
 proc vec2*(v1, v2: float32): Vec2 {.inline.} =
-  [v1, v2]
+  [float32(v1), float32(v2)]
 
 proc vec4*(v1, v2, v3, v4: float32): Vec4 {.inline.} =
-  [v1, v2, v3, v4]
+  [float32(v1), float32(v2), float32(v3), float32(v4)]
 
 proc vec4*(v1, v2: Vec2): Vec4 {.inline.} =
   [v1[0], v1[1], v2[0], v2[1]]

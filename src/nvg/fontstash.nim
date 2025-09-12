@@ -1,8 +1,9 @@
 import ./atlas
 import ./core
-import ./opentype
 import ./params
+import ./truetype
 
+import std/math
 import std/tables
 import std/unicode
 
@@ -19,12 +20,13 @@ type
   Glyph* = ref object
     fontId*: FontId
     glyphId*: GlyphId
+    hasGlyphBox: bool
     atlasGlyphBox: GlyphBox
-    shape: seq[GlyphVertex]
+    shape: seq[GlyphShapeVerb]
 
   Font* = ref object
     fontId*: FontId
-    openType*: OpenTypeObj
+    trueType*: TrueType
     metrics*: FontMetrics
     glyphs: Table[GlyphId, Glyph]
     atlasPixelScale: float32
@@ -47,8 +49,8 @@ proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FontId =
     fontId = cast[FontId](succ(fons.fonts.len))
 
   p.storage = move data
-  p.openType = parseOpenType(p.storage, 0)
-  p.metrics = p.openType.getFontMetrics()
+  p.trueType = parseTrueType(p.storage, 0)
+  p.metrics = p.trueType.getFontMetrics()
   p.fontId = fontId
   p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
@@ -61,8 +63,8 @@ proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FontId =
     p = Font()
     fontId = cast[FontId](succ(fons.fonts.len))
 
-  p.openType = parseOpenType(data, 0)
-  p.metrics = p.openType.getFontMetrics()
+  p.trueType = parseTrueType(data, 0)
+  p.metrics = p.trueType.getFontMetrics()
   p.fontId = fontId
   p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
@@ -80,7 +82,7 @@ proc getFont*(fons: FonsStash, fontId: FontId): Font =
       break
 
 proc getGlyphId*(font: Font, unicodeCodepoint: uint32): GlyphId {.inline.} =
-  font.openType.getGlyphId(unicodeCodepoint)
+  font.trueType.getGlyphId(unicodeCodepoint)
 
 proc getGlyph*(font: Font, glyphId: GlyphId): Glyph =
   var glyph = default(Glyph)
@@ -95,9 +97,10 @@ proc getGlyph*(font: Font, glyphId: GlyphId): Glyph =
     font.glyphs[glyphId] = glyph
   glyph
 
-proc getGlyphShape*(font: Font, glyph: Glyph): lent seq[GlyphVertex] {.inline.} =
+proc getGlyphShape*(font: Font, glyph: Glyph): lent seq[
+    GlyphShapeVerb] {.inline.} =
   if glyph.shape.len <= 0:
-    glyph.shape = font.openType.getGlyphShape(glyph.glyphId)
+    glyph.shape = font.trueType.getGlyphShape(glyph.glyphId)
   glyph.shape
 
 proc measureText*(
@@ -115,12 +118,12 @@ proc measureText*(
       continue
 
     if not prevGlyphId.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyphId)
+      let adv = font.trueType.getGlyphKernAdvance(prevGlyphId, glyphId)
       x = x + scale * float32(adv) + spacing
 
     prevGlyphId = glyphId
 
-    let advance = font.openType.getGlyphAdvance(glyphId)
+    let advance = font.trueType.getGlyphAdvance(glyphId)
     x = x + scale * float32(advance)
 
   x
@@ -169,14 +172,14 @@ iterator arrange*(
       continue
 
     if not prevGlyphId.isNil:
-      let adv = font.openType.getGlyphKernAdvance(prevGlyphId, glyphId)
+      let adv = font.trueType.getGlyphKernAdvance(prevGlyphId, glyphId)
       x = x + scale * float32(adv) + spacing
 
     prevGlyphId = glyphId
 
     yield (x, y, glyphId)
 
-    let advance = font.openType.getGlyphAdvance(glyphId)
+    let advance = font.trueType.getGlyphAdvance(glyphId)
     x = x + scale * float32(advance)
 
 proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
@@ -184,14 +187,29 @@ proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
   if font.isNil:
     return
 
-  if glyph.atlasGlyphBox.x2 <= 0 and glyph.atlasGlyphBox.y2 <= 0:
-    glyph.atlasGlyphBox = font.openType.getGlyphBox(glyph.glyphId,
-        font.atlasPixelScale, font.atlasPixelScale, 0, 0)
+  if not glyph.hasGlyphBox:
+    let glyphBox = font.trueType.getGlyphBox(glyph.glyphId)
+
+    let
+      x1 = int32(floor(float32(glyphBox.xMin) * font.atlasPixelScale))
+      y1 = int32(floor(-float32(glyphBox.yMax) * font.atlasPixelScale))
+      x2 = int32(ceil(float32(glyphBox.xMax) * font.atlasPixelScale))
+      y2 = int32(ceil(-float32(glyphBox.yMin) * font.atlasPixelScale))
+
+    glyph.hasGlyphBox = true
+    glyph.atlasGlyphBox.xMin = x1
+    glyph.atlasGlyphBox.yMin = y1
+    glyph.atlasGlyphBox.xMax = x2
+    glyph.atlasGlyphBox.yMax = y2
+
+  if glyph.atlasGlyphBox.xMin == glyph.atlasGlyphBox.xMax or
+      glyph.atlasGlyphBox.yMin == glyph.atlasGlyphBox.yMax:
+    return
 
   let
     pad = fons.atlasPadding + 1
-    w = glyph.atlasGlyphBox.x2 - glyph.atlasGlyphBox.x1
-    h = glyph.atlasGlyphBox.y2 - glyph.atlasGlyphBox.y1
+    w = glyph.atlasGlyphBox.xMax - glyph.atlasGlyphBox.xMin
+    h = glyph.atlasGlyphBox.yMax - glyph.atlasGlyphBox.yMin
 
   let
     fontId32 = cast[uint32](glyph.fontId)
@@ -209,7 +227,7 @@ proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
     if result.isNil:
       return
 
-    let sdf = font.openType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale,
+    let sdf = font.trueType.getGlyphSDF(glyph.glyphId, font.atlasPixelScale,
         pad, 127, 32)
     if sdf.data.len > 0:
       fons.atlas.updateCell(result, sdf.w, sdf.h, sdf.w, sdf.data[0].addr)
@@ -222,12 +240,12 @@ proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
 
   let
     pad = fons.atlasPadding + 1
-    w = glyph.atlasGlyphBox.x2 - glyph.atlasGlyphBox.x1
-    h = glyph.atlasGlyphBox.y2 - glyph.atlasGlyphBox.y1
+    w = glyph.atlasGlyphBox.xMax - glyph.atlasGlyphBox.xMin
+    h = glyph.atlasGlyphBox.yMax - glyph.atlasGlyphBox.yMin
 
   let
-    xoff = float32(glyph.atlasGlyphBox.x1 - pad)
-    yoff = float32(glyph.atlasGlyphBox.y1 - pad)
+    xoff = float32(glyph.atlasGlyphBox.xMin - pad)
+    yoff = float32(glyph.atlasGlyphBox.yMin - pad)
 
     x1 = float32(cell.x)
     y1 = float32(cell.y)

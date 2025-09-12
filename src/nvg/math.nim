@@ -14,6 +14,9 @@ proc `*`*(v1: Vec2, v2: float32): Vec2 {.inline.} =
 proc `/`*(v1: Vec2, v2: float32): Vec2 {.inline.} =
   [v1[0] / v2, v1[1] / v2]
 
+proc `/`*(v1, v2: Vec2): Vec2 {.inline.} =
+  [v1[0] / v2[0], v1[1] / v2[1]]
+
 proc dot*(v1, v2: Vec2): float32 {.inline.} =
   v1[0] * v2[0] + v1[1] * v2[1]
 
