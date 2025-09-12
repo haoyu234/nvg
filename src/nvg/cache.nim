@@ -113,13 +113,13 @@ proc flattenPaths*(
 
   for command, vals in path.commands:
     case command
-    of PathCommand.MOVE:
+    of Command.MOVE:
       c.addContour()
 
       let p = matrix * vec2(vals[0], vals[1])
       c.addPoint(p)
 
-    of PathCommand.LINE:
+    of Command.LINE:
       if not c.curPath.isNil:
         let p = matrix * vec2(vals[0], vals[1])
 
@@ -130,7 +130,7 @@ proc flattenPaths*(
 
         c.addPoint(p)
 
-    of PathCommand.CURVE:
+    of Command.CURVE:
       if not c.curPath.isNil:
         if c.curPath.pointCount > 0:
           let
@@ -140,7 +140,7 @@ proc flattenPaths*(
 
           c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
-    of PathCommand.BEZIER:
+    of Command.BEZIER:
       if not c.curPath.isNil:
         if c.curPath.pointCount > 0:
           let
@@ -151,11 +151,11 @@ proc flattenPaths*(
 
           c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 
-    of PathCommand.CLOSE:
+    of Command.CLOSE:
       if not c.curPath.isNil:
         c.curPath.closed = true
 
-    of PathCommand.RESTART:
+    of Command.RESTART:
       if not c.curPath.isNil:
         c.curPath.restart = true
 

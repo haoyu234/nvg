@@ -132,6 +132,12 @@ proc addCall(ctx: var RenderData, call: InstanceCall) =
 
   ctx.calls.add(call)
 
+proc premultiplied(c: Color): Color {.inline.} =
+  result.r = c.r * c.a
+  result.g = c.g * c.a
+  result.b = c.b * c.a
+  result.a = c.a
+
 proc fillCall*(
     ctx: var RenderData,
     view: Vec2,
@@ -184,8 +190,8 @@ proc fillCall*(
   uniformParam.shaderType = float32(Solid)
   uniformParam.fillType = 0
   uniformParam.feather = paint.feather
-  uniformParam.innerColor = paint.innerColor
-  uniformParam.outerColor = paint.outerColor
+  uniformParam.innerColor = paint.innerColor.premultiplied
+  uniformParam.outerColor = paint.outerColor.premultiplied
   uniformParam.extent = paint.extent
   uniformParam.transform1[0] = paint.transform[0]
   uniformParam.transform1[1] = paint.transform[1]
@@ -386,8 +392,8 @@ proc trianglesCall*(
   uniformParam.shaderType = float32(Text)
   uniformParam.fillType = 0
   uniformParam.feather = paint.feather
-  uniformParam.innerColor = paint.innerColor
-  uniformParam.outerColor = paint.outerColor
+  uniformParam.innerColor = paint.innerColor.premultiplied
+  uniformParam.outerColor = paint.outerColor.premultiplied
   uniformParam.extent = paint.extent
   uniformParam.transform1[0] = paint.transform[0]
   uniformParam.transform1[1] = paint.transform[1]

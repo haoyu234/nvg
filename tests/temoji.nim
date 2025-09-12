@@ -81,34 +81,10 @@ proc getGlyphPathImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
   if glyph.isNil:
     return
 
-  let verts = font.getGlyphShape(glyph)
-  if len(verts) <= 0:
-    return
-
-  var matrix = [scale, 0, 0, -scale, x, y]
-  matrix.multiply(ctx.getTransform())
-
-  for idx in 0 ..< verts.len:
-    let v = verts[idx].addr
-
-    case v.command
-    of GlyphShapeCommand.MOVE:
-      let p = matrix * vec2(float32(v.x), float32(v.y))
-      result.moveTo(p)
-
-      if idx <= 0:
-        result.appendCommands([float32(PathCommand.RESTART)])
-
-    of GlyphShapeCommand.LINE:
-      let p = matrix * vec2(float32(v.x), float32(v.y))
-      result.lineTo(p)
-
-    of GlyphShapeCommand.CURVE:
-      let
-        p = matrix * vec2(float32(v.x), float32(v.y))
-        cp = matrix * vec2(float32(v.cx), float32(v.cy))
-
-      result.quadCurveTo(cp, p)
+  result = font.getGlyphPath(glyph)
+  if not result.empty:
+    let matrix = [scale, 0, 0, -scale, x, y]
+    result.transform(matrix)
 
 proc fillGlyphPath(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     fontSize: float32) =

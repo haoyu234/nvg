@@ -5,7 +5,6 @@ import ./fontstash
 import ./math
 import ./params
 import ./path
-import ./truetype
 
 import std/math
 
@@ -343,34 +342,12 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
     if glyph.isNil:
       continue
 
-    let verts = font.getGlyphShape(glyph)
-    if len(verts) <= 0:
-      continue
+    let path = font.getGlyphPath(glyph)
+    if not path.empty:
+      var matrix = [scale, 0, 0, -scale, x, y]
+      matrix.multiply(ctx.transform)
 
-    var matrix = [scale, 0, 0, -scale, x, y]
-    matrix.multiply(ctx.transform)
-
-    for idx in 0 ..< verts.len:
-      let v = verts[idx].addr
-
-      case v.command
-      of GlyphShapeCommand.MOVE:
-        let p = matrix * vec2(float32(v.x), float32(v.y))
-        result.moveTo(p)
-
-        if idx <= 0:
-          result.appendCommands([float32(PathCommand.RESTART)])
-
-      of GlyphShapeCommand.LINE:
-        let p = matrix * vec2(float32(v.x), float32(v.y))
-        result.lineTo(p)
-
-      of GlyphShapeCommand.CURVE:
-        let
-          p = matrix * vec2(float32(v.x), float32(v.y))
-          cp = matrix * vec2(float32(v.cx), float32(v.cy))
-
-        result.quadCurveTo(cp, p)
+      result.addPath(path, matrix)
 
 proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:

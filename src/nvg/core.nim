@@ -73,6 +73,18 @@ type
     CopyOperation
     XorOperation
 
+  Command* = enum
+    MOVE
+    LINE
+    CURVE
+    BEZIER
+    CLOSE
+    RESTART
+
+  Path* = object
+    currentPos*: Vec2
+    data*: seq[float32]
+
   SomePaint* = Paint | Color
 
 proc isNil*(fontId: FontId): bool {.inline.} =

@@ -130,38 +130,6 @@ float sdroundrect(vec2 pt, vec2 ext, float rad)
   return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - rad;
 }
 
-// Super-sampled SDF text rendering - super-sampling gives big improvement at very small sizes; quality is
-// comparable to summed text; w/ supersamping, FPS is actually slightly lower
-float sdfCov(float D, float sdfscale)
-{
-  // Could we use derivative info (and/or distance at pixel center) to improve?
-  return D > 0.0f ? clamp((D - 0.5f) / sdfscale + radius, 0.0f, 1.0f)
-                  : 0.0f; //+ 0.25f
-}
-
-float superSDF(texture2D tex, vec2 st)
-{
-  vec2 tex_wh = texSize; // convert from ivec2 to vec2
-  // st = st + vec2(4.0)/tex_wh;  // account for 4 pixel padding in SDF
-  float s =
-      (32.0f / 255.0f) * transform[0][0]; // 32/255 is STBTT pixel_dist_scale
-  // return sdfCov(texture(sampler2D(tex, smp1), st).r, s);  // single sample
-  s = 0.5f * s; // we're sampling 4 0.5x0.5 subpixels
-  float dx = transform[0][0] / tex_wh.x / 4.0f;
-  float dy = transform[1][1] / tex_wh.y / 4.0f;
-
-  // vec2 stextent = extent/tex_wh;  ... clamping doesn't seem to be necessary
-  // vec2 stmin = floor(st*stextent)*stextent;
-  // vec2 stmax = stmin + stextent - vec2(1.0f);
-  float d11 = texture(sampler2D(tex, smp1), st + vec2(dx, dy))
-                  .r; // clamp(st + ..., stmin, stmax)
-  float d10 = texture(sampler2D(tex, smp1), st + vec2(dx, -dy)).r;
-  float d01 = texture(sampler2D(tex, smp1), st + vec2(-dx, dy)).r;
-  float d00 = texture(sampler2D(tex, smp1), st + vec2(-dx, -dy)).r;
-  return 0.25f *
-         (sdfCov(d11, s) + sdfCov(d10, s) + sdfCov(d01, s) + sdfCov(d00, s));
-}
-
 vec4 edgeFetch(uint idx)
 {
   uint idx0 = idx;
@@ -177,6 +145,11 @@ float coverage(float W)
   if ((fillType & NVG_PATH_EVENODD) != 0)
     return 1.0f - abs(mod(W, 2.0f) - 1.0f);
   return min(abs(W), 1.0f); // non-zero fill
+}
+
+float contour(float dist, float edge, float width)
+{
+  return clamp(smoothstep(edge - width, edge + width, dist), 0.0, 1.0);
 }
 
 void main(void)
@@ -221,8 +194,10 @@ void main(void)
     result = color * cov;
   } else if (shaderType == 4) { // Textured tris - only used for text, so no
                                 // need for coverage()
-    float tcov = superSDF(imageTex, f_vb);
-    result = vec4(tcov) * innerColor;
+    vec4 textColor = clamp(innerColor, 0.0, 1.0);
+    float sd = texture(sampler2D(imageTex, smp1), f_vb).r;
+    float alpha = contour(sd, 0.5, fwidth(sd));
+    result = textColor * alpha;
   } else { // not used
     result = vec4(1.0f, 0, 0, 1.0f);
   }

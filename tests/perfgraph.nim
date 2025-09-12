@@ -108,7 +108,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
 
   ctx.fontId = ctx.getDefaultFont()
   ctx.fontSize = 36
-  ctx.fillStyle = color(0.58, 0.25, 1, 1)
+  ctx.fillStyle = color(0.94, 0.94, 0.94, 1)
   ctx.textAlign = RightAlign
   ctx.textBaseline = TopBaseline
 
@@ -118,7 +118,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   of PERF_GRAPH_RENDER_FPS:
     ctx.fillText(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fontSize = 30
-    ctx.fillStyle = color(0.58, 0.25, 1, 0.9)
+    ctx.fillStyle = color(0.94, 0.94, 0.94, 0.62)
     ctx.textBaseline = BottomBaseline
     ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
 

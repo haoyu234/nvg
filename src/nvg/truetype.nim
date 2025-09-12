@@ -1,23 +1,14 @@
 import ./core
 import ./math
+import ./path
 import ./pieces
 
-import std/math
 import std/endians
 import std/hashes
+import std/math
 
 type
   GlyphId* = distinct uint32
-
-  GlyphShapeCommand* = enum
-    MOVE = 1
-    LINE
-    CURVE
-
-  GlyphShapeVerb* = object
-    x*, y*: int16
-    cx*, cy*: int16
-    command*: GlyphShapeCommand
 
   GlyphPoint = object
     flags: uint8
@@ -36,10 +27,6 @@ type
   GlyphMetrics* = object
     advance*: int32
     bearing*: int32
-
-  GlyphSDF* = object
-    w*, h*: int32
-    data*: seq[byte]
 
   GlyphLayer* = object
     glyphId*: GlyphId
@@ -425,6 +412,23 @@ proc getGlyphBox*(font: TrueType, glyphId: GlyphId): GlyphBox =
   result.xMax = font.data.toInt(offset + 6, 2, int32)
   result.yMax = font.data.toInt(offset + 8, 2, int32)
 
+proc getGlyphBitmapBox*(font: TrueType, glyphId: GlyphId, scaleX, scaleY,
+    shiftX, shiftY: float32): GlyphBox =
+  let offset = font.getGlyphGlyfOffset(glyphId)
+  if offset <= 0 or offset == high(uint32):
+    return
+
+  let
+    xMin = font.data.toInt(offset + 2, 2, int32)
+    yMin = font.data.toInt(offset + 4, 2, int32)
+    xMax = font.data.toInt(offset + 6, 2, int32)
+    yMax = font.data.toInt(offset + 8, 2, int32)
+
+  result.xMin = int32(floor(float32(xMin) * scaleX + shiftX))
+  result.yMin = int32(floor(-float32(yMax) * scaleY + shiftY))
+  result.xMax = int32(ceil(float32(xMax) * scaleX + shiftX))
+  result.yMax = int32(ceil(-float32(yMin) * scaleY + shiftY))
+
 proc update(loader: var GlyphLoader, font: TrueType, glyphId: GlyphId) =
   let
     bbox = font.getGlyphBox(glyphId)
@@ -666,10 +670,9 @@ proc loadGlyphAux(loader: var GlyphLoader, font: TrueType, glyphId: GlyphId,
       elif contourCount < 0:
         result = loader.loadCompositeGlyphAux(font, offset, points)
 
-proc getGlyphShape(loader: GlyphLoader, points: seq[GlyphPoint]): seq[GlyphShapeVerb] =
+proc getGlyphPath(loader: GlyphLoader, points: seq[GlyphPoint]): Path =
   var
     pointIdx = default(int32)
-    vert = default(GlyphShapeVerb)
 
   while pointIdx < points.len:
     let
@@ -678,79 +681,66 @@ proc getGlyphShape(loader: GlyphLoader, points: seq[GlyphPoint]): seq[GlyphShape
     var
       closed = false
       limit = pointEndIdx
-      sx = points[pointIdx].x
-      sy = points[pointIdx].y
+      sx = float32(points[pointIdx].x)
+      sy = float32(points[pointIdx].y)
 
     if (points[pointIdx].flags and 0x1) == 0:
       if (points[pointEndIdx].flags and 0x1) != 0:
         dec limit, 1
-        sx = points[pointEndIdx].x
-        sy = points[pointEndIdx].y
+        sx = float32(points[pointEndIdx].x)
+        sy = float32(points[pointEndIdx].y)
       else:
-        sx = (points[pointIdx].x + points[pointEndIdx].x) div 2
-        sy = (points[pointIdx].y + points[pointEndIdx].y) div 2
+        sx = float32((points[pointIdx].x + points[pointEndIdx].x) div 2)
+        sy = float32((points[pointIdx].y + points[pointEndIdx].y) div 2)
       dec pointIdx, 1
 
-    vert.command = MOVE
-    vert.x = int16(sx)
-    vert.y = int16(sy)
-    vert.cx = 0
-    vert.cy = 0
-    result.add(vert)
+    result.moveTo(vec2(sx, sy))
 
     while pointIdx < limit:
       inc pointIdx, 1
 
       if (points[pointIdx].flags and 0x01) != 0:
-        vert.command = LINE
-        vert.x = int16(points[pointIdx].x)
-        vert.y = int16(points[pointIdx].y)
-        vert.cx = 0
-        vert.cy = 0
+        let
+          x = float32(points[pointIdx].x)
+          y = float32(points[pointIdx].y)
+
+        result.lineTo(vec2(x, y))
       else:
-        vert.cx = int16(points[pointIdx].x)
-        vert.cy = int16(points[pointIdx].y)
+        var
+          cx = float32(points[pointIdx].x)
+          cy = float32(points[pointIdx].y)
 
         while true:
           if pointIdx < limit:
             inc pointIdx, 1
 
             if (points[pointIdx].flags and 0x01) != 0:
-              vert.command = CURVE
-              vert.x = int16(points[pointIdx].x)
-              vert.y = int16(points[pointIdx].y)
+              let
+                x = float32(points[pointIdx].x)
+                y = float32(points[pointIdx].y)
+
+              result.quadCurveTo(vec2(cx, cy), vec2(x, y))
             else:
-              vert.command = CURVE
+              let
+                x = float32(int32(cx + float32(points[pointIdx].x)) div 2)
+                y = float32(int32(cy + float32(points[pointIdx].y)) div 2)
 
-              vert.x = int16((int32(vert.cx) + points[pointIdx].x) div 2)
-              vert.y = int16((int32(vert.cy) + points[pointIdx].y) div 2)
-              result.add(vert)
+              result.quadCurveTo(vec2(cx, cy), vec2(x, y))
 
-              vert.cx = int16(points[pointIdx].x)
-              vert.cy = int16(points[pointIdx].y)
+              cx = float32(points[pointIdx].x)
+              cy = float32(points[pointIdx].y)
               continue
           else:
-            vert.command = CURVE
-            vert.x = int16(sx)
-            vert.y = int16(sy)
+            result.quadCurveTo(vec2(cx, cy), vec2(sx, sy))
             closed = true
           break
 
-      result.add(vert)
-
     if not closed:
-      vert.command = LINE
-      vert.x = int16(sx)
-      vert.y = int16(sy)
-      vert.cx = 0
-      vert.cy = 0
-
-      result.add(vert)
+      result.lineTo(vec2(sx, sy))
 
     pointIdx = pointEndIdx + 1
 
-proc getGlyphShape*(font: TrueType, glyphId: GlyphId): seq[
-    GlyphShapeVerb] {.inline.} =
+proc getGlyphPath*(font: TrueType, glyphId: GlyphId): Path {.inline.} =
   let offset = font.getGlyphGlyfOffset(glyphId)
   if offset <= 0 or offset == high(uint32):
     return
@@ -770,382 +760,7 @@ proc getGlyphShape*(font: TrueType, glyphId: GlyphId): seq[
     #   echo "idx: ", idx, " ", p
     #   inc idx, 1
 
-    result = loader.getGlyphShape(points)
-
-proc rayBezier(
-    orig, ray, q1, q2, q3: array[2, float32], hits: var array[2, array[2, float32]]
-): uint32 =
-  let
-    q1perp = q1[1] * ray[0] - q1[0] * ray[1]
-    q2perp = q2[1] * ray[0] - q2[0] * ray[1]
-    q3perp = q3[1] * ray[0] - q3[0] * ray[1]
-    roperp = orig[1] * ray[0] - orig[0] * ray[1]
-
-    a = q1perp - 2 * q2perp + q3perp
-    b = q2perp - q1perp
-    c = q1perp - roperp
-
-  var
-    n = uint32(0)
-    s1 = default(float32)
-    s2 = default(float32)
-
-  if a != 0:
-    let discriminant = b * b - a * c
-    if discriminant > 0:
-      let
-        rcpna = float32(-1) / a
-        d = sqrt(discriminant)
-
-      s1 = (b + d) * rcpna
-      s2 = (b - d) * rcpna
-
-      if s1 > 0 and s1 <= 1:
-        n = 1
-
-      if d > 0 and s2 > 0 and s2 <= 1:
-        if n <= 0:
-          s1 = s2
-
-        inc n, 1
-  else:
-    s1 = c / (-2 * b)
-    if s1 > 0 and s1 <= 1:
-      n = 1
-
-  if n > 0:
-    let
-      rcpLen2 = 1 / (ray[0] * ray[0] + ray[1] * ray[1])
-      raynX = ray[0] * rcpLen2
-      raynY = ray[1] * rcpLen2
-
-      q1d = q1[0] * raynX + q1[1] * raynY
-      q2d = q2[0] * raynX + q2[1] * raynY
-      q3d = q3[0] * raynX + q3[1] * raynY
-      rod = orig[0] * raynX + orig[1] * raynY
-
-      q21d = q2d - q1d
-      q31d = q3d - q1d
-      q1rd = q1d - rod
-
-    hits[0][0] = q1rd + s1 * (2.0f - 2.0f * s1) * q21d + s1 * s1 * q31d
-    hits[0][1] = a * s1 + b
-    result = 1
-
-    if n > 1:
-      hits[1][0] = q1rd + s2 * (2.0f - 2.0f * s2) * q21d + s2 * s2 * q31d
-      hits[1][1] = a * s2 + b
-      result = 2
-
-proc computeCrossX(x, y: float32, verts: seq[GlyphShapeVerb]): int32 =
-  var y = y
-
-  let frac = y mod 1
-  if frac < 0.01f:
-    y = y + 0.01
-  elif frac > 0.99f:
-    y = y - 0.01
-
-  var
-    orig = [x, y]
-    ray = [float32(1), 0]
-    winding = default(int32)
-    hints = default(array[2, array[2, float32]])
-
-  for idx in 1 ..< len(verts):
-    let
-      v1 = verts[idx].addr
-      v2 = verts[idx - 1].addr
-
-    template check() =
-      let
-        x1 = v2.x
-        y1 = v2.y
-        x2 = v1.x
-        y2 = v1.y
-
-      if y > float32(min(y1, y2)) and y < float32(max(y1, y2)) and
-          x > float32(min(x1, x2)):
-        let inter =
-          (y - float32(y1)) / float32(y2 - y1) * float32(x2 - x1) + float32(x1)
-        if inter < x:
-          if y1 < y2:
-            inc winding, 1
-          else:
-            dec winding, 1
-
-    if v1.command == GlyphShapeCommand.LINE:
-      check()
-    elif v1.command == GlyphShapeCommand.CURVE:
-      let
-        x1 = v2.x
-        y1 = v2.y
-        x2 = v1.cx
-        y2 = v1.cy
-        x3 = v1.x
-        y3 = v1.y
-
-        ax = min(x1, min(x2, x3))
-        ay = min(y1, min(y2, y3))
-        by = max(y1, max(y2, y3))
-
-      if y > float32(ay) and y < float32(by) and x > float32(ax):
-        let
-          q1 = [float32(x1), float32(y1)]
-          q2 = [float32(x2), float32(y2)]
-          q3 = [float32(x3), float32(y3)]
-
-        if q1 == q2 or q2 == q3:
-          check()
-        else:
-          let n = rayBezier(orig, ray, q1, q2, q3, hints)
-          for idx in 0 ..< n:
-            if hints[idx][0] < 0:
-              if hints[idx][1] < 0:
-                dec winding, 1
-              else:
-                inc winding, 1
-
-  winding
-
-proc solveCubic(a, b, c: float32, res: var array[3, float32]): uint32 =
-  let
-    s = -a / 3
-    p = b - a * a / 3
-    q = a * (2 * a * a - 9 * b) / 27 + c
-    p3 = p * p * p
-    d = q * q + 4 * p3 / 27
-
-  template cubeRoot(v: float32): float32 =
-    let sign = float32(sgn(v))
-    sign * pow(sign * v, float32(1) / float32(3))
-
-  if d >= 0:
-    let
-      z = sqrt(d)
-      u = cubeRoot((-q + z) / 2)
-      v = cubeRoot((-q - z) / 2)
-
-    res[0] = s + u + v
-    result = 1
-  else:
-    let
-      u = sqrt(-p / 3)
-      v = arccos(-sqrt(-27 / p3) * q / 2) / 3
-      m = cos(v)
-      n = cos(v - PI / 2) * 1.732050808f
-
-    res[0] = s + u * 2 * m
-    res[1] = s - u * (m + n)
-    res[2] = s - u * (m - n)
-    result = 3
-
-proc getGlyphSDF*(
-    font: TrueType,
-    glyphId: GlyphId,
-    scale: float32,
-    padding: int32,
-    edge: byte,
-    pixelDistScale: float32,
-): GlyphSDF =
-  if scale <= 0:
-    return
-
-  let
-    glyphBox = font.getGlyphBox(glyphId)
-  if glyphBox.xMin == glyphBox.xMax or glyphBox.yMin == glyphBox.yMax:
-    return
-
-  let
-    x1 = int32(floor(float32(glyphBox.xMin) * scale)) - padding
-    y1 = int32(floor(-float32(glyphBox.yMax) * scale)) - padding
-    x2 = int32(ceil(float32(glyphBox.xMax) * scale)) + padding
-    y2 = int32(ceil(-float32(glyphBox.yMin) * scale)) + padding
-
-    w = x2 - x1
-    h = y2 - y1
-
-  result.w = w
-  result.h = h
-  result.data.setLen(w * h)
-
-  let
-    scaleX = scale
-    scaleY = -scale # invert for y-downwards bitmaps
-
-  const
-    eps = float32(1) / float32(1024)
-    eps2 = eps * eps
-
-  let verts = font.getGlyphShape(glyphId)
-
-  var
-    i = default(uint32)
-    j = uint32(len(verts) - 1)
-    data = newSeq[float32](len(verts))
-
-  while i < uint32(len(verts)):
-    let
-      v1 = verts[i].addr
-      v2 = verts[j].addr
-
-    if v1.command == GlyphShapeCommand.LINE:
-      let
-        x1 = float32(v1.x) * scaleX
-        y1 = float32(v1.y) * scaleY
-        x2 = float32(v2.x) * scaleX
-        y2 = float32(v2.y) * scaleY
-
-        dx = x2 - x1
-        dy = y2 - y1
-        dist = sqrt(dx * dx + dy * dy)
-
-      if dist >= eps:
-        data[i] = float32(1) / dist
-
-    elif v1.command == GlyphShapeCommand.CURVE:
-      let
-        x3 = float32(v2.x) * scaleX
-        y3 = float32(v2.y) * scaleY
-        x2 = float32(v1.cx) * scaleX
-        y2 = float32(v1.cy) * scaleY
-        x1 = float32(v1.x) * scaleX
-        y1 = float32(v1.y) * scaleY
-
-        bx = x1 - 2 * x2 + x3
-        by = y1 - 2 * y2 + y3
-        len2 = bx * bx + by * by
-
-      if len2 >= eps2:
-        data[i] = float32(1) / len2
-
-    j = i
-    inc i, 1
-
-  for y in y1 ..< y2:
-    for x in x1 ..< x2:
-      var
-        sx = float32(x) + 0.5f
-        sy = float32(y) + 0.5f
-
-        xSpace = sx / scaleX
-        ySpace = sy / scaleY
-
-        minDist = float32(999999)
-
-      let winding = computeCrossX(xSpace, ySpace, verts)
-
-      for idx in 1 ..< len(verts):
-        let
-          v1 = verts[idx].addr
-          v2 = verts[idx - 1].addr
-
-          x1 = float32(v1.x) * scaleX
-          y1 = float32(v1.y) * scaleY
-
-        if v1.command == GlyphShapeCommand.LINE and data[idx] != 0:
-          let
-            x2 = float32(v2.x) * scaleX
-            y2 = float32(v2.y) * scaleY
-
-            dx = x2 - x1
-            dy = y2 - y1
-
-            px = x1 - sx
-            py = y1 - sy
-            dist2 = px * px + py * py
-
-          if dist2 < minDist * minDist:
-            minDist = sqrt(dist2)
-
-          let dist = abs(dx * py - dy * px) * data[idx]
-          if dist < minDist:
-            let t = -(px * dx + py * dy) / (dx * dx + dy * dy)
-            if t >= 0 and t <= 1:
-              minDist = dist
-        elif v1.command == GlyphShapeCommand.CURVE:
-          let
-            x3 = float32(v2.x) * scaleX
-            y3 = float32(v2.y) * scaleY
-            x2 = float32(v1.cx) * scaleX
-            y2 = float32(v1.cy) * scaleY
-
-          let
-            bx1 = min(min(x1, x2), x3)
-            by1 = min(min(y1, y2), y3)
-            bx2 = max(max(x1, x2), x3)
-            by2 = max(max(y1, y2), y3)
-
-          if sx > (bx1 - minDist) and sx < (bx2 + minDist) and sy > (by1 -
-              minDist) and sy < (by2 + minDist):
-            let
-              ax = x2 - x1
-              ay = y2 - y1
-              bx = x1 - 2 * x2 + x3
-              by = y1 - 2 * y2 + y3
-              mx = x1 - sx
-              my = y1 - sy
-              aInv = data[idx]
-
-            var
-              n = default(uint32)
-              res = default(array[3, float32])
-
-            if aInv == 0:
-              let
-                a = 3 * (ax * bx + ay * by)
-                b = 2 * (ax * ax + ay * ay) + (mx * bx + my * by)
-                c = mx * ax + my * ay
-
-              if abs(a) < eps2:
-                if abs(b) >= eps2:
-                  res[n] = -c / b
-                  inc n, 1
-              else:
-                let discriminant = b * b - 4 * a * c
-                if discriminant < 0:
-                  n = 0
-                else:
-                  let root = sqrt(discriminant)
-                  res[0] = (-b - root) / (2 * a)
-                  res[1] = (-b + root) / (2 * a)
-                  n = 2
-            else:
-              let
-                b = 3 * (ax * bx + ay * by) * aInv
-                c = (2 * (ax * ax + ay * ay) + (mx * bx + my * by)) * aInv
-                d = (mx * ax + my * ay) * aInv
-
-              n = solveCubic(b, c, d, res)
-
-            var dist2 = mx * mx + my * my
-            if dist2 < minDist * minDist:
-              minDist = sqrt(dist2)
-
-            for idx in 0 ..< n:
-              if res[idx] >= 0 and res[idx] <= 1:
-                let
-                  t = res[idx]
-                  it = float32(1) - t
-                  px = it * it * x1 + 2 * t * it * x2 + t * t * x3
-                  py = it * it * y1 + 2 * t * it * y2 + t * t * y3
-
-                  dx = px - sx
-                  dy = py - sy
-
-                dist2 = dx * dx + dy * dy
-                if dist2 < minDist * minDist:
-                  minDist = sqrt(dist2)
-
-      if winding == 0:
-        minDist = -minDist
-
-      let
-        v1 = float32(edge) + pixelDistScale * minDist
-        v2 = clamp(v1, float32(0), float32(255))
-        idx = (y - y1) * w + (x - x1)
-
-      result.data[idx] = byte(v2)
+    result = loader.getGlyphPath(points)
 
 proc getCoverageIndex(
     font: TrueType, coverageTable: uint32, glyphId: GlyphId

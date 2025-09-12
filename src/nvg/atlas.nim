@@ -282,6 +282,18 @@ proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32,
   a.updateCell(image, cell.x, cell.y, w, h, stride, cast[ptr UncheckedArray[
       byte]](data))
 
+proc updateCell*(a: Atlas, cell: AtlasCell, x, y, w, h, stride: int32,
+    data: pointer) =
+  if cell.imageIdx >= uint32(a.images.len):
+    return
+
+  let image = a.images[cell.imageIdx].addr
+  if cell.imageId != image.imageId:
+    return
+
+  a.updateCell(image, cell.x + x, cell.y + y, w, h, stride, cast[
+      ptr UncheckedArray[byte]](data))
+
 proc evictCells(a: Atlas, duration: int32) =
   var
     idx = a.lru.tail
