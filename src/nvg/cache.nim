@@ -32,7 +32,7 @@ proc addPoint(c: var Cache, p: Vec2) {.inline, raises: [].} =
   c.points.add(p)
 
 proc quadCurve(
-    c: var Cache, p1, p2, p3: Vec2, level: int, tessTolSq, distTolSq: float32
+    c: var Cache, p1, p2, p3: Vec2, level: int32, tessTolSq, distTolSq: float32
 ) =
   let
     d = p3 - p1
@@ -52,7 +52,7 @@ proc quadCurve(
     c.quadCurve(p123, p23, p3, level + 1, tessTolSq, distTolSq)
 
 proc bezier(
-    c: var Cache, p1, p2, p3, p4: Vec2, level: int, tessTolSq,
+    c: var Cache, p1, p2, p3, p4: Vec2, level: int32, tessTolSq,
         distTolSq: float32
 ) =
   let d = p4 - p1
@@ -175,13 +175,13 @@ proc flattenPaths*(
 
       p.closed = true
 
-proc curveDivs(r, arc, tol: float32): int {.inline.} =
+proc curveDivs(r, arc, tol: float32): int32 {.inline.} =
   let da = arccos(r / (r + tol)) * 2
-  max(2, int(ceil(arc / da)))
+  max(2, int32(ceil(arc / da)))
 
 proc arcJoin(
-    memory: Piece[Vec4], idx: int, p0, p1, c: Vec2, w: float32, nCap, dir: int
-): int =
+    memory: Piece[Vec4], idx: int32, p0, p1, c: Vec2, w: float32, nCap, dir: int32
+): int32 =
   var
     pos = idx
     ax = float32(0)
@@ -193,7 +193,7 @@ proc arcJoin(
   if a1 > a0:
     a1 = a1 - PI * 2
 
-  let n = clamp(int(ceil((a0 - a1) / float32(PI) * float32(nCap))), 2, nCap)
+  let n = clamp(int32(ceil((a0 - a1) / float32(PI) * float32(nCap))), 2, nCap)
   for i in 0 ..< n:
     let
       u = float32(i) / float32(n - 1)
@@ -305,7 +305,7 @@ proc expandStroke*(
     mLimSq = w * w * miterLimit * miterLimit
 
   let vertCount = block:
-    var count = 0
+    var count = default(int32)
     for p in c.contours:
       if lineJoin == RoundJoin or lineCap == RoundCap:
         inc count, (p.pointCount * (nCap + 2) + 1) * 2
@@ -316,9 +316,9 @@ proc expandStroke*(
   c.storage.setLenUninit(vertCount)
 
   var
-    l = 0
+    l = default(int32)
     r = vertCount
-    n = default(int)
+    n = default(int32)
     offset = l
 
   let memory = piece(c.storage)

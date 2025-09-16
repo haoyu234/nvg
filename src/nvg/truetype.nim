@@ -89,8 +89,8 @@ const
 proc toInt[T: SomeInteger, O: Natural](
     s: Piece[byte], offset: O, SIZE: static[Natural], _: typedesc[T]
 ): T {.inline, raises: [].} =
-  assert sizeof(T) >= int(SIZE)
-  assert s.len >= int(offset) + int(SIZE)
+  assert sizeof(T) >= int32(SIZE)
+  assert s.len >= int32(offset) + int32(SIZE)
 
   template RESULT_TYPE(): typedesc =
     const HAS_SIGN = T is SomeSignedInt
@@ -106,16 +106,16 @@ proc toInt[T: SomeInteger, O: Natural](
   when SIZE > 1:
     var data = default(RESULT_TYPE())
     when SIZE == 8:
-      bigEndian64(data.addr, s[int(offset)].addr)
+      bigEndian64(data.addr, s[int32(offset)].addr)
       T(data)
     elif SIZE == 4:
-      bigEndian32(data.addr, s[int(offset)].addr)
+      bigEndian32(data.addr, s[int32(offset)].addr)
       T(data)
     elif SIZE == 2:
-      bigEndian16(data.addr, s[int(offset)].addr)
+      bigEndian16(data.addr, s[int32(offset)].addr)
       T(data)
   else:
-    let v = s[int(offset)]
+    let v = s[int32(offset)]
     T(cast[RESULT_TYPE()](v))
 
 iterator tables(data: Piece[byte], fontStart: uint32): tuple[tag,

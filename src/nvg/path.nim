@@ -69,7 +69,7 @@ proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
     inc idx, 1
 
   let
-    ndivs = max(1, min(int(abs(da) / pidiv2 + float32(0.5)), 5))
+    ndivs = max(1, min(int32(abs(da) / pidiv2 + float32(0.5)), 5))
     hda = da / float32(ndivs) / 2
 
   var kappa = abs(s * (1 - cos(hda)) / sin(hda))

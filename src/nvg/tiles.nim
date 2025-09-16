@@ -143,7 +143,7 @@ iterator pieces*(tiles: var Tiles, tileId: TileId): Piece[Vec4] =
 
   while true:
     let p = cast[ptr UncheckedArray[Vec4]](tiles.storage[b.pos].addr)
-    yield piece(p, int(b.len))
+    yield piece(p, int32(b.len))
 
     if b.next > 0:
       b = s[b.next].addr

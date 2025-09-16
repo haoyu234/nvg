@@ -206,7 +206,7 @@ proc solveCubic(res: var array[3, float32], a, b, c, d: float32): int32 =
   result = solveQuadratic(res, b, c, d)
   return
 
-proc direction(p1, p2, p3: Vec2, tp: static int): Vec2 =
+proc direction(p1, p2, p3: Vec2, tp: static int32): Vec2 =
   when tp == 0:
     let tangent = p2 - p1
   else:

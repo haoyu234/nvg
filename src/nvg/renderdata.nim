@@ -231,10 +231,10 @@ proc fillCall*(
     callh = ltrb[3] - ltrb[1]
 
     let
-      xtiles = int(ceil(callw / tileSize))
-      ytiles = int(ceil(callh / tileSize))
-      tilew = int(ceil(callw / float32(xtiles)))
-      tileh = int(ceil(callh / float32(ytiles)))
+      xtiles = int32(ceil(callw / tileSize))
+      ytiles = int32(ceil(callh / tileSize))
+      tilew = int32(ceil(callw / float32(xtiles)))
+      tileh = int32(ceil(callh / float32(ytiles)))
 
     ctx.tiles.setup(xtiles, ytiles, nedges)
 
@@ -245,7 +245,7 @@ proc fillCall*(
       if p.fill.len <= 0:
         continue
 
-      let pymin = clamp(int(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0, ytiles - 1)
+      let pymin = clamp(int32(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0, ytiles - 1)
 
       for v in p.fill.toOpenArray:
         let
@@ -258,9 +258,9 @@ proc fillCall*(
           continue
 
         let
-          vxmin = clamp(int(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0, xtiles - 1)
-          vxmax = clamp(int(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0, xtiles - 1)
-          vymax = clamp(int(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0, ytiles - 1)
+          vxmin = clamp(int32(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0, xtiles - 1)
+          vxmax = clamp(int32(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0, xtiles - 1)
+          vymax = clamp(int32(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0, ytiles - 1)
 
         for ix in vxmin .. vxmax:
           for iy in pymin .. vymax:
@@ -345,7 +345,7 @@ proc fillCall*(
         if callbnds[0] >= callbnds[2] or callbnds[1] >= callbnds[3]:
           if instanceParam.fillOffset > 0:
             ctx.verts.setLen(ctx.verts.len - 6)
-            ctx.edges.setLen(int(instanceParam.fillOffset))
+            ctx.edges.setLen(int32(instanceParam.fillOffset))
             ctx.instances.setLen(ctx.instances.len - 1)
         else:
           instanceParam.fillOffset = int32(ctx.edges.len)

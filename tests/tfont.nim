@@ -29,7 +29,7 @@ proc main() =
   # echo b2
   # quit(0)
 
-  if glyphId >= int(font.numGlyphs):
+  if glyphId >= int32(font.numGlyphs):
     return
   elif glyphId > 0:
     var count = 1

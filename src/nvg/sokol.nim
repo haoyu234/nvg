@@ -186,7 +186,7 @@ proc updateImage(image: var SokolImage, name: cstring, data: var seq[Vec4]) =
       let n = if (data.len mod layerSize) > 0: 1 else: 0
       data.len div layerSize + n
 
-    size = int(ceil(float32(data.len) / float32(layerSize))) * layerSize
+    size = int32(ceil(float32(data.len) / float32(layerSize))) * layerSize
 
   if capacity(data) < size:
     data.setLen(size)
