@@ -7,30 +7,23 @@ import ./app
 import ./fonts
 
 proc fillGlyphSdfImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
-    fontSize: float32, paint: Paint) =
+    fontSize: float32, color: Color) =
   let glyph = font.getGlyph(glyphId)
   if glyph.isNil:
     return
 
-  let
-    scale = float32(ctx.fons.atlasFontSize) / fontSize
-
   let quad = ctx.fons.getGlyphQuad(glyph, x, y, fontSize)
   if quad.imageId.isNil:
     return
-
-  let transform = ctx.getTransform()
-
-  var paint = paint
+  
+  var paint = default(Paint)
   paint.image = quad.imageId
-  paint.transform[0] = length(vec2(transform[0], transform[2])) / scale
-  paint.transform[3] = length(vec2(transform[1], transform[3])) / scale
-  paint.extent = vec2(float32(ctx.fons.atlasFontSize), float32(
-      ctx.fons.atlasFontSize))
+  paint.innerColor = color
+  paint.outerColor = color
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
-  paint.radius = ctx.fontBlur
 
+  let transform = ctx.getTransform()
   let
     p1 = transform * vec2(quad.x1, quad.y1)
     p2 = transform * vec2(quad.x2, quad.y1)
@@ -63,17 +56,17 @@ proc fillGlyphSdf(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     fontSize: float32) =
   let layers = font.trueType.getGlyphLayers(glyphId)
   if layers.len <= 0:
-    fillGlyphSdfImpl(ctx, font, glyphId, x, y, fontSize, ctx.fillStyle)
+    fillGlyphSdfImpl(ctx, font, glyphId, x, y, fontSize, ctx.fillStyle.innerColor)
     return
 
-  let oldStyle = ctx.fillStyle
+  let fillColor = ctx.fillStyle.innerColor
 
   for layer in layers:
-    var style = oldStyle
+    var color = fillColor
     if layer.paletteIdx != 0xFFFF:
-      style = font.trueType.getPaletteColor(layer.paletteIdx, 0)
+      color = font.trueType.getPaletteColor(layer.paletteIdx, 0)
 
-    fillGlyphSdfImpl(ctx, font, layer.glyphId, x, y, fontSize, style)
+    fillGlyphSdfImpl(ctx, font, layer.glyphId, x, y, fontSize, color)
 
 proc getGlyphPathImpl(ctx: Context, font: Font, glyphId: GlyphId, x, y,
     scale: float32): Path =

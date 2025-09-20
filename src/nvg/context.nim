@@ -27,7 +27,6 @@ type
     fontSize: float32
     letterSpacing: float32
     lineHeight: float32
-    fontBlur: float32
     textAlign: HorizontalAlignment
     textBaseline: BaselineAlignment
     fontId: FontId
@@ -51,7 +50,6 @@ type
     fontSize*: float32
     letterSpacing*: float32
     lineHeight*: float32
-    fontBlur*: float32
     textAlign*: HorizontalAlignment
     textBaseline*: BaselineAlignment
     fontId*: FontId
@@ -105,7 +103,6 @@ proc resetState(ctx: Context) =
   ctx.fontSize = 16
   ctx.letterSpacing = 0
   ctx.lineHeight = 16
-  ctx.fontBlur = 0
   ctx.textAlign = LeftAlign
   ctx.textBaseline = AlphabeticBaseline
   ctx.fontId = default(FontId)
@@ -134,7 +131,6 @@ proc state(ctx: Context): ContextState =
   result.fontSize = ctx.fontSize
   result.letterSpacing = ctx.letterSpacing
   result.lineHeight = ctx.lineHeight
-  result.fontBlur = ctx.fontBlur
   result.textAlign = ctx.textAlign
   result.textBaseline = ctx.textBaseline
   result.fontId = ctx.fontId
@@ -163,7 +159,6 @@ proc restore*(ctx: Context) =
     ctx.fontSize = state.fontSize
     ctx.letterSpacing = state.letterSpacing
     ctx.lineHeight = state.lineHeight
-    ctx.fontBlur = state.fontBlur
     ctx.textAlign = state.textAlign
     ctx.textBaseline = state.textBaseline
     ctx.fontId = state.fontId
@@ -357,9 +352,6 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if font.isNil:
     return
 
-  let
-    scale = float32(ctx.fons.atlasFontSize) / ctx.fontSize
-
   var
     rev = default(int32)
     verts = newSeqOfCap[Vec4](text.len * 6)
@@ -369,14 +361,11 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.transform[0] * ctx.transform[3] < 0:
     rev = 1
 
-  var paint = ctx.fillStyle
-  paint.transform[0] = length(vec2(ctx.transform[0], ctx.transform[2])) / scale
-  paint.transform[3] = length(vec2(ctx.transform[1], ctx.transform[3])) / scale
-  paint.extent = vec2(float32(ctx.fons.atlasFontSize), float32(
-      ctx.fons.atlasFontSize))
+  var paint = default(Paint)
+  paint.innerColor = ctx.fillStyle.innerColor
+  paint.outerColor = ctx.fillStyle.outerColor
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
-  paint.radius = ctx.fontBlur
 
   for x, y, glyphId in ctx.fons.arrange(
     font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,

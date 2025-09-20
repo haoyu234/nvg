@@ -58,7 +58,6 @@ type
     feather*: float32
     innerColor*: Color
     outerColor*: Color
-    blur*: Vec2
 
   CompositeOperation* = enum
     SourceOverOperation = 1
