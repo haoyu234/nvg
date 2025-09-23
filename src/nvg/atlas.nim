@@ -122,7 +122,7 @@ proc initImage(a: Atlas, image: ptr Image, idx, w, h: int32, typ: TextureType) =
   image.width = w
   image.height = h
   image.rp.expand(w, h)
-  image.storage.setLen(w * h)
+  image.storage.setLen(w * h * typ.bytePerPixel)
   image.scaleX = 1 / float32(w)
   image.scaleY = 1 / float32(h)
   image.imageId = a.params.createTextureImpl(
