@@ -68,7 +68,7 @@ proc frameImpl(ctx: Context) =
 
     if lastIdx >= len(text):
       break
-  
+
 launch(800, 600, App(
   name: "tdash.nim",
   initImpl: initImpl,

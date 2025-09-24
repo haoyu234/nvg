@@ -15,7 +15,7 @@ layout (location = 1) in int v_fillCount;
 layout (location = 2) in int v_fillOffset;
 
 layout (location = 0) out vec2 f_pos;
-layout (location = 1) out vec2 f_vb;
+layout (location = 1) out vec2 f_uv;
 layout (location = 2) flat out vec2 f_viewSize;
 layout (location = 3) flat out int f_fillCount;
 layout (location = 4) flat out int f_fillOffset;
@@ -37,7 +37,7 @@ void main()
   vec4 r = vertFetch(gl_InstanceIndex * 6 + triangleOffset + gl_VertexIndex);
 
   f_pos = r.xy;
-  f_vb = r.zw;
+  f_uv = r.zw;
   f_viewSize = viewSize;
 
   f_fillCount = v_fillCount;
@@ -66,7 +66,7 @@ layout (std140, binding = 5) uniform params {
 };
 
 layout (location = 0) in vec2 f_pos;
-layout (location = 1) in vec2 f_vb;
+layout (location = 1) in vec2 f_uv;
 layout (location = 2) flat in vec2 f_viewSize;
 layout (location = 3) flat in int f_fillCount;
 layout (location = 4) flat in int f_fillOffset;
@@ -140,11 +140,11 @@ vec4 edgeFetch(uint idx)
   return texelFetch(sampler2DArray(edgeTex, smp2), ivec3(col, row, layer), 0);
 }
 
-float coverage(float W)
+float coverage(float w)
 {
   if ((fillType & NVG_PATH_EVENODD) != 0)
-    return 1.0f - abs(mod(W, 2.0f) - 1.0f);
-  return min(abs(W), 1.0f); // non-zero fill
+    return 1.0f - abs(mod(w, 2.0f) - 1.0f);
+  return min(abs(w), 1.0f); // non-zero fill
 }
 
 float contour(float dist, float edge, float width)
@@ -160,13 +160,13 @@ void main(void)
 #else
   vec2 fpos = vec2(gl_FragCoord.x, f_viewSize.y - gl_FragCoord.y);
 #endif
-  float W = 0.0f;
+  float w = 0.0f;
   for (uint idx = 0; idx < f_fillCount; ++idx) {
     vec4 edge = edgeFetch(f_fillOffset + idx);
-    W += areaEdge2(edge.zw - fpos,
-                   edge.xy - fpos); // noAA ? coversCenter(f_vb, f_pos) :
+    w += areaEdge2(edge.zw - fpos,
+                   edge.xy - fpos); // noAA ? coversCenter(f_uv, f_pos) :
   }
-  float cov = coverage(W);
+  float cov = coverage(w);
   if (shaderType == 1) { // Solid color
     result = innerColor * cov;
   } else if (shaderType == 2) { // Gradient
@@ -195,7 +195,7 @@ void main(void)
   } else if (shaderType == 4) { // Textured tris - only used for text, so no
                                 // need for coverage()
     vec4 textColor = clamp(innerColor, 0.0, 1.0);
-    float sd = texture(sampler2D(imageTex, smp1), f_vb).r;
+    float sd = texture(sampler2D(imageTex, smp1), f_uv).r;
     float alpha = contour(sd, 0.5, fwidth(sd));
     result = textColor * alpha;
   } else { // not used
