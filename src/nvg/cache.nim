@@ -52,11 +52,12 @@ proc quadCurve(
     c.quadCurve(p123, p23, p3, level + 1, tessTolSq, distTolSq)
 
 proc bezier(
-    c: var Cache, p1, p2, p3, p4: Vec2, level: int32, tessTolSq,
-        distTolSq: float32
+    c: var Cache, p1, p2, p3, p4: Vec2, level: int32,
+    tessTolSq, distTolSq: float32
 ) =
   let d = p4 - p1
   let distSq = d.lengthSq
+
   if distSq < distTolSq:
     if not equals(p1, p4, distTolSq):
       c.addPoint(p4)
@@ -70,11 +71,15 @@ proc bezier(
     p234 = (p23 + p34) / 2
     p1234 = (p123 + p234) / 2
 
-  let crossDist = cross(d, p1234 - p1)
-  let crossDistSq = crossDist * crossDist
+  let midDeviation = cross(d, p1234 - p1)
+  let quarterDeviation = cross(d, p123 - p1)
+  let threeQuarterDeviation = cross(d, p234 - p1)
+
+  let maxCross = max(max(abs(midDeviation), abs(quarterDeviation)), abs(threeQuarterDeviation))
+  let maxCrossSq = maxCross * maxCross
   let toleranceSq = tessTolSq * distSq
 
-  if crossDistSq < toleranceSq or level >= 9:
+  if maxCrossSq < toleranceSq or level >= 9:
     if not equals(p1, p4, distTolSq):
       c.addPoint(p4)
     return

@@ -1,48 +1,35 @@
-import nvg/context
-import nvg/core
-import nvg/dummy
-import nvg/path
+import nvg
 
-import std/monotimes
-import std/strformat
-import std/times
+import ./app
 
-proc draw(ctx: Context) =
-  ctx.begin(vec2(200, 200), 1)
-
+proc frameImpl(ctx: Context) =
   ctx.save()
 
-  var p = default(Path)
-  p.moveTo(vec2(100, 100))
-  p.arc(vec2(250, 170), 20, 40, 50, true)
-  p.arc(vec2(250, 170), 20, 40, 50, false)
-  p.arc(vec2(-340, -219), 170, -9, 181, true)
-  p.arc(vec2(-340, -219), 170, -9, 181, false)
-  p.arc(vec2(162, -219), 76, 610, -991, true)
-  p.arc(vec2(162, -219), 76, 610, -991, false)
+  let
+    p1 = vec2(0.1f, 0.5f)
+    p2 = vec2(0.4f, 0.9f)
+    p3 = vec2(0.6f, 0.1f)
+    p4 = vec2(0.9f, 0.5f)
 
-  p.quadCurveTo(vec2(250, 170), vec2(230, 20))
+  ctx.beginPath()
+  ctx.scale(vec2(200, 200))
+  ctx.strokeWidth = 0.04f
+  ctx.moveTo(p1)
+  ctx.bezierTo(p2, p3, p4)
+  ctx.stroke()
 
-  ctx.strokePath(p)
-  ctx.fillPath(p)
+  ctx.beginPath()
+  ctx.strokeStyle = color(1, 0.2, 0.2, 0.6)
+  ctx.strokeWidth = 0.02f
+  ctx.moveTo(p1)
+  ctx.lineTo(p2)
+  ctx.moveTo(p3)
+  ctx.lineTo(p4)
+  ctx.stroke()
 
   ctx.restore()
 
-proc main() =
-  let numRun = 10000
-
-  let ctx = newContext()
-  let a = getMonoTime()
-
-  for i in 0 ..< numRun:
-    draw(ctx)
-
-  let b = getMonoTime()
-
-  let us = (b - a).inMicroseconds
-  echo fmt"nim version: {NimVersion}"
-  echo fmt"times: {numRun}"
-  echo fmt"total time: {us} usecs"
-  echo fmt"average time: {float(us) / float(numRun)} usecs"
-
-main()
+launch(400, 300, App(
+  name: "tcore.nim",
+  frameImpl: frameImpl,
+))
