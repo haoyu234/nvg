@@ -115,61 +115,111 @@ proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
   p.appendCommands(commands.toOpenArray(0, idx - 1))
 
 proc ellipse*(p: var Path, c: Vec2, rx, ry: float32) {.inline.} =
-  p.appendCommands(
-    [
-      float32(Command.MOVE),
-      c[0] - rx,
-      c[1],
-      float32(Command.BEZIER),
-      c[0] - rx,
-      c[1] + ry * NVG_KAPPA90,
-      c[0] - rx * NVG_KAPPA90,
-      c[1] + ry,
-      c[0],
-      c[1] + ry,
-      float32(Command.BEZIER),
-      c[0] + rx * NVG_KAPPA90,
-      c[1] + ry,
-      c[0] + rx,
-      c[1] + ry * NVG_KAPPA90,
-      c[0] + rx,
-      c[1],
-      float32(Command.BEZIER),
-      c[0] + rx,
-      c[1] - ry * NVG_KAPPA90,
-      c[0] + rx * NVG_KAPPA90,
-      c[1] - ry,
-      c[0],
-      c[1] - ry,
-      float32(Command.BEZIER),
-      c[0] - rx * NVG_KAPPA90,
-      c[1] - ry,
-      c[0] - rx,
-      c[1] - ry * NVG_KAPPA90,
-      c[0] - rx,
-      c[1],
-      float32(Command.CLOSE),
-    ]
-  )
+  p.appendCommands([
+    float32(Command.MOVE),
+    c[0] - rx,
+    c[1],
+    float32(Command.BEZIER),
+    c[0] - rx,
+    c[1] + ry * NVG_KAPPA90,
+    c[0] - rx * NVG_KAPPA90,
+    c[1] + ry,
+    c[0],
+    c[1] + ry,
+    float32(Command.BEZIER),
+    c[0] + rx * NVG_KAPPA90,
+    c[1] + ry,
+    c[0] + rx,
+    c[1] + ry * NVG_KAPPA90,
+    c[0] + rx,
+    c[1],
+    float32(Command.BEZIER),
+    c[0] + rx,
+    c[1] - ry * NVG_KAPPA90,
+    c[0] + rx * NVG_KAPPA90,
+    c[1] - ry,
+    c[0],
+    c[1] - ry,
+    float32(Command.BEZIER),
+    c[0] - rx * NVG_KAPPA90,
+    c[1] - ry,
+    c[0] - rx,
+    c[1] - ry * NVG_KAPPA90,
+    c[0] - rx,
+    c[1],
+    float32(Command.CLOSE),
+  ])
 
 proc circle*(p: var Path, c: Vec2, r: float32) {.inline.} =
   p.ellipse(c, r, r)
 
 proc moveTo*(p: var Path, pos: Vec2) {.inline.} =
-  p.appendCommands([float32(Command.MOVE), pos[0], pos[1]])
+  p.appendCommands([
+    float32(Command.MOVE),
+    pos[0],
+    pos[1],
+  ])
+
+proc relMoveTo*(p: var Path, pos: Vec2) {.inline.} =
+  p.appendCommands([
+    float32(Command.MOVE),
+     p.currentPos[0] + pos[0],
+     p.currentPos[1] + pos[1],
+  ])
 
 proc lineTo*(p: var Path, pos: Vec2) {.inline.} =
-  p.appendCommands([float32(Command.LINE), pos[0], pos[1]])
+  p.appendCommands([
+    float32(Command.LINE),
+    pos[0],
+    pos[1],
+  ])
+
+proc relLineTo*(p: var Path, pos: Vec2) {.inline.} =
+  p.appendCommands([
+    float32(Command.LINE),
+     p.currentPos[0] + pos[0],
+     p.currentPos[1] + pos[1],
+  ])
 
 proc bezierTo*(p: var Path, cp1, cp2, to: Vec2) {.inline.} =
-  p.appendCommands(
-    [float32(Command.BEZIER), cp1[0], cp1[1], cp2[0], cp2[1], to[0], to[1]]
-  )
+  p.appendCommands([
+    float32(Command.BEZIER),
+    cp1[0],
+    cp1[1],
+    cp2[0],
+    cp2[1],
+    to[0],
+    to[1],
+  ])
+
+proc relBezierTo*(p: var Path, cp1, cp2, to: Vec2) {.inline.} =
+  p.appendCommands([
+    float32(Command.BEZIER),
+    p.currentPos[0] + cp1[0],
+    p.currentPos[1] + cp1[1],
+    p.currentPos[0] + cp2[0],
+    p.currentPos[1] + cp2[1],
+    p.currentPos[0] + to[0],
+    p.currentPos[1] + to[1],
+  ])
 
 proc quadCurveTo*(p: var Path, cp, to: Vec2) {.inline.} =
-  p.appendCommands(
-    [float32(Command.CURVE), cp[0], cp[1], to[0], to[1]]
-  )
+  p.appendCommands([
+    float32(Command.CURVE),
+    cp[0],
+    cp[1],
+    to[0],
+    to[1],
+  ])
+
+proc relQuadCurveTo*(p: var Path, cp, to: Vec2) {.inline.} =
+  p.appendCommands([
+    float32(Command.CURVE),
+    p.currentPos[0] + cp[0],
+    p.currentPos[1] + cp[1],
+    p.currentPos[0] + to[0],
+    p.currentPos[1] + to[1],
+  ])
 
 proc arcTo*(p: var Path, a, b: Vec2, r: float32) =
   let
@@ -222,8 +272,9 @@ proc arcTo*(p: var Path, a, b: Vec2, r: float32) =
     p.arc([cpx, cpy], r, a0, a1, ccw)
 
 proc closePath*(p: var Path) {.inline.} =
-  const commands = [float32(Command.CLOSE)]
-  p.appendCommands(commands)
+  p.appendCommands([
+    float32(Command.CLOSE)
+  ])
 
 iterator commands*(p: Path): (Command, Piece[float32]) =
   var j = 0
@@ -258,13 +309,16 @@ iterator commands*(p: Path): (Command, Piece[float32]) =
       yield (command, piece(p.data.toOpenArray(i, j - 1)))
 
 proc addPath*(p: var Path, other: Path) {.inline.} =
-  const commands = [float32(Command.RESTART)]
-  p.appendCommands(commands)
+  p.appendCommands([
+    float32(Command.RESTART)
+  ])
+
   p.appendCommands(other.data)
 
 proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
-  const commands = [float32(Command.RESTART)]
-  p.appendCommands(commands)
+  p.appendCommands([
+    float32(Command.RESTART)
+  ])
 
   for command, data in other.commands:
     case command

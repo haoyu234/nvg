@@ -288,14 +288,26 @@ proc circle*(ctx: Context, c: Vec2, r: float32) {.inline.} =
 proc moveTo*(ctx: Context, pos: Vec2) {.inline.} =
   ctx.path.moveTo(pos)
 
+proc relMoveTo*(ctx: Context, pos: Vec2) {.inline.} =
+  ctx.path.relMoveTo(pos)
+
 proc lineTo*(ctx: Context, pos: Vec2) {.inline.} =
   ctx.path.lineTo(pos)
+
+proc relLineTo*(ctx: Context, pos: Vec2) {.inline.} =
+  ctx.path.relLineTo(pos)
 
 proc bezierTo*(ctx: Context, cp1, cp2, to: Vec2) {.inline.} =
   ctx.path.bezierTo(cp1, cp2, to)
 
+proc relBezierTo*(ctx: Context, cp1, cp2, to: Vec2) {.inline.} =
+  ctx.path.relBezierTo(cp1, cp2, to)
+
 proc quadCurveTo*(ctx: Context, cp, to: Vec2) {.inline.} =
   ctx.path.quadCurveTo(cp, to)
+
+proc relQuadCurveTo*(ctx: Context, cp, to: Vec2) {.inline.} =
+  ctx.path.relQuadCurveTo(cp, to)
 
 proc arcTo*(ctx: Context, a, b: Vec2, r: float32) =
   ctx.path.arcTo(a, b, r)
