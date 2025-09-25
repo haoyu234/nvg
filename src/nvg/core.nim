@@ -78,7 +78,6 @@ type
     CURVE
     BEZIER
     CLOSE
-    RESTART
 
   Path* = object
     currentPos*: Vec2

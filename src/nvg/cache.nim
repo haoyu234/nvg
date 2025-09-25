@@ -160,10 +160,6 @@ proc flattenPaths*(
       if not c.curPath.isNil:
         c.curPath.closed = true
 
-    of Command.RESTART:
-      if not c.curPath.isNil:
-        c.curPath.restart = true
-
   for idx in 0 ..< c.contours.len:
     let p = c.contours[idx].addr
 
@@ -263,9 +259,6 @@ proc dashStroke*(
           p.offset + p.pointCount - 1
 
     c.addContour()
-    c.curPath.restart = p.restart
-    # p = contours[idx].addr
-
     c.addPoint(p0)
 
     while i <= j:
@@ -281,8 +274,6 @@ proc dashStroke*(
 
         if not dashState:
           c.addContour()
-          # p = contours[idx].addr
-
         c.addPoint(p1)
 
         dashState = not dashState

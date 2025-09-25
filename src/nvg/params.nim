@@ -10,7 +10,6 @@ type
     pointCount*: int32
     fill*: Piece[Vec4]
     closed*: bool
-    restart*: bool
     bounds*: Vec4
 
   TextureType* = enum

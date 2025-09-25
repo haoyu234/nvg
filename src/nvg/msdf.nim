@@ -501,12 +501,6 @@ proc setupEdges(df: var ShapeDistanceFinder, path: Path) =
         p = e.p2
         df.edgeStorage.add(e)
 
-    of RESTART:
-      p[0] = 0
-      p[1] = 0
-      start[0] = 0
-      start[1] = 0
-
   addContour()
 
 proc setup(df: var ShapeDistanceFinder, path: Path) =

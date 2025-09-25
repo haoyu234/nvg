@@ -85,7 +85,8 @@ proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
   verts.add(vec4(bounds[2], bounds[1], 0, 0))
   verts.add(vec4(bounds[0], bounds[1], 0, 0))
 
-proc addQuad(verts: var seq[Vec4], bounds: array[4, float32], pad: float32) {.inline.} =
+proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
+    pad: float32) {.inline.} =
   let
     v0 = bounds[0] - pad
     v1 = bounds[1] - pad
@@ -126,9 +127,9 @@ proc addCall(ctx: var RenderData, call: InstanceCall) =
     let prev = ctx.calls[^1].addr
     if prev.blend == call.blend and prev.texture == call.texture and
       prev.uniformIndex == call.uniformIndex:
-        prev.instanceCount = prev.instanceCount + call.instanceCount
-        prev.triangleCount = prev.triangleCount + call.triangleCount
-        return
+      prev.instanceCount = prev.instanceCount + call.instanceCount
+      prev.triangleCount = prev.triangleCount + call.triangleCount
+      return
 
   ctx.calls.add(call)
 
@@ -147,17 +148,15 @@ proc fillCall*(
     bounds: Vec4,
     contours: openArray[Contour],
 ) =
-  var
-    ncalls = 0
-    nedges = 0
+  let edgeCount =
+    block:
+      var edgeCount = uint32(0)
+      for idx in 0 ..< contours.len:
+        let p = contours[idx].addr
+        inc edgeCount, p.fill.len
+      edgeCount
 
-  for idx in 0 ..< contours.len:
-    let p = contours[idx].addr
-    inc nedges, p.fill.len
-    if idx <= 0 or p.restart:
-      inc ncalls, 1
-
-  if nedges <= 0:
+  if edgeCount <= 0:
     return
 
   var
@@ -221,7 +220,7 @@ proc fillCall*(
 
   const tileSize = 32
 
-  if ncalls == 1 and nedges > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
+  if edgeCount > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
     ltrb[0] = floor(ltrb[0])
     ltrb[1] = floor(ltrb[1])
     ltrb[2] = ceil(ltrb[2])
@@ -236,16 +235,18 @@ proc fillCall*(
       tilew = int32(ceil(callw / float32(xtiles)))
       tileh = int32(ceil(callh / float32(ytiles)))
 
-    ctx.tiles.setup(xtiles, ytiles, nedges)
+    ctx.tiles.setup(xtiles, ytiles, edgeCount)
 
-    nedges = 0
-    ncalls = 0
+    var
+      edgeIdx = uint32(0)
+      callIdx = uint32(0)
 
     for p in contours:
       if p.fill.len <= 0:
         continue
 
-      let pymin = clamp(int32(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0, ytiles - 1)
+      let pymin = clamp(int32(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0,
+          ytiles - 1)
 
       for v in p.fill.toOpenArray:
         let
@@ -258,9 +259,12 @@ proc fillCall*(
           continue
 
         let
-          vxmin = clamp(int32(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0, xtiles - 1)
-          vxmax = clamp(int32(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0, xtiles - 1)
-          vymax = clamp(int32(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0, ytiles - 1)
+          vxmin = clamp(int32(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0,
+              xtiles - 1)
+          vxmax = clamp(int32(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0,
+              xtiles - 1)
+          vymax = clamp(int32(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0,
+              ytiles - 1)
 
         for ix in vxmin .. vxmax:
           for iy in pymin .. vymax:
@@ -277,15 +281,15 @@ proc fillCall*(
                 p[][3] = y1
                 continue
             else:
-              inc ncalls, 1
+              inc callIdx, 1
 
-            inc nedges, 1
+            inc edgeIdx, 1
 
             ctx.tiles.add(tileId, v)
 
-    ctx.verts.reserve(ncalls * 6)
-    ctx.edges.reserve(nedges)
+    ctx.edges.reserve(edgeIdx)
     ctx.instances.reserve(xtiles * ytiles)
+    ctx.verts.reserve(callIdx * 6)
 
     var tileBounds: array[4, float32]
 
@@ -302,7 +306,8 @@ proc fillCall*(
         for s in ctx.tiles.pieces(tileId):
           ctx.edges.add(s.toOpenArray)
 
-        instanceParam.fillCount = int32(ctx.edges.len) - instanceParam.fillOffset
+        instanceParam.fillCount = int32(ctx.edges.len) -
+            instanceParam.fillOffset
 
         tileBounds[0] = ltrb[0] + float32(ix * tilew)
         tileBounds[1] = ltrb[1] + float32(iy * tileh)
@@ -312,7 +317,7 @@ proc fillCall*(
         ctx.verts.addQuad(tileBounds)
         ctx.instances.add(instanceParam)
 
-  elif ncalls == 1:
+  else:
     instanceParam.fillOffset = int32(ctx.edges.len)
 
     for p in contours:
@@ -322,46 +327,6 @@ proc fillCall*(
 
     ctx.verts.addQuad(ltrb, 0.5)
     ctx.instances.add(instanceParam)
-
-  else:
-    var
-      lastIdx = 0
-      callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
-
-    for idx in 0 ..< contours.len:
-      let p = contours[idx].addr
-
-      callbnds[0] = min(callbnds[0], p.bounds[0])
-      callbnds[1] = min(callbnds[1], p.bounds[1])
-      callbnds[2] = max(callbnds[2], p.bounds[2])
-      callbnds[3] = max(callbnds[3], p.bounds[3])
-
-      if (idx + 1) == contours.len or contours[idx + 1].restart:
-        callbnds[0] = max(ltrb[0], callbnds[0])
-        callbnds[1] = max(ltrb[1], callbnds[1])
-        callbnds[2] = min(ltrb[2], callbnds[2])
-        callbnds[3] = min(ltrb[3], callbnds[3])
-
-        if callbnds[0] >= callbnds[2] or callbnds[1] >= callbnds[3]:
-          if instanceParam.fillOffset > 0:
-            ctx.verts.setLen(ctx.verts.len - 6)
-            ctx.edges.setLen(int32(instanceParam.fillOffset))
-            ctx.instances.setLen(ctx.instances.len - 1)
-        else:
-          instanceParam.fillOffset = int32(ctx.edges.len)
-
-          for idx2 in lastIdx .. idx:
-            let p = contours[idx2].addr
-            ctx.edges.add(p.fill.toOpenArray)
-
-          lastIdx = idx + 1
-
-          instanceParam.fillCount = int32(ctx.edges.len) - instanceParam.fillOffset
-
-          ctx.verts.addQuad(callbnds, 0.5)
-          ctx.instances.add(instanceParam)
-
-        callbnds = [1e6f, 1e6f, -1e6f, -1e6f]
 
   if ctx.instances.len > call.instanceOffset:
     call.triangleCount = int32(ctx.verts.len) - call.triangleOffset

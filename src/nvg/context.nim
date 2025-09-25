@@ -331,7 +331,7 @@ proc measureText*(ctx: Context, text: openArray[char]): float32 =
 
   ctx.fons.measureText(font, text, ctx.fontSize, ctx.letterSpacing)
 
-proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
+proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:
     return
 
@@ -350,11 +350,11 @@ proc textToPath*(ctx: Context, text: openArray[char], pos: Vec2): Path =
       continue
 
     let path = font.getGlyphPath(glyph)
-    if not path.empty:
-      var matrix = [scale, 0, 0, -scale, x, y]
-      matrix.multiply(ctx.transform)
+    if path.empty:
+      continue
 
-      result.addPath(path, matrix)
+    let matrix = [scale, 0, 0, -scale, x, y]
+    ctx.path.addPath(path, multiplied(matrix, ctx.transform))
 
 proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
   if ctx.fons.isNil:

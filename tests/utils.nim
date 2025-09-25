@@ -21,6 +21,3 @@ proc dumpPath*(p: Path) =
 
     of CLOSE:
       echo "Z"
-
-    of RESTART:
-      discard

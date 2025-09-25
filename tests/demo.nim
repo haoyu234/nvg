@@ -2,16 +2,6 @@ import nvg
 
 import ./fonts
 
-# proc dump*() =
-#   let us = totalTime.inMicroseconds
-
-#   echo ""
-#   echo fmt"nim version: {NimVersion}"
-#   echo fmt"times: {frameCount}"
-#   echo fmt"total time: {us} usecs"
-#   echo fmt"average time: {float(us) / float(frameCount)} usecs"
-#   echo ""
-
 proc renderDemo1*(ctx: Context) =
   ctx.save()
 
@@ -26,8 +16,9 @@ proc renderDemo1*(ctx: Context) =
       ctx.textAlign = align
       ctx.textBaseline = baseline
 
-      let path = ctx.textToPath("123456790", vec2(100, float32(y * 20 + 100)))
-      ctx.fillPath(path)
+      ctx.beginPath()
+      ctx.text("123456790", vec2(100, float32(y * 20 + 100)))
+      ctx.fill()
 
       inc y, 1
 

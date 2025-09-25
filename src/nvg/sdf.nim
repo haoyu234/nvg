@@ -109,10 +109,6 @@ iterator simplify(path: Path): (Command, Vec2, Piece[float32]) =
         yield (LINE, p, piece(s))
         p = s
 
-    of RESTART:
-      s = default(Vec2)
-      p = default(Vec2)
-
 proc computeCrossX(x, y: float32, path: Path): int32 =
   var y = y
 

@@ -302,24 +302,16 @@ iterator commands*(p: Path): (Command, Piece[float32]) =
 
       yield (command, piece(p.data.toOpenArray(i, j - 1)))
 
-    of Command.CLOSE, Command.RESTART:
+    of Command.CLOSE:
       let i = j
       inc j, 0
 
       yield (command, piece(p.data.toOpenArray(i, j - 1)))
 
 proc addPath*(p: var Path, other: Path) {.inline.} =
-  p.appendCommands([
-    float32(Command.RESTART)
-  ])
-
   p.appendCommands(other.data)
 
 proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
-  p.appendCommands([
-    float32(Command.RESTART)
-  ])
-
   for command, data in other.commands:
     case command
     of Command.MOVE:
@@ -345,7 +337,7 @@ proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
         p3 = matrix * vec2(data[4], data[5])
       p.bezierTo(p1, p2, p3)
 
-    of Command.CLOSE, Command.RESTART:
+    of Command.CLOSE:
       p.appendCommands([float32(command)])
 
 proc transform*(p: var Path, matrix: Mat2d) =
@@ -378,5 +370,5 @@ proc transform*(p: var Path, matrix: Mat2d) =
       data[4] = p3[0]
       data[5] = p3[1]
 
-    else:
+    of Command.CLOSE:
       discard
