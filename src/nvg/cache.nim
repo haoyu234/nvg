@@ -422,12 +422,8 @@ proc expandStroke*(
         l01Sq = d01.lengthSq
         l12Sq = d12.lengthSq
 
-        join =
-          if lineJoin == MiterJoin and mLenSq <= mLimSq and miterDenom > 1e-6f:
-            MiterJoin
-          else:
-            BevelJoin
-
+        join = if lineJoin == MiterJoin and mLenSq <= mLimSq and 
+          miterDenom > 1e-6f: MiterJoin else: BevelJoin
         outerJoin = if lineJoin == RoundJoin: RoundJoin else: join
         innerJoin = if l01Sq < mLenSq or l12Sq < mLenSq: BevelJoin else: join
 
@@ -513,7 +509,7 @@ proc expandStroke*(
         incp(v1, v2)
         incp(v2, rp)
       elif lineCap == RoundCap:
-        r = arcJoin(memory, r, lp, rp, p1[], w, nCap, 1)
+        l = arcJoin(memory, l, lp, rp, p1[], w, nCap, 1)
     else:
       incp(lp, l00)
       decp(r00, rp)
