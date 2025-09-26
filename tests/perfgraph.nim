@@ -43,22 +43,19 @@ proc average*(p: PerfGraph): float32 =
   sum / float32(n)
 
 proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
-  var p = default(Path)
-
   let
     w = float32(290)
     h = float32(80)
 
   ctx.save()
 
-  p.clear()
-  p.rect(vec4(pos[0], pos[1], w, h))
-
+  ctx.beginPath()
+  ctx.rect(vec4(pos[0], pos[1], w, h))
   ctx.fillStyle = color(0, 0, 0, 0.75)
-  ctx.fillPath(p)
+  ctx.fill()
 
-  p.clear()
-  p.moveTo(vec2(pos[0], pos[1] + h))
+  ctx.beginPath()
+  ctx.moveTo(vec2(pos[0], pos[1] + h))
 
   template lineTo(MAX: static[float32]) =
     if v > MAX:
@@ -67,7 +64,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
     vx = pos[0] + float32(idx) / float32(GRAPH_HISTORY_COUNT - 1) * w
     vy = pos[1] + h - (v / MAX * h)
 
-    p.lineTo(vec2(vx, vy))
+    ctx.lineTo(vec2(vx, vy))
 
   case perfGraph.renderStyle
   of PERF_GRAPH_RENDER_MS:
@@ -101,10 +98,10 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
 
       lineTo(float32(100))
 
-  p.lineTo(vec2(pos[0] + w, pos[1] + h))
+  ctx.lineTo(vec2(pos[0] + w, pos[1] + h))
 
   ctx.fillStyle = color(1, 0.75, 0, 0.5)
-  ctx.fillPath(p)
+  ctx.fill()
 
   ctx.fontId = ctx.getDefaultFont()
   ctx.fontSize = 36
