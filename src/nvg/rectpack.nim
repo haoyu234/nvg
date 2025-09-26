@@ -88,7 +88,9 @@ proc allocRow(p: var RectPack): ptr Row {.inline.} =
 
     result = p.getRow(idx)
     result.idx = idx
-    result.nextIdx = high(uint32)
+
+  result.nextIdx = high(uint32)
+  result.status = default(set[Status])
 
 proc allocItem(p: var RectPack): ptr Item {.inline.} =
   if p.itemFreeList != high(uint32):
@@ -101,7 +103,9 @@ proc allocItem(p: var RectPack): ptr Item {.inline.} =
     result = p.getItem(idx)
     result.generation = 1
     result.idx = idx
-    result.nextIdx = high(uint32)
+
+  result.nextIdx = high(uint32)
+  result.status = default(set[Status])
 
 proc allocEmptyRow(p: var RectPack, y, height: int32): ptr Row {.inline.} =
   let
@@ -396,9 +400,9 @@ proc expand*(p: var RectPack, w, h: int32) =
   if h > p.height:
     let
       expansionY = p.height
-      expansionHeigh = w - p.height
+      expansionHeigh = h - p.height
 
-    p.height = p.height
+    p.height = h
     p.rowStorage.reserve(1)
 
     var

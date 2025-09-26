@@ -24,7 +24,7 @@ const demos = [
   (demo4.demo_globalAlpha, "globalAlpha"),
 ]
 
-var idx = low(demos)
+var idx = int32(low(demos))
 
 proc initImpl(ctx: Context) =
   discard
