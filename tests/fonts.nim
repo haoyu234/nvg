@@ -2,7 +2,7 @@ import nvg/context
 import nvg/core
 
 const
-  FONT = staticRead("../msyh.ttf")
+  FONT = staticRead("../vivoSans-Regular.ttf")
   FONT_emoji = staticRead("../OpenMoji-color-glyf_colr_0.ttf")
 
 var
