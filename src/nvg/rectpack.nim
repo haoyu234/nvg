@@ -4,23 +4,23 @@ type
     Empty
 
   Item = object
-    idx: uint32
+    idx: int32
     generation: uint32
     x: int32
     width: int32
-    nextIdx: uint32
-    rowIdx: uint32
+    nextIdx: int32
+    rowIdx: int32
     status: set[Status]
 
   Row = object
-    idx: uint32
+    idx: int32
     y: int32
     height: int32
     baseHeight: int32
     maxDiff: int32
     maxEmptyItemWidth: int32
-    firstItemIdx: uint32
-    nextIdx: uint32
+    firstItemIdx: int32
+    nextIdx: int32
     status: set[Status]
 
   RectPack* = object
@@ -28,28 +28,28 @@ type
     height*: int32
     occupancy: int32
 
-    firstRowIdx: uint32
-    rowFreeList: uint32
-    itemFreeList: uint32
+    firstRowIdx: int32
+    rowFreeList: int32
+    itemFreeList: int32
 
     rowStorage: seq[Row]
     itemStorage: seq[Item]
 
   RectId* = object
-    idx: uint32
+    idx: int32
     generation: uint32
 
 proc isNil*(id: RectId): bool {.inline.} =
   id.generation <= 0
 
-proc getRow(p: RectPack, idx: uint32): ptr Row {.inline.} =
+proc getRow(p: RectPack, idx: int32): ptr Row {.inline.} =
   p.rowStorage[idx].addr
 
-proc getItem(p: RectPack, idx: uint32): ptr Item {.inline.} =
+proc getItem(p: RectPack, idx: int32): ptr Item {.inline.} =
   p.itemStorage[idx].addr
 
 proc getItem(p: RectPack, idx: RectId): ptr Item {.inline.} =
-  if idx.idx >= uint32(p.itemStorage.len):
+  if idx.idx >= int32(p.itemStorage.len):
     return
 
   let item = p.getItem(idx.idx)
@@ -62,7 +62,7 @@ iterator rows(p: RectPack): ptr Row =
   var
     nextIdx = p.firstRowIdx
 
-  while nextIdx != high(uint32):
+  while nextIdx != high(int32):
     let row = p.getRow(nextIdx)
     nextIdx = row.nextIdx
 
@@ -72,39 +72,39 @@ iterator items(p: RectPack, row: ptr Row): ptr Item =
   var
     nextIdx = row.firstItemIdx
 
-  while nextIdx != high(uint32):
+  while nextIdx != high(int32):
     let item = p.getItem(nextIdx)
     nextIdx = item.nextIdx
 
     yield item
 
 proc allocRow(p: var RectPack): ptr Row {.inline.} =
-  if p.rowFreeList != high(uint32):
+  if p.rowFreeList != high(int32):
     result = p.getRow(p.rowFreeList)
     p.rowFreeList = result.nextIdx
   else:
-    let idx = uint32(p.rowStorage.len())
+    let idx = int32(p.rowStorage.len())
     p.rowStorage.setLen(idx + 1)
 
     result = p.getRow(idx)
     result.idx = idx
 
-  result.nextIdx = high(uint32)
+  result.nextIdx = high(int32)
   result.status = default(set[Status])
 
 proc allocItem(p: var RectPack): ptr Item {.inline.} =
-  if p.itemFreeList != high(uint32):
+  if p.itemFreeList != high(int32):
     result = p.getItem(p.itemFreeList)
     p.itemFreeList = result.nextIdx
   else:
-    let idx = uint32(p.itemStorage.len())
+    let idx = int32(p.itemStorage.len())
     p.itemStorage.setLen(idx + 1)
 
     result = p.getItem(idx)
     result.generation = 1
     result.idx = idx
 
-  result.nextIdx = high(uint32)
+  result.nextIdx = high(int32)
   result.status = default(set[Status])
 
 proc allocEmptyRow(p: var RectPack, y, height: int32): ptr Row {.inline.} =
@@ -169,8 +169,8 @@ proc freeRow(p: var RectPack, row: ptr Row) {.inline.} =
 
 proc initIfNeeded(p: var RectPack) {.inline.} =
   if p.rowStorage.len <= 0:
-    p.rowFreeList = high(uint32)
-    p.itemFreeList = high(uint32)
+    p.rowFreeList = high(int32)
+    p.itemFreeList = high(int32)
     let newRow = p.allocEmptyRow(0, p.height)
     p.firstRowIdx = newRow.idx
 
@@ -255,7 +255,7 @@ proc allocRect*(p: var RectPack, w, h: int32): tuple[id: RectId, offsetX,
           bestRowError = error
           bestRow = row
 
-      elif h > row.height and row.nextIdx != high(uint32):
+      elif h > row.height and row.nextIdx != high(int32):
         let error = h - row.height
         if error < bestRowError:
           let nextRow = p.getRow(row.nextIdx)
@@ -320,7 +320,7 @@ proc freeRect*(p: var RectPack, itemId: RectId) =
     p.freeItem(targetItem)
     targetItem = prevItem
   
-  if targetItem.nextIdx != high(uint32):
+  if targetItem.nextIdx != high(int32):
     let
       nextItem = p.getItem(targetItem.nextIdx)
 
@@ -334,7 +334,7 @@ proc freeRect*(p: var RectPack, itemId: RectId) =
   let
     firstItem = p.getItem(targetRow.firstItemIdx)
 
-  if Empty in firstItem.status and firstItem.nextIdx == high(uint32):
+  if Empty in firstItem.status and firstItem.nextIdx == high(int32):
     targetRow.status.incl(Empty)
 
   if Empty in targetRow.status:
@@ -355,7 +355,7 @@ proc freeRect*(p: var RectPack, itemId: RectId) =
       p.freeRow(targetRow)
       targetRow = prevRow
 
-    if targetRow.nextIdx != high(uint32) and Empty in targetRow.status:
+    if targetRow.nextIdx != high(int32) and Empty in targetRow.status:
       let nextRow = p.getRow(targetRow.nextIdx)
       inc targetRow.height, nextRow.height
       targetRow.nextIdx = nextRow.nextIdx
