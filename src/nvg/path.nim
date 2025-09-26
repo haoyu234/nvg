@@ -89,8 +89,8 @@ proc rect*(p: var Path, xywh: Vec4) {.inline.} =
 
 proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
   const
-    pi2 = float32(2 * PI)
-    pidiv2 = float32(PI / 2)
+    pi2 = float32(PI) * 2
+    pidiv2 = float32(PI) * 0.5
     s = float32(4) / 3
 
   var da = a1 - a0
@@ -117,7 +117,7 @@ proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
 
   let
     ndivs = max(1, min(int32(abs(da) / pidiv2 + float32(0.5)), 5))
-    hda = da / float32(ndivs) / 2
+    hda = da / float32(ndivs) * 0.5
 
   var kappa = abs(s * (1 - cos(hda)) / sin(hda))
 
@@ -290,7 +290,7 @@ proc arcTo*(p: var Path, a, b: Vec2, r: float32) =
     let
       d0 = normalized(p12)
       d1 = normalized(p32)
-      d = r / tan(arccos(dot(d0, d1)) / 2f32)
+      d = r / tan(arccos(dot(d0, d1)) * 0.5)
 
     if d > 10000:
       p.lineTo(a)

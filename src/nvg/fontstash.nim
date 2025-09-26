@@ -147,7 +147,7 @@ iterator arrange*(
   elif textAlign == RightAlign:
     x = x - measureText(fons, font, text, size, spacing)
   elif textAlign == CenterAlign:
-    x = x - measureText(fons, font, text, size, spacing) / 2
+    x = x - measureText(fons, font, text, size, spacing) * 0.5
 
   let
     h = float32(font.metrics.ascender + font.metrics.lineGap -

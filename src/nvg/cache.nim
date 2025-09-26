@@ -44,9 +44,9 @@ proc quadCurve(
       c.addPoint(p3)
   else:
     let
-      p12 = (p1 + p2) / 2
-      p23 = (p2 + p3) / 2
-      p123 = (p12 + p23) / 2
+      p12 = (p1 + p2) * 0.5
+      p23 = (p2 + p3) * 0.5
+      p123 = (p12 + p23) * 0.5
 
     c.quadCurve(p1, p12, p123, level + 1, tessTolSq, distTolSq)
     c.quadCurve(p123, p23, p3, level + 1, tessTolSq, distTolSq)
@@ -64,12 +64,12 @@ proc bezier(
     return
 
   let
-    p12 = (p1 + p2) / 2
-    p23 = (p2 + p3) / 2
-    p34 = (p3 + p4) / 2
-    p123 = (p12 + p23) / 2
-    p234 = (p23 + p34) / 2
-    p1234 = (p123 + p234) / 2
+    p12 = (p1 + p2) * 0.5
+    p23 = (p2 + p3) * 0.5
+    p34 = (p3 + p4) * 0.5
+    p123 = (p12 + p23) * 0.5
+    p234 = (p23 + p34) * 0.5
+    p1234 = (p123 + p234) * 0.5
 
   let midDeviation = cross(d, p1234 - p1)
   let quarterDeviation = cross(d, p123 - p1)
