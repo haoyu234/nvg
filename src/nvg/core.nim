@@ -80,6 +80,7 @@ type
     CLOSE
 
   Path* = object
+    startPos*: Vec2
     currentPos*: Vec2
     data*: seq[float32]
 

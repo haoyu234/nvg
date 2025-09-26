@@ -12,14 +12,61 @@ proc empty*(p: Path): bool =
   p.data.len <= 0
 
 proc clear*(p: var Path) {.inline.} =
+  p.currentPos = vec2(0, 0)
   p.data.setLen(0)
 
-proc appendCommands*(p: var Path, values: openArray[float32]) {.inline.} =
-  if len(values) > 0:
-    p.currentPos[0] = values[^2]
-    p.currentPos[1] = values[^1]
+iterator splitCommands(p: openArray[float32]): (Command, Piece[float32]) =
+  var j = 0
 
-  p.data.add(values)
+  while j < p.len:
+    let command = Command(p[j])
+    inc j, 1
+
+    case command
+    of Command.MOVE, Command.LINE:
+      let i = j
+      inc j, 2
+
+      yield (command, piece(p.toOpenArray(i, j - 1)))
+
+    of Command.CURVE:
+      let i = j
+      inc j, 4
+
+      yield (command, piece(p.toOpenArray(i, j - 1)))
+
+    of Command.BEZIER:
+      let i = j
+      inc j, 6
+
+      yield (command, piece(p.toOpenArray(i, j - 1)))
+
+    of Command.CLOSE:
+      let i = j
+      inc j, 0
+
+      yield (command, piece(p.toOpenArray(i, j - 1)))
+
+proc appendCommands*(p: var Path, commands: openArray[float32]) {.inline.} =
+  for command, data in commands.splitCommands:
+    case command
+    of Command.MOVE:
+      p.startPos = vec2(data[0], data[1])
+      p.currentPos = p.startPos
+
+    of Command.LINE:
+      p.currentPos = vec2(data[0], data[1])
+
+    of Command.CURVE:
+      p.currentPos = vec2(data[2], data[3])
+
+    of Command.BEZIER:
+      p.currentPos = vec2(data[3], data[4])
+
+    of Command.CLOSE:
+      p.currentPos = p.startPos
+
+  p.data.add(commands)
 
 proc rect*(p: var Path, xywh: Vec4) {.inline.} =
   p.appendCommands(
@@ -277,42 +324,14 @@ proc closePath*(p: var Path) {.inline.} =
   ])
 
 iterator commands*(p: Path): (Command, Piece[float32]) =
-  var j = 0
-
-  while j < p.data.len:
-    let command = Command(p.data[j])
-    inc j, 1
-
-    case command
-    of Command.MOVE, Command.LINE:
-      let i = j
-      inc j, 2
-
-      yield (command, piece(p.data.toOpenArray(i, j - 1)))
-
-    of Command.CURVE:
-      let i = j
-      inc j, 4
-
-      yield (command, piece(p.data.toOpenArray(i, j - 1)))
-
-    of Command.BEZIER:
-      let i = j
-      inc j, 6
-
-      yield (command, piece(p.data.toOpenArray(i, j - 1)))
-
-    of Command.CLOSE:
-      let i = j
-      inc j, 0
-
-      yield (command, piece(p.data.toOpenArray(i, j - 1)))
+  for command, data in p.data.splitCommands:
+    yield (command, data)
 
 proc addPath*(p: var Path, other: Path) {.inline.} =
   p.appendCommands(other.data)
 
 proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
-  for command, data in other.commands:
+  for command, data in other.data.splitCommands:
     case command
     of Command.MOVE:
       let
@@ -341,7 +360,7 @@ proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
       p.appendCommands([float32(command)])
 
 proc transform*(p: var Path, matrix: Mat2d) =
-  for command, data in p.commands:
+  for command, data in p.data.splitCommands:
     case command
     of Command.MOVE, Command.LINE:
       let
