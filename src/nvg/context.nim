@@ -201,7 +201,7 @@ proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId {.inline.}
 
 proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.clear()
-  ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
+  ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
 
   var renderFlags = default(set[RenderFlags])
@@ -236,13 +236,13 @@ proc strokePath*(ctx: Context, path: Path) =
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
   ctx.cache.clear()
-  ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTol, ctx.distTolSq)
+  ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
 
   if len(ctx.dashArray) > 0 and ctx.dashArray[0] > 0:
     ctx.cache.dashStroke(s, strokeWidth, ctx.dashOffset, ctx.dashArray)
 
   ctx.cache.expandStroke(
-    ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit, ctx.tessTol, ctx.distTolSq
+    ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit, ctx.tessTolSq, ctx.distTolSq
   )
 
   if not ctx.params.fillImpl.isNil:
