@@ -86,7 +86,7 @@ proc `=destroy`(ctx: var ContextObj) =
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
-  ctx.fillStyle = color(1, 1, 1, 1)
+  ctx.fillStyle = color(0, 0, 0, 1)
   ctx.strokeStyle = color(0, 0, 0, 1)
 
   ctx.compositeOperation = SOURCE_OVER_OPERATION
@@ -100,7 +100,7 @@ proc resetState(ctx: Context) =
   ctx.transform = mat2d()
 
   # font settings
-  ctx.fontSize = 16
+  ctx.fontSize = 32
   ctx.letterSpacing = 0
   ctx.lineHeight = 16
   ctx.textAlign = LeftAlign
