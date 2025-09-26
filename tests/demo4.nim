@@ -1,0 +1,54 @@
+import nvg
+
+import std/math
+
+proc demo_fillRule*(ctx: Context) =
+  # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#canvas_fill_rules
+
+  ctx.beginPath()
+  ctx.fillRule = EvenOdd
+  ctx.arc(vec2(50, 50), 30, 0, 2 * PI, true)
+  ctx.arc(vec2(50, 50), 15, 0, 2 * PI, true)
+  ctx.fill()
+
+proc demo_fillStyle*(ctx: Context) =
+  # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#a_fillstyle_example
+
+  for i in 0 ..< 6:
+    for j in 0 ..< 6:
+      let r = floor(255 - 42.5 * float32(i))
+      let g = floor(255 - 42.5 * float32(j))
+
+      ctx.beginPath()
+      ctx.fillStyle = color(r / 255, g / 255, 0, 1)
+      ctx.rect(vec4(float32(j * 25), float32(i * 25), 25, 25))
+      ctx.fill()
+
+proc hexRGBColor4(h: uint32): Color =
+  let
+    r = float32((0xF00 and h) shr 8) / 15
+    g = float32((0x0F0 and h) shr 4) / 15
+    b = float32((0x00F and h) shr 0) / 15
+  return color(r, g, b, 1)
+
+proc demo_globalAlpha*(ctx: Context) =
+  # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#a_globalalpha_example
+
+  template fillRect(color: uint32, pos: Vec4) =
+    ctx.beginPath()
+    ctx.fillStyle = hexRGBColor4(color)
+    ctx.rect(pos)
+    ctx.fill()
+
+  fillRect(0xFD0, vec4(0, 0, 75, 75))
+  fillRect(0x6C0, vec4(75, 0, 75, 75))
+  fillRect(0x09F, vec4(0, 75, 75, 75))
+  fillRect(0xF30, vec4(75, 75, 75, 75))
+
+  ctx.globalAlpha = 0.2
+  ctx.fillStyle = hexRGBColor4(0xFFF)
+
+  for idx in 0 ..< 7:
+    ctx.beginPath()
+    ctx.arc(vec2(75, 75), float32(10 + 10 * idx), 0, 2 * PI, true)
+    ctx.fill()

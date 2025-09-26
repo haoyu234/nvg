@@ -1,34 +1,6 @@
 import nvg
 
-import ./fonts
-
-proc renderDemo1*(ctx: Context) =
-  ctx.save()
-
-  ctx.fontId = ctx.getDefaultFont()
-  ctx.fillStyle = color(1, 0, 0, 0.50)
-  ctx.fontSize = 32
-
-  var y = 0
-
-  for align in HorizontalAlignment:
-    for baseline in BaselineAlignment:
-      ctx.textAlign = align
-      ctx.textBaseline = baseline
-
-      ctx.beginPath()
-      ctx.text("123456790", vec2(100, float32(y * 20 + 100)))
-      ctx.fill()
-
-      inc y, 1
-
-  ctx.restore()
-
-proc renderTiger*(ctx: Context) =
-  ctx.save()
-  defer:
-    ctx.restore()
-
+proc demo_tiger*(ctx: Context) =
   ctx.scale(vec2(1, -1))
   ctx.translate(vec2(0, - 510))
 
