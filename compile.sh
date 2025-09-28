@@ -1,5 +1,3 @@
 #! /bin/bash
 
-nim -d:feature.nvg.opengl c -d:release -d:danger --cc:gcc --passC:-g -d:gl tests/tdemo.nim
-nim -d:feature.nvg.opengl c -d:release -d:danger --cc:gcc --passC:-g -d:gl tests/tdash.nim
-nim -d:feature.nvg.opengl c -d:release -d:danger --cc:gcc --passC:-g -d:gl tests/temoji.nim
+nim -d:feature.nvg.sokol c -d:release -d:danger --cc:gcc -d:gl tests/tdemo.nim
