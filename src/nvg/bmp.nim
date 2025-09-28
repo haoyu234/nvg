@@ -8,18 +8,18 @@ const BMP_LINEAR_COLOR_SPACE_SPECIFICATION = [
 ]
 
 proc writeBmp*(path: string, pixels: openArray[uint8], w, h,
-    bytePerPixel: int32) =
-  if bytePerPixel != 1 and
-    bytePerPixel != 3 and bytePerPixel != 4:
+    bytesPerPixel: int32) =
+  if bytesPerPixel != 1 and
+    bytesPerPixel != 3 and bytesPerPixel != 4:
     return
 
   let
-    padw = (bytePerPixel * w + int32(3)) and not int32(3)
+    padw = (bytesPerPixel * w + int32(3)) and not int32(3)
     padding = [uint8(0), 0, 0, 0]
 
   let
     colorTableEntries =
-      if bytePerPixel == 1:
+      if bytesPerPixel == 1:
         256
       else:
         0
@@ -40,8 +40,8 @@ proc writeBmp*(path: string, pixels: openArray[uint8], w, h,
   fstream.write(int32(w))
   fstream.write(int32(h))
   fstream.write(uint16(1))
-  fstream.write(uint16(8 * bytePerPixel))
-  if bytePerPixel == 4:
+  fstream.write(uint16(8 * bytesPerPixel))
+  if bytesPerPixel == 4:
     # BI_BITFIELDS
     fstream.write(uint32(3))
   else:
@@ -55,14 +55,14 @@ proc writeBmp*(path: string, pixels: openArray[uint8], w, h,
   fstream.write(uint32(0x00ff0000))
   fstream.write(uint32(0x0000ff00))
   fstream.write(uint32(0x000000ff))
-  if bytePerPixel == 4:
+  if bytesPerPixel == 4:
     fstream.write(uint32(0xff000000))
   else:
     fstream.write(uint32(0))
   fstream.write(uint32(0))
   fstream.writeData(BMP_LINEAR_COLOR_SPACE_SPECIFICATION[0].addr, len(BMP_LINEAR_COLOR_SPACE_SPECIFICATION))
 
-  if bytePerPixel == 1:
+  if bytesPerPixel == 1:
     var color = uint32(0)
     while color < uint32(0x01000000):
       fstream.write(color or uint32(0xff000000))
@@ -78,7 +78,7 @@ proc writeBmp*(path: string, pixels: openArray[uint8], w, h,
       if pad > 0:
         fstream.writeData(padding[0].addr, pad)
 
-  elif bytePerPixel == 3:
+  elif bytesPerPixel == 3:
     let
       pad = padw - 3 * w
 
@@ -94,7 +94,7 @@ proc writeBmp*(path: string, pixels: openArray[uint8], w, h,
       if pad > 0:
         fstream.writeData(padding[0].addr, pad)
 
-  elif bytePerPixel == 4:
+  elif bytesPerPixel == 4:
     for y in 0 ..< h:
       for x in 0 ..< w:
         let bgra = [

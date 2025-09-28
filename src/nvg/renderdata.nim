@@ -14,12 +14,6 @@ type
     Image
     Text
 
-  Texture* = ref object of RootObj
-    width*: int32
-    height*: int32
-    typ*: TextureType
-    imageFlags*: set[ImageFlags]
-
   UniformParam* = object
     innerColor*: Color
     outerColor*: Color
@@ -40,7 +34,7 @@ type
     fillOffset*: int32
 
   InstanceCall* = object
-    texture*: Texture
+    image*: Image
     triangleOffset*: int32
     triangleCount*: int32
     instanceOffset*: int32
@@ -56,26 +50,6 @@ type
     calls*: seq[InstanceCall]
     uniforms*: seq[UniformParam]
     instances*: seq[InstanceParam]
-    images*: Table[ImageId, Texture]
-
-proc addTexture*(
-    ctx: var RenderData,
-    texture: Texture): ImageId =
-  inc ctx.idgen, 1
-  let imageId = cast[ImageId](ctx.idgen)
-  ctx.images[imageId] = texture
-  imageId
-
-proc getTexture*(
-    ctx: var RenderData,
-    imageId: ImageId): Texture =
-  ctx.images.withValue(imageId, tex):
-    result = tex[]
-
-proc removeTexture*(
-    ctx: var RenderData,
-    imageId: ImageId) =
-  ctx.images.del(imageId)
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
   verts.add(vec4(bounds[2], bounds[3], 0, 0))
@@ -125,7 +99,7 @@ proc addUniform(ctx: var RenderData, uniform: UniformParam): int32 =
 proc addCall(ctx: var RenderData, call: InstanceCall) =
   if ctx.calls.len > 0:
     let prev = ctx.calls[^1].addr
-    if prev.blend == call.blend and prev.texture == call.texture and
+    if prev.blend == call.blend and prev.image == call.image and
       prev.uniformIndex == call.uniformIndex:
       prev.instanceCount = prev.instanceCount + call.instanceCount
       prev.triangleCount = prev.triangleCount + call.triangleCount
@@ -138,6 +112,43 @@ proc premultiplied(c: Color): Color {.inline.} =
   result.g = c.g * c.a
   result.b = c.b * c.a
   result.a = c.a
+
+proc toUniform(call: var InstanceCall, paint: Paint,
+    shaderType: ShaderType, renderFlags: set[RenderFlags]): UniformParam =
+  result.shaderType = float32(shaderType)
+  result.fillType = 0
+  result.feather = paint.feather
+  result.innerColor = paint.innerColor.premultiplied
+  result.outerColor = paint.outerColor.premultiplied
+  result.extent = paint.extent
+  result.transform1[0] = paint.transform[0]
+  result.transform1[1] = paint.transform[1]
+  result.transform2[0] = paint.transform[2]
+  result.transform2[1] = paint.transform[3]
+  result.transform3[0] = paint.transform[4]
+  result.transform3[1] = paint.transform[5]
+
+  if EvenOdd in renderFlags:
+    result.fillType = float32(1 shl 0)
+
+  let image = paint.image
+  if not image.isNil:
+    let pixelFormat = uint8(image.pixelFormat)
+    let premultiplied = uint8(ImagePremultiplied in image.imageFlags)
+    result.texType = float32(pixelFormat or (premultiplied shl 7))
+
+    case image.pixelFormat
+    of PixelFormatA8, PixelFormatA32f:
+      result.texType = 2
+    of PixelFormatRGB8, PixelFormatRGBA8, PixelFormatRGB32f, PixelFormatRGBA32f:
+      if ImagePremultiplied in image.imageFlags:
+        result.texType = 3
+      else:
+        result.texType = 1
+
+    result.texSize = vec2(float32(image.width), float32(image.height))
+
+    call.image = image
 
 proc fillCall*(
     ctx: var RenderData,
@@ -177,7 +188,7 @@ proc fillCall*(
 
   var
     call = default(InstanceCall)
-    uniformParam = default(UniformParam)
+    uniformParam = call.toUniform(paint, Solid, renderFlags)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation
@@ -185,38 +196,6 @@ proc fillCall*(
   call.triangleCount = 0
   call.instanceOffset = int32(ctx.instances.len)
   call.instanceCount = 0
-
-  uniformParam.shaderType = float32(Solid)
-  uniformParam.fillType = 0
-  uniformParam.feather = paint.feather
-  uniformParam.innerColor = paint.innerColor.premultiplied
-  uniformParam.outerColor = paint.outerColor.premultiplied
-  uniformParam.extent = paint.extent
-  uniformParam.transform1[0] = paint.transform[0]
-  uniformParam.transform1[1] = paint.transform[1]
-  uniformParam.transform2[0] = paint.transform[2]
-  uniformParam.transform2[1] = paint.transform[3]
-  uniformParam.transform3[0] = paint.transform[4]
-  uniformParam.transform3[1] = paint.transform[5]
-
-  if EvenOdd in renderFlags:
-    uniformParam.fillType = float32(1 shl 0)
-
-  if not paint.image.isNil:
-    let tex = ctx.getTexture(paint.image)
-    if not tex.isNil:
-      case tex.typ
-      of TextureRgba:
-        if ImagePremultiplied in tex.imageFlags:
-          uniformParam.texType = 3
-        else:
-          uniformParam.texType = 1
-
-      of TextureAlpha, TextureFloat:
-        uniformParam.texType = 2
-
-      uniformParam.texSize = vec2(float32(tex.width), float32(tex.height))
-      call.texture = tex
 
   const tileSize = 32
 
@@ -345,7 +324,7 @@ proc trianglesCall*(
 ) =
   var
     call = default(InstanceCall)
-    uniformParam = default(UniformParam)
+    uniformParam = call.toUniform(paint, Text, renderFlags)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation
@@ -353,38 +332,6 @@ proc trianglesCall*(
   call.triangleCount = 0
   call.instanceOffset = int32(ctx.instances.len)
   call.instanceCount = 0
-
-  uniformParam.shaderType = float32(Text)
-  uniformParam.fillType = 0
-  uniformParam.feather = paint.feather
-  uniformParam.innerColor = paint.innerColor.premultiplied
-  uniformParam.outerColor = paint.outerColor.premultiplied
-  uniformParam.extent = paint.extent
-  uniformParam.transform1[0] = paint.transform[0]
-  uniformParam.transform1[1] = paint.transform[1]
-  uniformParam.transform2[0] = paint.transform[2]
-  uniformParam.transform2[1] = paint.transform[3]
-  uniformParam.transform3[0] = paint.transform[4]
-  uniformParam.transform3[1] = paint.transform[5]
-
-  if EvenOdd in renderFlags:
-    uniformParam.fillType = float32(1 shl 0)
-
-  if not paint.image.isNil:
-    let tex = ctx.getTexture(paint.image)
-    if not tex.isNil:
-      case tex.typ
-      of TextureRgba:
-        if ImagePremultiplied in tex.imageFlags:
-          uniformParam.texType = 3
-        else:
-          uniformParam.texType = 1
-
-      of TextureAlpha, TextureFloat:
-        uniformParam.texType = 2
-
-      uniformParam.texSize = vec2(float32(tex.width), float32(tex.height))
-      call.texture = tex
 
   ctx.verts.add(verts)
 

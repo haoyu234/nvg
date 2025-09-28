@@ -1,4 +1,4 @@
-import pkg/sokol/gfx except Color
+import pkg/sokol/gfx except Color, Image, PixelFormat
 
 import ./context
 import ./core
@@ -18,27 +18,26 @@ type
     srcAlpha: BlendFactor
     dstAlpha: BlendFactor
 
-  SokolTexture = ref object of Texture
-    storage: seq[byte]
-    pixels: ptr UncheckedArray[byte]
-    texImage: Image
+  SokolTexture = ref object
+    image: Image
+    texImage: gfx.Image
     texImageView: View
     smp: Sampler
-    dirty: bool
+    version: uint32
 
-  SokolImage = object
-    tex: Image
+  SokolImageStorage = object
+    tex: gfx.Image
     view: View
     layerCount: int32
 
   SokolBackendContextObj = object
     shader: Shader
     smpDummy: Sampler
-    texDummy: Image
+    texDummy: gfx.Image
     texDummyView: View
 
-    texEdge: SokolImage
-    texVert: SokolImage
+    texEdge: SokolImageStorage
+    texVert: SokolImageStorage
 
     vertDummyBuf: Buffer
     instanceBuf: Buffer
@@ -49,6 +48,8 @@ type
 
     viewBounds: Vec2
     renderData: RenderData
+
+    textures: Table[pointer, SokolTexture]
 
 proc getShader(): Shader =
   var s = ShaderDesc(label: "nvg.shader")
@@ -227,12 +228,12 @@ proc getShader(): Shader =
 
   makeShader(s)
 
-proc initImage(image: var SokolImage) =
+proc initImage(image: var SokolImageStorage) =
   image.tex = allocImage()
   image.view = allocView()
   image.layerCount = -1
 
-proc updateImage(image: var SokolImage, name: cstring, data: var seq[Vec4]) =
+proc updateImage(image: var SokolImageStorage, name: cstring, data: var seq[Vec4]) =
   if data.len <= 0 and image.layerCount >= 0:
     return
 
@@ -279,7 +280,7 @@ proc updateImage(image: var SokolImage, name: cstring, data: var seq[Vec4]) =
     let data = Range(addr: data[0].addr, size: size * sizeof(Vec4))
     image.tex.updateImage(ImageData(subimage: [[data]]))
 
-proc destroyImage(image: SokolImage) =
+proc destroyImageStorage(image: SokolImageStorage) =
   destroyView(image.view)
   destroyImage(image.tex)
 
@@ -341,30 +342,6 @@ proc initImpl(ctx: pointer) =
     )
   )
   )
-
-proc destroyImpl(ctx: pointer) =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  destroyShader(ctx.shader)
-  destroySampler(ctx.smpDummy)
-  destroyImage(ctx.texDummy)
-  destroyView(ctx.texDummyView)
-  destroyBuffer(ctx.vertDummyBuf)
-  destroyBuffer(ctx.instanceBuf)
-
-  ctx.texEdge.destroyImage()
-  ctx.texVert.destroyImage()
-
-  for image in ctx.renderData.images.values():
-    let tex = SokolTexture(image)
-    destroyView(tex.texImageView)
-    destroyImage(tex.texImage)
-    destroySampler(tex.smp)
-
-  destroyPipeline(ctx.pipeline)
-
-  reset(ctx[])
-  dealloc(ctx)
 
 proc cancelImpl(ctx: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
@@ -492,27 +469,16 @@ proc trianglesImpl(
     verts,
   )
 
-proc toSokolPixelFormat(typ: TextureType): PixelFormat =
+proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat =
   case typ
-    of TextureRgba:
-      pixelFormatRgba32f
+  of PixelFormatA8: gfx.pixelFormatR8
+  of PixelFormatRGB8: gfx.pixelFormatRgba8
+  of PixelFormatRGBA8: gfx.pixelFormatRgba8
+  of PixelFormatA32f: gfx.pixelFormatR32f
+  of PixelFormatRGB32f: gfx.pixelFormatRgba32f
+  of PixelFormatRGBA32f: gfx.pixelFormatRgba32f
 
-    of TextureAlpha:
-      pixelFormatR8
-
-    of TextureFloat:
-      pixelFormatR32f
-
-proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
-    imageFlags: set[ImageFlags], data: pointer): ImageId =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  var tex = SokolTexture()
-  tex.width = w
-  tex.height = h
-  tex.typ = typ
-  tex.imageFlags = imageFlags
-
+proc createTexture(image: Image): SokolTexture =
   var
     wrapX = wrapClampToEdge
     wrapY = wrapClampToEdge
@@ -523,13 +489,13 @@ proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
     dataRange = default(Range)
     imageUsage = default(ImageUsage)
 
-  if ImageRepeatX in imageFlags:
+  if ImageRepeatX in image.imageFlags:
     wrapX = wrapRepeat
 
-  if ImageRepeatY in imageFlags:
+  if ImageRepeatY in image.imageFlags:
     wrapY = wrapRepeat
 
-  if ImageNearest in imageFlags:
+  if ImageNearest in image.imageFlags:
     minFilter = filterNearest
     magFilter = filterNearest
     mipmapFilter = filterNearest
@@ -538,39 +504,31 @@ proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
     magFilter = filterLinear
     mipmapFilter = filterLinear
 
-  if ImageGenerateMipmaps in imageFlags:
+  if ImageGenerateMipmaps in image.imageFlags:
     minFilter = filterDefault
   else:
     mipmapFilter = filterDefault
 
-  if not data.isNil and ImageGenerateMipmaps in imageFlags:
+  if ImageGenerateMipmaps in image.imageFlags:
     imageUsage.immutable = true
   else:
     imageUsage.dynamicUpdate = true
 
   let
-    size = w * h * typ.bytePerPixel
+    size = image.width * image.height * image.pixelFormat.bytesPerPixel
+  dataRange = Range(addr: image.data[0].addr, size: size)
 
-  if ImageExternalStorage in imageFlags:
-    tex.pixels = cast[ptr UncheckedArray[byte]](data)
-  else:
-    tex.storage.setLenUninit(size)
-    tex.pixels = cast[ptr UncheckedArray[byte]](tex.storage[0].addr)
-
-    if not data.isNil:
-      copyMem(tex.pixels, data, size)
-
-  if not tex.pixels.isNil and imageUsage.immutable:
-    dataRange = Range(addr: tex.pixels[0].addr, size: size)
+  let tex = SokolTexture()
+  tex.image = image
 
   tex.texImage = makeImage(
       ImageDesc(
         type: imageType2d,
-        width: w,
-        height: h,
+        width: image.width,
+        height: image.height,
         usage: imageUsage,
         data: ImageData(subimage: [[dataRange]]),
-        pixelFormat: typ.toSokolPixelFormat,
+        pixelFormat: image.pixelFormat.toSokolPixelFormat,
         numMipmaps: 1,
         label: "nvg.image",
     )
@@ -594,72 +552,36 @@ proc createTextureImpl(ctx: pointer, typ: TextureType, w, h: int32,
   )
   )
 
-  ctx.renderData.addTexture(tex)
+  tex
 
-proc updateTexture(tex: SokolTexture, x, y, w, h, stride: int32,
-    data: ptr UncheckedArray[byte]) =
+proc updateTexture(tex: SokolTexture) {.inline.} =
   let
-    bytePerPixel = tex.typ.bytePerPixel
-    offset = x + y * tex.width
-    lineBytes = w * bytePerPixel
-    sourceStrideBytes = stride * bytePerPixel
-    destinationStrideBytes = tex.width * bytePerPixel
-    destinationPixels = cast[ptr UncheckedArray[byte]](tex.storage[offset *
-        bytePerPixel].addr)
+    image = tex.image
+    data = Range(addr: image.data[0].addr, size: image.width * image.height *
+        image.pixelFormat.bytesPerPixel)
 
-  for idx in 0 ..< h:
-    copyMem(destinationPixels[idx * destinationStrideBytes].addr, data[idx *
-        sourceStrideBytes].addr, lineBytes)
-
-proc updateTextureImpl(ctx: pointer, imageId: ImageId, x, y, w, h,
-    stride: int32, data: pointer) =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  let tex = ctx.renderData.getTexture(imageId)
-  if not tex.isNil:
-    let tex = SokolTexture(tex)
-
-    tex.dirty = true
-    tex.updateTexture(x, y, w, h, stride, cast[
-        ptr UncheckedArray[byte]](data))
-
-proc markTextureDirtyImpl(ctx: pointer, imageId: ImageId, x, y, w, h: int32) =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  let tex = ctx.renderData.getTexture(imageId)
-  if not tex.isNil:
-    let tex = SokolTexture(tex)
-
-    if ImageExternalStorage in tex.imageFlags and not tex.pixels.isNil:
-      discard
-
-    tex.dirty = true
-
-proc getTextureSizeImpl(ctx: pointer, imageId: ImageId): Vec2 =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  let tex = ctx.renderData.getTexture(imageId)
-  if not tex.isNil:
-    result = vec2(float32(tex.width), float32(tex.height))
-
-proc deleteTextureImpl(ctx: pointer, imageId: ImageId) =
-  let ctx = cast[ptr SokolBackendContextObj](ctx)
-
-  let tex = ctx.renderData.getTexture(imageId)
-  if not tex.isNil:
-    let tex = SokolTexture(tex)
-
-    destroySampler(tex.smp)
-    destroyImage(tex.texImage)
-
-    ctx.renderData.removeTexture(imageId)
-
-proc updateTexImage(ctx: ptr SokolBackendContextObj, tex: SokolTexture) =
-  let
-    data = Range(addr: tex.pixels[0].addr, size: tex.width * tex.height *
-        tex.typ.bytePerPixel)
-
+  tex.version = image.version
   tex.texImage.updateImage(ImageData(subimage: [[data]]))
+
+proc destroyTexture(tex: SokolTexture) {.inline.} =
+  destroyView(tex.texImageView)
+  destroyImage(tex.texImage)
+  destroySampler(tex.smp)
+
+  tex.image = nil
+
+proc addTexture(ctx: ptr SokolBackendContextObj, image: Image,
+    tex: SokolTexture) {.inline.} =
+  ctx.textures[cast[pointer](image)] = tex
+
+proc getTexture(ctx: ptr SokolBackendContextObj,
+    image: Image): SokolTexture {.inline.} =
+  ctx.textures.withValue(cast[pointer](image), tex):
+    result = tex[]
+
+# proc deleteTexture(ctx: ptr SokolBackendContextObj,
+#     tex: texImageView) {.inline.} =
+#   ctx.textures.del(cast[pointer](tex.image))
 
 proc updateInstanceBuf(ctx: ptr SokolBackendContextObj) =
   if ctx.instanceBufSize < ctx.renderData.instances.len:
@@ -727,14 +649,23 @@ proc flushImpl(ctx: pointer) =
       bindings.vertexBufferOffsets[0] = 0
       bindings.vertexBufferOffsets[1] = call.instanceOffset * int32(sizeof(InstanceParam))
 
-      if call.texture.isNil:
+      if call.image.isNil:
         bindings.views[1] = ctx.texDummyView
         bindings.samplers[3] = ctx.smpDummy
       else:
-        let tex = SokolTexture(call.texture)
-        if tex.dirty:
-          ctx.updateTexImage(tex)
-          tex.dirty = false
+        var
+          tex = ctx.getTexture(call.image)
+          isDirty = false
+
+        if tex.isNil:
+          tex = createTexture(call.image)
+          ctx.addTexture(call.image, tex)
+          isDirty = true
+        elif tex.version != call.image.version:
+          isDirty = true
+
+        if isDirty:
+          tex.updateTexture()
 
         bindings.views[1] = tex.texImageView
         bindings.samplers[3] = tex.smp
@@ -749,6 +680,27 @@ proc flushImpl(ctx: pointer) =
 
       draw(0, 6, call.instanceCount)
 
+proc destroyImpl(ctx: pointer) =
+  let ctx = cast[ptr SokolBackendContextObj](ctx)
+
+  destroyShader(ctx.shader)
+  destroySampler(ctx.smpDummy)
+  destroyImage(ctx.texDummy)
+  destroyView(ctx.texDummyView)
+  destroyBuffer(ctx.vertDummyBuf)
+  destroyBuffer(ctx.instanceBuf)
+
+  ctx.texEdge.destroyImageStorage()
+  ctx.texVert.destroyImageStorage()
+
+  for tex in ctx.textures.values():
+    tex.destroyTexture()
+
+  destroyPipeline(ctx.pipeline)
+
+  reset(ctx[])
+  dealloc(ctx)
+
 proc newContext*(): Context =
   let ctx = create(SokolBackendContextObj)
 
@@ -759,11 +711,6 @@ proc newContext*(): Context =
       destroyImpl: destroyImpl,
       fillImpl: fillImpl,
       trianglesImpl: trianglesImpl,
-      createTextureImpl: createTextureImpl,
-      updateTextureImpl: updateTextureImpl,
-      markTextureDirtyImpl: markTextureDirtyImpl,
-      getTextureSizeImpl: getTextureSizeImpl,
-      deleteTextureImpl: deleteTextureImpl,
       viewportImpl: viewportImpl,
       cancelImpl: cancelImpl,
       flushImpl: flushImpl,

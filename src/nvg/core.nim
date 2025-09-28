@@ -7,8 +7,6 @@ type
 
   FontId* = distinct uint32
 
-  ImageId* = distinct uint32
-
   ImageFlags* = enum
     ImageDefault
     ImageGenerateMipmaps
@@ -17,7 +15,22 @@ type
     ImageFlipY
     ImagePremultiplied
     ImageNearest
-    ImageExternalStorage
+
+  PixelFormat* = enum
+    PixelFormatA8
+    PixelFormatRGB8
+    PixelFormatRGBA8
+    PixelFormatA32f
+    PixelFormatRGB32f
+    PixelFormatRGBA32f
+
+  Image* = ref object
+    width*: int32
+    height*: int32
+    pixelFormat*: PixelFormat
+    imageFlags*: set[ImageFlags]
+    data*: seq[uint8]
+    version*: uint32
 
   LineCap* = enum
     ButtCap
@@ -51,7 +64,7 @@ type
     a*: float32
 
   Paint* = object
-    image*: ImageId
+    image*: Image
     transform*: Mat2d
     extent*: Vec2
     radius*: float32
@@ -89,16 +102,9 @@ type
 proc isNil*(fontId: FontId): bool {.inline.} =
   cast[uint32](fontId) == 0
 
-proc isNil*(imageId: ImageId): bool {.inline.} =
-  cast[uint32](imageId) == 0
-
 proc `==`*(v1, v2: FontId): bool {.borrow, inline.}
 
 proc `hash`*(v: FontId): Hash {.borrow, inline.}
-
-proc `==`*(v1, v2: ImageId): bool {.borrow, inline.}
-
-proc `hash`*(v: ImageId): Hash {.borrow, inline.}
 
 proc vec2*(v1, v2: float32): Vec2 {.inline.} =
   [float32(v1), float32(v2)]
@@ -131,3 +137,12 @@ converter parseSomePaint*(paint: SomePaint): Paint {.inline.} =
     result.setColor(paint)
   else:
     paint
+
+proc bytesPerPixel*(typ: PixelFormat): int32 =
+  case typ
+  of PixelFormatA8: int32(sizeof(uint8))
+  of PixelFormatRGB8: int32(sizeof(uint32))
+  of PixelFormatRGBA8: int32(sizeof(uint32))
+  of PixelFormatA32f: int32(sizeof(float32))
+  of PixelFormatRGB32f: int32(sizeof(array[3, float32]))
+  of PixelFormatRGBA32f: int32(sizeof(array[4, float32]))

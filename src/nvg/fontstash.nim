@@ -1,6 +1,5 @@
 import ./atlas
 import ./core
-import ./params
 import ./path
 import ./sdf
 import ./truetype
@@ -14,7 +13,7 @@ type
     BottomLeftOrigin
 
   Quad* = object
-    imageId*: ImageId
+    image*: Image
     x1*, y1*, x2*, y2*: float32
     s1*, t1*, s2*, t2*: float32
 
@@ -208,7 +207,7 @@ proc updateCell(fons: FonsStash, glyph: Glyph): AtlasCell =
     if sdf.data.len <= 0:
       return
 
-    result = fons.atlas.allocCell(id, sdf.w, sdf.h, TextureAlpha)
+    result = fons.atlas.allocCell(id, sdf.w, sdf.h, PixelFormatA8)
     if result.isNil:
       return
 
@@ -237,7 +236,7 @@ proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
 
     scale = size / float32(fons.atlasFontSize)
 
-  result.imageId = cell.imageId
+  result.image = cell.image
 
   result.x1 = x + scale * xoff
   result.y1 = y + scale * yoff * fons.signY

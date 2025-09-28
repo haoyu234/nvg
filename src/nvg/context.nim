@@ -193,10 +193,12 @@ proc resetTransform*(ctx: Context) {.inline.} =
 proc getTransform*(ctx: Context): lent Mat2d {.inline.} =
   ctx.transform
 
-proc loadFontFromMemory*(ctx: Context, data: sink seq[byte]): FontId {.inline.} =
+proc loadFontFromMemory*(ctx: Context, data: sink seq[
+    byte]): FontId {.inline.} =
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
-proc loadFontFromMemory*(ctx: Context, data: openArray[byte]): FontId {.inline.} =
+proc loadFontFromMemory*(ctx: Context, data: openArray[
+    byte]): FontId {.inline.} =
   cast[FontId](ctx.fons.loadFontFromMemory(data))
 
 proc fillPath*(ctx: Context, path: Path) =
@@ -388,11 +390,11 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
       continue
 
     let quad = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
-    if quad.imageId.isNil:
+    if quad.image.isNil:
       continue
 
     if not paint.image.isNil:
-      if paint.image != quad.imageId:
+      if paint.image != quad.image:
         if not ctx.params.trianglesImpl.isNil:
           ctx.params.trianglesImpl(
             ctx.ctx,
@@ -404,7 +406,7 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
           verts.setLen(0)
 
-    paint.image = quad.imageId
+    paint.image = quad.image
 
     let
       p1 = ctx.transform * vec2(quad.x1, quad.y1)
