@@ -103,7 +103,7 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   ctx.fillStyle = color(1, 0.75, 0, 0.5)
   ctx.fill()
 
-  ctx.fontId = ctx.getDefaultFont()
+  ctx.fontId = ctx.getMonoFont()
   ctx.fontSize = 36
   ctx.fillStyle = color(0.94, 0.94, 0.94, 1)
   ctx.textAlign = RightAlign
