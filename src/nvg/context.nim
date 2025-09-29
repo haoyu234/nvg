@@ -175,7 +175,7 @@ proc createInternal*(ctx: pointer, params: BackendContextParams): Context =
   result.resetState()
   result.setDevicePixelRatio(1)
 
-  result.atlas = createAtlas(2048, 2048, result.ctx, params)
+  result.atlas = createAtlas(2048, 2048)
   result.fons = createFonsStash(TopLeftOrigin, result.atlas)
 
 proc translate*(ctx: Context, v: Vec2) {.inline.} =

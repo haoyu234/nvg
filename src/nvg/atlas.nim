@@ -1,7 +1,6 @@
 import ./core
 import ./image
 import ./lru
-import ./params
 import ./rectpack
 
 import std/hashes
@@ -10,6 +9,7 @@ import std/tables
 type
   Cell = object
     id: uint32
+    idx: int32
     rectId: RectId
     imageIdx: int32
     x: int32
@@ -32,10 +32,7 @@ type
     image*: Image
     imageIdx: int32
 
-  Atlas* = ref AtlasObj
-  AtlasObj = object
-    ctx: pointer
-    params: BackendContextParams
+  Atlas* = ref object
     atlasWidth: int32
     atlasHeight: int32
     images: seq[AtlasImage]
@@ -45,11 +42,6 @@ type
     cells: seq[Cell]
     cellFreeList: int32
     lookup: Table[uint32, int32]
-
-proc `=destroy`(a: var AtlasObj) {.raises: [].} =
-  `=destroy`(a.images)
-  `=destroy`(a.cells)
-  `=destroy`(a.lookup)
 
 proc getLruHead(a: Atlas): ptr LruHead {.inline.} =
   a.lruHead.addr
@@ -131,6 +123,35 @@ proc getCell*(a: Atlas, id: uint32): AtlasCell {.inline.} =
 
   a.moveToFrontLru(idx)
 
+proc allocCell(a: Atlas): ptr Cell {.inline.} =
+  if a.cellFreeList != high(int32):
+    let idx = a.cellFreeList
+    a.cellFreeList = a.cells[a.cellFreeList].lru.next
+
+    result = a.cells[idx].addr
+  else:
+    let idx = int32(a.cells.len())
+    a.cells.setLen(idx + 1)
+
+    result = a.cells[idx].addr
+    result.idx = idx
+
+  result.lru.initLru()
+
+proc freeCell(a: Atlas, cell: ptr Cell) {.inline.} =
+  a.removeLru(cell.idx)
+
+  cell.rectId = default(RectId)
+  cell.lru.next = a.cellFreeList
+
+  a.lookup.del(cell.id)
+  a.cellFreeList = cell.idx
+
+  if not cell.rectId.isNil:
+    let
+      image = a.images[cell.imageIdx].addr
+    image.rp.freeRect(cell.rectId)
+
 proc allocCell*(a: Atlas, id: uint32, w, h: int32,
     typ: PixelFormat): AtlasCell =
   if id in a.lookup:
@@ -155,16 +176,8 @@ proc allocCell*(a: Atlas, id: uint32, w, h: int32,
   if r.id.isNil:
     return
 
-  var idx = default(int32)
-  if a.cellFreeList != high(int32):
-    idx = a.cellFreeList
-    a.cellFreeList = a.cells[a.cellFreeList].lru.next
-  else:
-    idx = int32(a.cells.len())
-    a.cells.setLen(idx + 1)
-
   let
-    cell = a.cells[idx].addr
+    cell = a.allocCell()
 
   cell.id = id
   cell.rectId = r.id
@@ -174,10 +187,9 @@ proc allocCell*(a: Atlas, id: uint32, w, h: int32,
   cell.w = w
   cell.h = h
   cell.lastAccessStamp = a.nowStamp
-  initLru(cell.lru)
 
-  a.lookup[id] = int32(idx)
-  a.moveToFrontLru(idx)
+  a.lookup[id] = cell.idx
+  a.moveToFrontLru(cell.idx)
 
   r.cell
 
@@ -186,74 +198,65 @@ proc updateCell*(a: Atlas, cell: AtlasCell, w, h, stride: int32,
   if cell.imageIdx >= int32(a.images.len):
     return
 
-  let atlasImage = a.images[cell.imageIdx].addr
+  let
+    atlasImage = a.images[cell.imageIdx].addr
+    image = atlasImage.image
+
   if cell.imageIdx != atlasImage.idx:
     return
 
-  let
-    image = atlasImage.image
-  image.updatePixels(cell.x, cell.y, w, h, stride, cast[ptr UncheckedArray[
-      byte]](data))
+  image.updatePixels(cell.x, cell.y, w, h, stride, data)
 
 proc updateCell*(a: Atlas, cell: AtlasCell, x, y, w, h, stride: int32,
     data: pointer) =
   if cell.imageIdx >= int32(a.images.len):
     return
 
-  let atlasImage = a.images[cell.imageIdx].addr
+  let
+    atlasImage = a.images[cell.imageIdx].addr
+    image = atlasImage.image
+
   if cell.imageIdx != atlasImage.idx:
     return
 
-  let
-    image = atlasImage.image
-  image.updatePixels(cell.x + x, cell.y + y, w, h, stride, cast[
-      ptr UncheckedArray[byte]](data))
+  image.updatePixels(cell.x + x, cell.y + y, w, h, stride, data)
 
-proc evictCells(a: Atlas, duration: int32) =
+proc evictCells(a: Atlas, imageIdx: int32, duration: int32) =
   for idx in a.reversedLru:
     let
       cell = a.cells[idx].addr
-      inactiveDuration = int32(a.nowStamp - cell.lastAccessStamp)
+    if cell.imageIdx != imageIdx:
+      continue
 
-    if inactiveDuration <= duration:
+    if int32(a.nowStamp - cell.lastAccessStamp) <= duration:
       break
 
-    let
-      image = a.images[cell.imageIdx].addr
-
-    a.lookup.del(cell.id)
-    image.rp.freeRect(cell.rectId)
-
-    a.removeLru(idx)
-
-    cell.lru.next = a.cellFreeList
-    a.cellFreeList = idx
+    a.freeCell(cell)
 
 proc compact*(a: Atlas) =
   inc a.nowStamp, 1
 
-  var
-    duration = int32(10)
-    maxOccupancy = float32(0)
-
-  for idx in 0 ..< a.images.len:
+  for idx in 0 ..< int32(a.images.len):
     let
       image = a.images[idx].addr
+      occupancy = image.rp.occupancy
 
-    maxOccupancy = max(maxOccupancy, image.rp.occupancy)
+    var
+      duration = int32(10)
 
-  if maxOccupancy > 0.65f:
-    duration = 1
-  elif maxOccupancy > 0.35f:
-    duration = (duration + 1) div 2
+    if occupancy > 0.65f:
+      duration = 1
+    elif occupancy > 0.35f:
+      duration = (duration + 1) div 2
+    elif occupancy > 0.15f:
+      discard
+    else:
+      continue
 
-  a.evictCells(duration)
+    a.evictCells(idx, duration)
 
-proc createAtlas*(width, height: int32, ctx: pointer,
-    params: BackendContextParams): Atlas =
+proc createAtlas*(width, height: int32): Atlas =
   result = Atlas()
-  result.ctx = ctx
-  result.params = params
   result.atlasWidth = width
   result.atlasHeight = height
   result.nowStamp = 1
