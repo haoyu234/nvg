@@ -24,7 +24,13 @@ const demos = [
   (demo4.demo_globalAlpha, "globalAlpha"),
 ]
 
-var idx = int32(low(demos))
+var
+  idx = int32(low(demos))
+  dx = int32(0)
+  dy = int32(0)
+  mouseDown = false
+  mouseX = int32(0)
+  mouseY = int32(0)
 
 proc initImpl(ctx: Context) =
   discard
@@ -32,13 +38,30 @@ proc initImpl(ctx: Context) =
 proc eventImpl(ctx: Context, event: AppEvent) =
   case event.typ
   of EVENT_TYPE_KEY_DOWN:
-    case event.keyCode
-    of KEY_CODE_LEFT:
+    if event.keyCode == KEY_CODE_LEFT:
       dec idx, 1
-    of KEY_CODE_RIGHT:
+    elif event.keyCode == KEY_CODE_RIGHT:
       inc idx, 1
     else:
-      discard
+      return
+
+    dx = 0
+    dy = 0
+
+  of EVENT_TYPE_MOUSE_DOWN:
+    mouseDown = true
+
+  of EVENT_TYPE_MOUSE_UP:
+    mouseDown = false
+
+  of EVENT_TYPE_MOUSE_MOVE:
+    if mouseDown:
+      dx += event.mouseDx
+      dy += event.mouseDy
+
+    mouseX = event.mouseX
+    mouseY = event.mouseY
+
   else:
     discard
 
@@ -50,20 +73,25 @@ proc eventImpl(ctx: Context, event: AppEvent) =
 proc frameImpl(ctx: Context) =
   let name = demos[idx][1]
 
+  # render
+  block:
+    ctx.save()
+
+    ctx.translate(vec2(float32(dx), float32(dy)))
+
+    let frameImpl = demos[idx][0]
+    frameImpl(ctx)
+
+    ctx.restore()
+
   ctx.save()
+
   # name
   ctx.fontId = ctx.getDefaultFont()
   ctx.fontSize = 32
   ctx.textBaseline = MiddleBaseline
   ctx.fillStyle = color(0, 0, 0, 1)
   ctx.fillText(name, vec2(10, float32(SCREEN_H - 20)))
-
-  # render
-  block:
-    ctx.save()
-    let frameImpl = demos[idx][0]
-    frameImpl(ctx)
-    ctx.restore()
 
   # page indicator
   let

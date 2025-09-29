@@ -8,6 +8,7 @@ type
     EVENT_TYPE_MOUSE_DOWN = 3
     EVENT_TYPE_MOUSE_UP = 4
     EVENT_TYPE_MOUSE_MOVE = 5
+    EVENT_TYPE_MOUSE_SCROLL = 6
 
   AppMouseButton* = enum
     MOUSE_BUTTON_NONE = 0
@@ -129,6 +130,10 @@ type
     mouseButton*: AppMouseButton
     mouseX*: int32
     mouseY*: int32
+    mouseDx*: int32
+    mouseDy*: int32
+    scrollX*: int32
+    scrollY*: int32
 
   App* = object
     name*: string
@@ -359,7 +364,15 @@ when defined(feature.nvg.opengl):
           event.typ = EVENT_TYPE_MOUSE_MOVE
           event.mouseX = e2.x
           event.mouseY = e2.y
-        
+          event.mouseDx = e2.xrel
+          event.mouseDy = e2.yrel
+
+        of MouseWheel:
+          let e2 = cast[MouseWheelEventPtr](e.addr)
+          event.typ = EVENT_TYPE_MOUSE_SCROLL
+          event.scrollX = e2.x
+          event.scrollY = e2.y
+
         else:
           continue
 
@@ -571,6 +584,14 @@ elif defined(feature.nvg.sokol):
       event.typ = EVENT_TYPE_MOUSE_MOVE
       event.mouseX = int32(e.mouseX)
       event.mouseY = int32(e.mouseY)
+      event.mouseDx = int32(e.mouseDx)
+      event.mouseDy = int32(e.mouseDy)
+
+    of eventTypeMouseScroll:
+      event.typ = EVENT_TYPE_MOUSE_SCROLL
+      event.scrollX = int32(e.scrollX)
+      event.scrollY = int32(e.scrollY)
+
     else:
       return
 
