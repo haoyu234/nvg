@@ -193,6 +193,12 @@ proc resetTransform*(ctx: Context) {.inline.} =
 proc getTransform*(ctx: Context): lent Mat2d {.inline.} =
   ctx.transform
 
+proc setTransform*(ctx: Context, v: Mat2d) {.inline.} =
+  ctx.transform = v
+
+proc transform*(ctx: Context, v: Mat2d) {.inline.} =
+  ctx.transform.premultiply(v)
+
 proc loadFontFromMemory*(ctx: Context, data: sink seq[
     byte]): FontId {.inline.} =
   cast[FontId](ctx.fons.loadFontFromMemory(data))
@@ -223,8 +229,8 @@ proc fillPath*(ctx: Context, path: Path) =
 
 proc getAverageScale(t: Mat2d): float32 {.inline.} =
   let
-    sx = sqrt(t[0] * t[0] + t[2] * t[2])
-    sy = sqrt(t[1] * t[1] + t[3] * t[3])
+    sx = sqrt(t.xx * t.xx + t.xy * t.xy)
+    sy = sqrt(t.yx * t.yx + t.yy * t.yy)
 
   (sx + sy) * 0.5
 
@@ -355,7 +361,7 @@ proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
     if path.empty:
       continue
 
-    let matrix = [scale, 0, 0, -scale, x, y]
+    let matrix = mat2d(scale, 0, 0, -scale, x, y)
     ctx.path.addPath(path, multiplied(matrix, ctx.transform))
 
 proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
@@ -372,7 +378,7 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
     vertBuf: array[6, Vec4]
 
-  if ctx.transform[0] * ctx.transform[3] < 0:
+  if ctx.transform.xx * ctx.transform.yy < 0:
     rev = 1
 
   var paint = default(Paint)
@@ -409,10 +415,10 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
     paint.image = quad.image
 
     let
-      p1 = ctx.transform * vec2(quad.x1, quad.y1)
-      p2 = ctx.transform * vec2(quad.x2, quad.y1)
-      p3 = ctx.transform * vec2(quad.x2, quad.y2)
-      p4 = ctx.transform * vec2(quad.x1, quad.y2)
+      p1 = vec2(quad.x1, quad.y1) * ctx.transform
+      p2 = vec2(quad.x2, quad.y1) * ctx.transform
+      p3 = vec2(quad.x2, quad.y2) * ctx.transform
+      p4 = vec2(quad.x1, quad.y2) * ctx.transform
 
     vertBuf[0] = vec4(p1, vec2(quad.s1, quad.t1))
     vertBuf[1 + rev] = vec4(p3, vec2(quad.s2, quad.t2))

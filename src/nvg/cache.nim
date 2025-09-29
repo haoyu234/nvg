@@ -121,12 +121,12 @@ proc flattenPaths*(
     of Command.MOVE:
       c.addContour()
 
-      let p = matrix * vec2(vals[0], vals[1])
+      let p = vec2(vals[0], vals[1]) * matrix
       c.addPoint(p)
 
     of Command.LINE:
       if not c.curPath.isNil:
-        let p = matrix * vec2(vals[0], vals[1])
+        let p = vec2(vals[0], vals[1]) * matrix
 
         if c.curPath.pointCount > 0:
           let idx = c.curPath.offset + c.curPath.pointCount - 1
@@ -140,8 +140,8 @@ proc flattenPaths*(
         if c.curPath.pointCount > 0:
           let
             idx = c.curPath.offset + c.curPath.pointCount - 1
-            cp = matrix * vec2(vals[0], vals[1])
-            p = matrix * vec2(vals[2], vals[3])
+            cp = vec2(vals[0], vals[1]) * matrix
+            p = vec2(vals[2], vals[3]) * matrix
 
           c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
@@ -150,9 +150,9 @@ proc flattenPaths*(
         if c.curPath.pointCount > 0:
           let
             idx = c.curPath.offset + c.curPath.pointCount - 1
-            cp1 = matrix * vec2(vals[0], vals[1])
-            cp2 = matrix * vec2(vals[2], vals[3])
-            p = matrix * vec2(vals[4], vals[5])
+            cp1 = vec2(vals[0], vals[1]) * matrix
+            cp2 = vec2(vals[2], vals[3]) * matrix
+            p = vec2(vals[4], vals[5]) * matrix
 
           c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 

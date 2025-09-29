@@ -14,6 +14,12 @@ proc `*`*(v1, v2: Vec2): Vec2 {.inline.} =
 proc `*`*(v1: Vec2, v2: float32): Vec2 {.inline.} =
   [v1[0] * v2, v1[1] * v2]
 
+proc `*`*(v: Vec2, matrix: Mat2d): Vec2 {.inline.} =
+  [
+    v[0] * matrix.xx + v[1] * matrix.xy + matrix.dx,
+    v[0] * matrix.yx + v[1] * matrix.yy + matrix.dy,
+  ]
+
 proc `/`*(v1: Vec2, v2: float32): Vec2 {.inline.} =
   [v1[0] / v2, v1[1] / v2]
 
@@ -47,131 +53,93 @@ proc normalized*(v: Vec2): Vec2 {.inline.} =
 proc equals*(v1, v2: Vec2, distTolSq: float32): bool {.inline.} =
   lengthSq(v2 - v1) < distTolSq
 
-proc `*`*(matrix: Mat2d, v: Vec2): Vec2 {.inline.} =
-  [
-    v[0] * matrix[0] + v[1] * matrix[2] + matrix[4],
-    v[0] * matrix[1] + v[1] * matrix[3] + matrix[5],
-  ]
-
-proc scale*(matrix: var Mat2d, v: Vec2) {.inline.} =
-  matrix[0] = matrix[0] * v[0]
-  matrix[1] = matrix[1] * v[0]
-  matrix[2] = matrix[2] * v[1]
-  matrix[3] = matrix[3] * v[1]
-  matrix[4] = matrix[4] * v[0]
-  matrix[5] = matrix[5] * v[1]
-
-proc scaled*(matrix: Mat2d, v: Vec2): Mat2d {.inline.} =
-  [
-    matrix[0] * v[0],
-    matrix[1] * v[0],
-    matrix[2] * v[1],
-    matrix[3] * v[1],
-    matrix[4] * v[0],
-    matrix[5] * v[1],
-  ]
-
-proc translate*(matrix: var Mat2d, v: Vec2) {.inline.} =
-  matrix[4] = matrix[4] + matrix[0] * v[0] + matrix[2] * v[1]
-  matrix[5] = matrix[5] + matrix[1] * v[0] + matrix[3] * v[1]
-
-proc translated*(matrix: Mat2d, v: Vec2): Mat2d {.inline.} =
-  [
-    matrix[0],
-    matrix[1],
-    matrix[2],
-    matrix[3],
-    matrix[4] + matrix[0] * v[0] + matrix[2] * v[1],
-    matrix[5] + matrix[1] * v[0] + matrix[3] * v[1],
-  ]
-
-proc rotate*(matrix: var Mat2d, angle: float32) {.inline.} =
-  let
-    c = cos(angle)
-    s = sin(angle)
-
-  let
-    m0 = matrix[0]
-    m1 = matrix[1]
-    m2 = matrix[2]
-    m3 = matrix[3]
-
-  matrix[0] = m0 * c + m2 * s
-  matrix[1] = m1 * c + m3 * s
-  matrix[2] = m0 * (-s) + m2 * c
-  matrix[3] = m1 * (-s) + m3 * c
-
-proc rotated*(matrix: Mat2d, angle: float32): Mat2d {.inline.} =
-  let
-    c = cos(angle)
-    s = sin(angle)
-
-  [
-    matrix[0] * c + matrix[2] * s,
-    matrix[1] * c + matrix[3] * s,
-    matrix[0] * (-s) + matrix[2] * c,
-    matrix[1] * (-s) + matrix[3] * c,
-    matrix[4],
-    matrix[5],
-  ]
-
-proc det*(matrix: Mat2d): float32 {.inline.} =
-  matrix[0] * matrix[3] - matrix[1] * matrix[2]
-
-proc inverse*(matrix: var Mat2d) {.inline.} =
-  let
-    invDet = 1 / matrix.det
-
-  let
-    m0 = matrix[0]
-    m1 = matrix[1]
-    m2 = matrix[2]
-    m3 = matrix[3]
-    m4 = matrix[4]
-    m5 = matrix[5]
-
-  matrix[0] = m3 * invDet
-  matrix[1] = -m1 * invDet
-  matrix[2] = -m2 * invDet
-  matrix[3] = m0 * invDet
-  matrix[4] = (m2 * matrix[5] - m3 * m4) * invDet
-  matrix[5] = (m1 * matrix[4] - m0 * m5) * invDet
-
-proc inversed*(matrix: Mat2d): Mat2d {.inline.} =
-  let
-    invDet = 1 / matrix.det
-
-  [
-   +matrix[3] * invDet,
-   -matrix[1] * invDet,
-   -matrix[2] * invDet,
-   +matrix[0] * invDet,
-   +(matrix[2] * matrix[5] - matrix[3] * matrix[4]) * invDet,
-   +(matrix[1] * matrix[4] - matrix[0] * matrix[5]) * invDet,
-  ]
-
 proc multiply*(matrix: var Mat2d, matrix2: Mat2d) {.inline.} =
   let
-    m0 = matrix[0]
-    m1 = matrix[1]
-    m2 = matrix[2]
-    m3 = matrix[3]
-    m4 = matrix[4]
-    m5 = matrix[5]
+    xx = matrix.xx
+    yx = matrix.yx
+    xy = matrix.xy
+    yy = matrix.yy
 
-  matrix[0] = m0 * matrix2[0] + m2 * matrix2[1]
-  matrix[1] = m1 * matrix2[0] + m3 * matrix2[1]
-  matrix[2] = m0 * matrix2[2] + m2 * matrix2[3]
-  matrix[3] = m1 * matrix2[2] + m3 * matrix2[3]
-  matrix[4] = m0 * matrix2[4] + m2 * matrix2[5] + m4
-  matrix[5] = m1 * matrix2[4] + m3 * matrix2[5] + m5
+  matrix.xx = xx * matrix2.xx + yx * matrix2.xy
+  matrix.yx = xx * matrix2.yx + yx * matrix2.yy
+  matrix.xy = xy * matrix2.xx + yy * matrix2.xy
+  matrix.yy = xy * matrix2.yx + yy * matrix2.yy
+  matrix.dx = matrix.dx * matrix2.xx + matrix.dy * matrix2.xy + matrix2.dx
+  matrix.dy = matrix.dx * matrix2.yx + matrix.dy * matrix2.yy + matrix2.dy
+
+proc premultiply*(matrix: var Mat2d, matrix2: Mat2d) {.inline.} =
+  let
+    xx = matrix.xx
+    yx = matrix.yx
+    xy = matrix.xy
+    yy = matrix.yy
+
+  matrix.xx = matrix2.xx * xx + matrix2.yx * xy
+  matrix.yx = matrix2.xx * yx + matrix2.yx * yy
+  matrix.xy = matrix2.xy * xx + matrix2.yy * xy
+  matrix.yy = matrix2.xy * yx + matrix2.yy * yy
+  matrix.dx = matrix2.dx * xx + matrix2.dy * xy + matrix.dx
+  matrix.dy = matrix2.dx * yx + matrix2.dy * yy + matrix.dy
 
 proc multiplied*(matrix, matrix2: Mat2d): Mat2d {.inline.} =
-  [
-    matrix[0] * matrix2[0] + matrix[2] * matrix2[1],
-    matrix[1] * matrix2[0] + matrix[3] * matrix2[1],
-    matrix[0] * matrix2[2] + matrix[2] * matrix2[3],
-    matrix[1] * matrix2[2] + matrix[3] * matrix2[3],
-    matrix[0] * matrix2[4] + matrix[2] * matrix2[5] + matrix[4],
-    matrix[1] * matrix2[4] + matrix[3] * matrix2[5] + matrix[5],
-  ]
+  result.xx = matrix.xx * matrix2.xx + matrix.yx * matrix2.xy
+  result.yx = matrix.xx * matrix2.yx + matrix.yx * matrix2.yy
+  result.xy = matrix.xy * matrix2.xx + matrix.yy * matrix2.xy
+  result.yy = matrix.xy * matrix2.yx + matrix.yy * matrix2.yy
+  result.dx = matrix.dx * matrix2.xx + matrix.dy * matrix2.xy + matrix2.dx
+  result.dy = matrix.dx * matrix2.yx + matrix.dy * matrix2.yy + matrix2.dy
+
+proc scaled*(v: Vec2): Mat2d {.inline.} =
+  result.xx = v[0]
+  result.yx = 0
+  result.xy = 0
+  result.yy = v[1]
+  result.dx = 0
+  result.dy = 0
+
+proc scaled*(matrix: Mat2d, v: Vec2): Mat2d {.inline.} =
+  result = scaled(v)
+  result.multiply(matrix)
+
+proc scale*(matrix: var Mat2d, v: Vec2) {.inline.} =
+  let s = scaled(v)
+  matrix.premultiply(s)
+
+proc translated*(v: Vec2): Mat2d {.inline.} =
+  result.xx = 1
+  result.yx = 0
+  result.xy = 0
+  result.yy = 1
+  result.dx = v[0]
+  result.dy = v[1]
+
+proc translated*(matrix: Mat2d, v: Vec2): Mat2d {.inline.} =
+  result = translated(v)
+  result.multiply(matrix)
+
+proc translate*(matrix: var Mat2d, v: Vec2) {.inline.} =
+  let t = translated(v)
+  matrix.premultiply(t)
+
+proc radians*(angle: float32): float32 {.inline.} =
+  angle * PI / 180.0
+
+proc rotated*(radians: float32): Mat2d {.inline.} =
+  let
+    c = cos(radians)
+    s = sin(radians)
+
+  result.xx = c
+  result.yx = s
+  result.xy = -s
+  result.yy = c
+  result.dx = 0
+  result.dy = 0
+
+proc rotated*(matrix: Mat2d, radians: float32): Mat2d {.inline.} =
+  result = rotated(radians)
+  result.multiply(matrix)
+
+proc rotate*(matrix: var Mat2d, radians: float32) {.inline.} =
+  let r = rotated(radians)
+  matrix.premultiply(r)

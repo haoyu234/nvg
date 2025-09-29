@@ -3,7 +3,11 @@ import std/hashes
 type
   Vec2* = array[2, float32]
   Vec4* = array[4, float32]
-  Mat2d* = array[6, float32]
+
+  Mat2d* = object
+    xx*, yx*: float32
+    xy*, yy*: float32
+    dx*, dy*: float32
 
   FontId* = distinct uint32
 
@@ -116,7 +120,20 @@ proc vec4*(v1, v2: Vec2): Vec4 {.inline.} =
   [v1[0], v1[1], v2[0], v2[1]]
 
 proc mat2d*(): Mat2d {.inline.} =
-  [float32(1), 0, 0, 1, 0, 0]
+  result.xx = 1
+  result.yx = 0
+  result.xy = 0
+  result.yy = 1
+  result.dx = 0
+  result.dy = 0
+
+proc mat2d*(xx, yx, xy, yy, dx, dy: float32): Mat2d {.inline.} =
+  result.xx = xx
+  result.yx = yx
+  result.xy = xy
+  result.yy = yy
+  result.dx = dx
+  result.dy = dy
 
 proc color*(r, g, b, a: float32): Color {.inline.} =
   result.r = r

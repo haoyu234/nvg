@@ -121,12 +121,12 @@ proc toUniform(call: var InstanceCall, paint: Paint,
   result.innerColor = paint.innerColor.premultiplied
   result.outerColor = paint.outerColor.premultiplied
   result.extent = paint.extent
-  result.transform1[0] = paint.transform[0]
-  result.transform1[1] = paint.transform[1]
-  result.transform2[0] = paint.transform[2]
-  result.transform2[1] = paint.transform[3]
-  result.transform3[0] = paint.transform[4]
-  result.transform3[1] = paint.transform[5]
+  result.transform1[0] = paint.transform.xx
+  result.transform1[1] = paint.transform.yx
+  result.transform2[0] = paint.transform.xy
+  result.transform2[1] = paint.transform.yy
+  result.transform3[0] = paint.transform.dx
+  result.transform3[1] = paint.transform.dy
 
   if EvenOdd in renderFlags:
     result.fillType = float32(1 shl 0)

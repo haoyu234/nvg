@@ -335,25 +335,25 @@ proc addPath*(p: var Path, other: Path, matrix: Mat2d) {.inline.} =
     case command
     of Command.MOVE:
       let
-        p1 = matrix * vec2(data[0], data[1])
+        p1 = vec2(data[0], data[1]) * matrix
       p.moveTo(p1)
 
     of Command.LINE:
       let
-        p1 = matrix * vec2(data[0], data[1])
+        p1 = vec2(data[0], data[1]) * matrix
       p.lineTo(p1)
 
     of Command.CURVE:
       let
-        p1 = matrix * vec2(data[0], data[1])
-        p2 = matrix * vec2(data[2], data[3])
+        p1 = vec2(data[0], data[1]) * matrix
+        p2 = vec2(data[2], data[3]) * matrix
       p.quadCurveTo(p1, p2)
 
     of Command.BEZIER:
       let
-        p1 = matrix * vec2(data[0], data[1])
-        p2 = matrix * vec2(data[2], data[3])
-        p3 = matrix * vec2(data[4], data[5])
+        p1 = vec2(data[0], data[1]) * matrix
+        p2 = vec2(data[2], data[3]) * matrix
+        p3 = vec2(data[4], data[5]) * matrix
       p.bezierTo(p1, p2, p3)
 
     of Command.CLOSE:
@@ -364,14 +364,14 @@ proc transform*(p: var Path, matrix: Mat2d) =
     case command
     of Command.MOVE, Command.LINE:
       let
-        p1 = matrix * vec2(data[0], data[1])
+        p1 = vec2(data[0], data[1]) * matrix
       data[0] = p1[0]
       data[1] = p1[1]
 
     of Command.CURVE:
       let
-        p1 = matrix * vec2(data[0], data[1])
-        p2 = matrix * vec2(data[2], data[3])
+        p1 = vec2(data[0], data[1]) * matrix
+        p2 = vec2(data[2], data[3]) * matrix
       data[0] = p1[0]
       data[1] = p1[1]
       data[2] = p2[0]
@@ -379,9 +379,9 @@ proc transform*(p: var Path, matrix: Mat2d) =
 
     of Command.BEZIER:
       let
-        p1 = matrix * vec2(data[0], data[1])
-        p2 = matrix * vec2(data[2], data[3])
-        p3 = matrix * vec2(data[4], data[5])
+        p1 = vec2(data[0], data[1]) * matrix
+        p2 = vec2(data[2], data[3]) * matrix
+        p3 = vec2(data[4], data[5]) * matrix
       data[0] = p1[0]
       data[1] = p1[1]
       data[2] = p2[0]
