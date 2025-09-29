@@ -22,6 +22,7 @@ const demos = [
   (demo4.demo_fillRule, "fillRule"),
   (demo4.demo_fillStyle, "fillStyle"),
   (demo4.demo_globalAlpha, "globalAlpha"),
+  (demo4.demo_rotate, "rotate"),
 ]
 
 var
