@@ -277,8 +277,8 @@ proc updateImage(image: var SokolImageStorage, name: cstring, data: var seq[Vec4
     )
 
   if data.len > 0:
-    let data = Range(addr: data[0].addr, size: size * sizeof(Vec4))
-    image.tex.updateImage(ImageData(subimage: [[data]]))
+    let dataRange = Range(addr: data[0].addr, size: size * sizeof(Vec4))
+    image.tex.updateImage(ImageData(mipLevels: [dataRange]))
 
 proc destroyImageStorage(image: SokolImageStorage) =
   destroyView(image.view)
@@ -331,8 +331,8 @@ proc initImpl(ctx: pointer) =
       numMipmaps: 1,
       label: "nvg.texDummy",
       data:
-    ImageData(subimage: [[dataRange]]),
-  )
+      ImageData(mipLevels: [dataRange]),
+    )
   )
 
   ctx.texDummyView = makeView(
@@ -522,15 +522,15 @@ proc createTexture(image: Image): SokolTexture =
   tex.image = image
 
   tex.texImage = makeImage(
-      ImageDesc(
-        type: imageType2d,
-        width: image.width,
-        height: image.height,
-        usage: imageUsage,
-        data: ImageData(subimage: [[dataRange]]),
-        pixelFormat: image.pixelFormat.toSokolPixelFormat,
-        numMipmaps: 1,
-        label: "nvg.image",
+    ImageDesc(
+      type: imageType2d,
+      width: image.width,
+      height: image.height,
+      usage: imageUsage,
+      data: ImageData(mipLevels: [dataRange]),
+      pixelFormat: image.pixelFormat.toSokolPixelFormat,
+      numMipmaps: 1,
+      label: "nvg.image",
     )
   )
 
@@ -557,11 +557,11 @@ proc createTexture(image: Image): SokolTexture =
 proc updateTexture(tex: SokolTexture) {.inline.} =
   let
     image = tex.image
-    data = Range(addr: image.data[0].addr, size: image.width * image.height *
+    dataRange = Range(addr: image.data[0].addr, size: image.width * image.height *
         image.pixelFormat.bytesPerPixel)
 
   tex.version = image.version
-  tex.texImage.updateImage(ImageData(subimage: [[data]]))
+  tex.texImage.updateImage(ImageData(mipLevels: [dataRange]))
 
 proc destroyTexture(tex: SokolTexture) {.inline.} =
   destroyView(tex.texImageView)
