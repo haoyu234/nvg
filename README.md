@@ -25,7 +25,6 @@ A **Nim** port of [nanovgXC](https://github.com/styluslabs/nanovgXC) with some o
 * [sdf_text_sample](https://github.com/suikki/sdf_text_sample): heavily referenced
 * [nanovg_sokol.h](https://github.com/void256/nanovg_sokol.h): heavily referenced
 * [pixie](https://github.com/treeform/pixie): some enums and user-friendly API style
-* [msdfgen](https://github.com/Chlumsky/msdfgen): some unused modules are derived from it
 * [cairo samples](https://www.cairographics.org/samples): some demos are sourced from here
 * [MDN tutorial](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes): some demos are sourced from here
 
