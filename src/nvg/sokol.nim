@@ -2,6 +2,7 @@ import pkg/sokol/gfx except Color, Image, PixelFormat
 
 import ./context
 import ./core
+import ./fontstash
 import ./glsl
 import ./params
 import ./renderdata
@@ -701,7 +702,7 @@ proc destroyImpl(ctx: pointer) =
   reset(ctx[])
   dealloc(ctx)
 
-proc newContext*(): Context =
+proc newContext*(fons: FonsStash = nil): Context =
   let ctx = create(SokolBackendContextObj)
 
   createInternal(
@@ -714,5 +715,6 @@ proc newContext*(): Context =
       viewportImpl: viewportImpl,
       cancelImpl: cancelImpl,
       flushImpl: flushImpl,
-    )
+    ),
+    fons,
   )

@@ -59,7 +59,6 @@ type
     params*: BackendContextParams
 
     fons*: FonsStash
-    atlas*: Atlas
 
     tessTol: float32
     tessTolSq: float32
@@ -79,7 +78,6 @@ proc `=destroy`(ctx: var ContextObj) =
   `=destroy`(ctx.path)
 
   reset(ctx.fons)
-  reset(ctx.atlas)
 
   if not ctx.params.destroyImpl.isNil:
     ctx.params.destroyImpl(ctx.ctx)
@@ -165,7 +163,7 @@ proc restore*(ctx: Context) =
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(ctx: pointer, params: BackendContextParams): Context =
+proc createInternal*(ctx: pointer, params: BackendContextParams, fons: FonsStash): Context =
   if not params.initImpl.isNil:
     params.initImpl(ctx)
 
@@ -175,8 +173,11 @@ proc createInternal*(ctx: pointer, params: BackendContextParams): Context =
   result.resetState()
   result.setDevicePixelRatio(1)
 
-  result.atlas = createAtlas(2048, 2048)
-  result.fons = createFonsStash(TopLeftOrigin, result.atlas)
+  if fons.isNil:
+    let atlas = createAtlas(2048, 2048)
+    result.fons = createFonsStash(TopLeftOrigin, atlas)
+  else:
+    result.fons = fons
 
 proc translate*(ctx: Context, v: Vec2) {.inline.} =
   ctx.transform.translate(v)
@@ -272,7 +273,7 @@ proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
   if not ctx.params.viewportImpl.isNil:
     ctx.params.viewportImpl(ctx.ctx, view, devicePixelRatio)
 
-  ctx.atlas.compact()
+  ctx.fons.atlas.compact()
 
 proc flush*(ctx: Context) =
   if not ctx.params.flushImpl.isNil:

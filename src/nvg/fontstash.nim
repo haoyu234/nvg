@@ -37,7 +37,7 @@ type
     atlasFontSize*: int32
     atlasPadding*: int32
     fonts: seq[Font]
-    atlas: Atlas
+    atlas*: Atlas
 
 proc getPixelHeightScale*(font: Font, size: float32): float32 =
   size / float32(font.metrics.ascender - font.metrics.descender)

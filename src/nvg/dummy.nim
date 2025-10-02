@@ -5,4 +5,5 @@ proc newContext*(): Context =
   createInternal(
     nil,
     default(BackendContextParams),
+    nil,
   )
