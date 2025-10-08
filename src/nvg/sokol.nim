@@ -52,6 +52,9 @@ type
 
     textures: Table[pointer, SokolTexture]
 
+    supportDrawBaseVertex: bool
+    supportDrawBaseInstance: bool
+
 proc getShader(): Shader =
   var s = ShaderDesc(label: "nvg.shader")
 
@@ -343,6 +346,10 @@ proc initImpl(ctx: pointer) =
     )
   )
   )
+
+  let features = queryFeatures()
+  ctx.supportDrawBaseVertex = features.drawBaseVertex
+  ctx.supportDrawBaseInstance = features.drawBaseInstance
 
 proc cancelImpl(ctx: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
@@ -647,8 +654,6 @@ proc flushImpl(ctx: pointer) =
 
       bindings.vertexBuffers[0] = ctx.vertDummyBuf
       bindings.vertexBuffers[1] = ctx.instanceBuf
-      bindings.vertexBufferOffsets[0] = 0
-      bindings.vertexBufferOffsets[1] = call.instanceOffset * int32(sizeof(InstanceParam))
 
       if call.image.isNil:
         bindings.views[1] = ctx.texDummyView
@@ -677,9 +682,16 @@ proc flushImpl(ctx: pointer) =
       bindings.views[6] = ctx.texVert.view
       bindings.samplers[7] = ctx.smpDummy
 
+      if not ctx.supportDrawBaseInstance:
+        bindings.vertexBufferOffsets[0] = 0
+        bindings.vertexBufferOffsets[1] = call.instanceOffset * int32(sizeof(InstanceParam))
+
       applyBindings(bindings)
 
-      draw(0, 6, call.instanceCount)
+      if not ctx.supportDrawBaseInstance:
+        draw(0, 6, call.instanceCount)
+      else:
+        drawEx(0, 6, call.instanceCount, 0, call.instanceOffset)
 
 proc destroyImpl(ctx: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
