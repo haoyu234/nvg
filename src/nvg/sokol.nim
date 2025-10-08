@@ -489,6 +489,9 @@ proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat =
   of PixelFormatRGBA32f: gfx.pixelFormatRgba32f
 
 proc createTexture(image: Image): SokolTexture =
+  let
+    size = image.width * image.height * image.pixelFormat.bytesPerPixel
+
   var
     wrapX = wrapClampToEdge
     wrapY = wrapClampToEdge
@@ -521,15 +524,13 @@ proc createTexture(image: Image): SokolTexture =
 
   if ImageGenerateMipmaps in image.imageFlags:
     imageUsage.immutable = true
+    dataRange = Range(addr: image.data[0].addr, size: size)
   else:
     imageUsage.dynamicUpdate = true
 
-  let
-    size = image.width * image.height * image.pixelFormat.bytesPerPixel
-  dataRange = Range(addr: image.data[0].addr, size: size)
-
   let tex = SokolTexture()
   tex.image = image
+  tex.version = image.version
 
   tex.texImage = makeImage(
     ImageDesc(
@@ -561,6 +562,11 @@ proc createTexture(image: Image): SokolTexture =
     )
   )
   )
+
+  if not imageUsage.immutable:
+    dataRange = Range(addr: image.data[0].addr, size: size)
+
+    tex.texImage.updateImage(ImageData(mipLevels: [dataRange]))
 
   tex
 
@@ -670,7 +676,6 @@ proc flushImpl(ctx: pointer) =
         if tex.isNil:
           tex = createTexture(call.image)
           ctx.addTexture(call.image, tex)
-          isDirty = true
         elif tex.version != call.image.version:
           isDirty = true
 
