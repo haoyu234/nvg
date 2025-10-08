@@ -45,7 +45,7 @@ type
   OpenglBackendContextObj = object
     shaderProgram: OpenglShaderProgram
     vertArr: GLuint
-    vertDummyBuf: GLuint
+    vertAndIndexDummyBuf: GLuint
     instanceBuf: GLuint
     texEdge: GLuint
     texVert: GLuint
@@ -132,20 +132,20 @@ proc initImpl(ctx: pointer) =
     )
 
   glGenBuffers(1, ctx.instanceBuf.addr)
-  glGenBuffers(1, ctx.vertDummyBuf.addr)
+  glGenBuffers(1, ctx.vertAndIndexDummyBuf.addr)
   glGenTextures(1, ctx.texEdge.addr)
   glGenTextures(1, ctx.texVert.addr)
   glGenTextures(1, ctx.texDummy.addr)
 
   const
-    verts = [int32(0), 1, 2, 3, 4, 5]
+    vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
     pixels = [color(1, 1, 1, 1)]
 
-  glBindBuffer(GL_ARRAY_BUFFER, ctx.vertDummyBuf)
+  glBindBuffer(GL_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
   glBufferData(
     GL_ARRAY_BUFFER,
-    GLsizeiptr(6 * sizeof(int32)),
-    verts[0].addr,
+    GLsizeiptr(6 * sizeof(uint32)),
+    vertAndIndex[0].addr,
     GL_STATIC_DRAW,
   )
   glBindBuffer(GL_ARRAY_BUFFER, 0)
@@ -465,7 +465,9 @@ proc flushImpl(ctx: pointer) =
   ctx.updateTex(ctx.texEdge, ctx.renderData.edges, ctx.maxTexEdgeLayerCount)
   ctx.updateTex(ctx.texVert, ctx.renderData.verts, ctx.maxTexVertLayerCount)
 
-  glBindBuffer(GL_ARRAY_BUFFER, ctx.vertDummyBuf)
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
+
+  glBindBuffer(GL_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
   glVertexAttribIPointer(0, 1, cGL_INT, GLsizei(sizeof(int32)), nil)
   glVertexAttribDivisor(0, 1)
   glEnableVertexAttribArray(0)
@@ -550,7 +552,8 @@ proc flushImpl(ctx: pointer) =
     )
     glVertexAttribDivisor(2, 1)
 
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, call.instanceCount)
+    glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nil,
+        call.instanceCount)
 
   glDisableVertexAttribArray(0)
   glDisableVertexAttribArray(1)
@@ -560,6 +563,7 @@ proc flushImpl(ctx: pointer) =
     glBindVertexArray(0)
 
   glUseProgram(0)
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
   glBindBuffer(GL_ARRAY_BUFFER, 0)
 
   glActiveTexture(GL_TEXTURE0)
@@ -590,8 +594,8 @@ proc destroyImpl(ctx: pointer) {.raises: [].} =
     if ctx.vertArr != 0:
       tryCall glDeleteVertexArrays(1, ctx.vertArr.addr)
 
-  if ctx.vertDummyBuf != 0:
-    tryCall glDeleteBuffers(1, ctx.vertDummyBuf.addr)
+  if ctx.vertAndIndexDummyBuf != 0:
+    tryCall glDeleteBuffers(1, ctx.vertAndIndexDummyBuf.addr)
 
   if ctx.instanceBuf != 0:
     tryCall glDeleteBuffers(1, ctx.instanceBuf.addr)

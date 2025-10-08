@@ -375,12 +375,11 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
   var
     rev = default(int32)
-    verts = newSeqOfCap[Vec4](text.len * 6)
-
-    vertBuf: array[6, Vec4]
+    verts = newSeqOfCap[Vec4](text.len * 4)
+    vertBuf: array[4, Vec4]
 
   if ctx.transform.xx * ctx.transform.yy < 0:
-    rev = 1
+    rev = 2
 
   var paint = default(Paint)
   paint.innerColor = ctx.fillStyle.innerColor
@@ -421,12 +420,10 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
       p3 = vec2(quad.x2, quad.y2) * ctx.transform
       p4 = vec2(quad.x1, quad.y2) * ctx.transform
 
-    vertBuf[0] = vec4(p1, vec2(quad.s1, quad.t1))
-    vertBuf[1 + rev] = vec4(p3, vec2(quad.s2, quad.t2))
-    vertBuf[2 - rev] = vec4(p2, vec2(quad.s2, quad.t1))
-    vertBuf[3] = vec4(p1, vec2(quad.s1, quad.t1))
-    vertBuf[4 + rev] = vec4(p4, vec2(quad.s1, quad.t2))
-    vertBuf[5 - rev] = vec4(p3, vec2(quad.s2, quad.t2))
+    vertBuf[0] = vec4(p3, vec2(quad.s2, quad.t2))
+    vertBuf[1 + rev] = vec4(p2, vec2(quad.s2, quad.t1))
+    vertBuf[2] = vec4(p1, vec2(quad.s1, quad.t1))
+    vertBuf[3 - rev] = vec4(p4, vec2(quad.s1, quad.t2))
 
     verts.add(vertBuf)
 

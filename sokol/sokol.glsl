@@ -34,7 +34,7 @@ vec4 vertFetch(uint idx)
 
 void main()
 {
-  vec4 r = vertFetch(gl_InstanceIndex * 6 + triangleOffset + gl_VertexIndex);
+  vec4 r = vertFetch(gl_InstanceIndex * 4 + triangleOffset + gl_VertexIndex);
 
   f_pos = r.xy;
   f_uv = r.zw;

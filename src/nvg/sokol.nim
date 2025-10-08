@@ -40,7 +40,7 @@ type
     texEdge: SokolImageStorage
     texVert: SokolImageStorage
 
-    vertDummyBuf: Buffer
+    vertAndIndexDummyBuf: Buffer
     instanceBuf: Buffer
     instanceBufSize: int32
 
@@ -292,7 +292,7 @@ proc initImpl(ctx: pointer) =
   let ctx = cast[ptr SokolBackendContextObj](ctx)
 
   ctx.shader = getShader()
-  ctx.vertDummyBuf = allocBuffer()
+  ctx.vertAndIndexDummyBuf = allocBuffer()
   ctx.instanceBuf = allocBuffer()
   ctx.pipeline = allocPipeline()
 
@@ -310,14 +310,17 @@ proc initImpl(ctx: pointer) =
   )
 
   const
-    verts = [int32(0), 1, 2, 3, 4, 5]
+    vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
 
-  ctx.vertDummyBuf.initBuffer(
+  ctx.vertAndIndexDummyBuf.initBuffer(
     BufferDesc(
-      size: sizeof(int32) * len(verts),
-      usage: BufferUsage(vertexBuffer: true, immutable: true),
-      label: "nvg.vertDummyBuf",
-      data: Range(addr: verts[0].addr, size: sizeof(int32) * len(verts)),
+      size: sizeof(uint32) * len(vertAndIndex),
+      usage: BufferUsage(vertexBuffer: true, indexBuffer: true,
+          immutable: true),
+      label: "nvg.vertAndIndexDummyBuf",
+      data: Range(
+        addr: vertAndIndex[0].addr,
+        size: sizeof(uint32) * len(vertAndIndex)),
     )
   )
 
@@ -334,8 +337,7 @@ proc initImpl(ctx: pointer) =
       pixelFormat: pixelFormatRgba32f,
       numMipmaps: 1,
       label: "nvg.texDummy",
-      data:
-      ImageData(mipLevels: [dataRange]),
+      data: ImageData(mipLevels: [dataRange]),
     )
   )
 
@@ -436,7 +438,7 @@ proc updatePipeline(
       stencil: StencilState(enabled: false),
       colors: [ColorTargetState(writeMask: colorMaskRgba, blend: blendState)],
       primitiveType: primitiveTypeTriangles,
-      indexType: indexTypeNone,
+      indexType: indexTypeUint32,
       cullMode: cullModeBack,
       faceWinding: faceWindingCcw,
       label: "nvg.pipeline",
@@ -565,8 +567,9 @@ proc createTexture(image: Image): SokolTexture =
 proc updateTexture(tex: SokolTexture) {.inline.} =
   let
     image = tex.image
-    dataRange = Range(addr: image.data[0].addr, size: image.width * image.height *
-        image.pixelFormat.bytesPerPixel)
+    dataRange = Range(
+      addr: image.data[0].addr,
+      size: image.width * image.height * image.pixelFormat.bytesPerPixel)
 
   tex.version = image.version
   tex.texImage.updateImage(ImageData(mipLevels: [dataRange]))
@@ -652,7 +655,8 @@ proc flushImpl(ctx: pointer) =
         ),
       )
 
-      bindings.vertexBuffers[0] = ctx.vertDummyBuf
+      bindings.indexBuffer = ctx.vertAndIndexDummyBuf
+      bindings.vertexBuffers[0] = ctx.vertAndIndexDummyBuf
       bindings.vertexBuffers[1] = ctx.instanceBuf
 
       if call.image.isNil:
@@ -700,7 +704,7 @@ proc destroyImpl(ctx: pointer) =
   destroySampler(ctx.smpDummy)
   destroyImage(ctx.texDummy)
   destroyView(ctx.texDummyView)
-  destroyBuffer(ctx.vertDummyBuf)
+  destroyBuffer(ctx.vertAndIndexDummyBuf)
   destroyBuffer(ctx.instanceBuf)
 
   ctx.texEdge.destroyImageStorage()

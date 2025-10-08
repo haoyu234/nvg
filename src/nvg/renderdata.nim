@@ -52,27 +52,29 @@ type
     instances*: seq[InstanceParam]
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
-  verts.add(vec4(bounds[2], bounds[3], 0, 0))
-  verts.add(vec4(bounds[2], bounds[1], 0, 0))
-  verts.add(vec4(bounds[0], bounds[3], 0, 0))
-  verts.add(vec4(bounds[0], bounds[3], 0, 0))
-  verts.add(vec4(bounds[2], bounds[1], 0, 0))
-  verts.add(vec4(bounds[0], bounds[1], 0, 0))
+  let
+    xMin = bounds[0]
+    yMin = bounds[1]
+    xMax = bounds[2]
+    yMax = bounds[3]
+
+  verts.add(vec4(xMax, yMax, 0, 0))
+  verts.add(vec4(xMax, yMin, 0, 0))
+  verts.add(vec4(xMin, yMin, 0, 0))
+  verts.add(vec4(xMin, yMax, 0, 0))
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
     pad: float32) {.inline.} =
   let
-    v0 = bounds[0] - pad
-    v1 = bounds[1] - pad
-    v2 = bounds[2] + pad
-    v3 = bounds[3] + pad
+    xMin = bounds[0] - pad
+    yMin = bounds[1] - pad
+    xMax = bounds[2] + pad
+    yMax = bounds[3] + pad
 
-  verts.add(vec4(v2, v3, 0, 0))
-  verts.add(vec4(v2, v1, 0, 0))
-  verts.add(vec4(v0, v3, 0, 0))
-  verts.add(vec4(v0, v3, 0, 0))
-  verts.add(vec4(v2, v1, 0, 0))
-  verts.add(vec4(v0, v1, 0, 0))
+  verts.add(vec4(xMax, yMax, 0, 0))
+  verts.add(vec4(xMax, yMin, 0, 0))
+  verts.add(vec4(xMin, yMin, 0, 0))
+  verts.add(vec4(xMin, yMax, 0, 0))
 
 proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
   let
@@ -268,7 +270,7 @@ proc fillCall*(
 
     ctx.edges.reserve(edgeIdx)
     ctx.instances.reserve(xtiles * ytiles)
-    ctx.verts.reserve(callIdx * 6)
+    ctx.verts.reserve(callIdx * 4)
 
     var tileBounds: array[4, float32]
 
@@ -341,7 +343,7 @@ proc trianglesCall*(
   var idx = 0
   while idx < verts.len:
     ctx.instances.add(instanceParam)
-    inc idx, 6
+    inc idx, 4
 
   if ctx.instances.len > call.instanceOffset:
     call.triangleCount = int32(ctx.verts.len) - call.triangleOffset
