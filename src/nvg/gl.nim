@@ -531,7 +531,6 @@ proc flushImpl(ctx: pointer) =
       if tex.isNil:
         tex = createTexture(call.image)
         ctx.addTexture(call.image, tex)
-        isDirty = true
       elif tex.version != call.image.version:
         isDirty = true
 
