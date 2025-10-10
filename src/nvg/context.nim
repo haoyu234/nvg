@@ -233,12 +233,12 @@ proc getAverageScale(t: Mat2d): float32 {.inline.} =
     sx = sqrt(t.xx * t.xx + t.xy * t.xy)
     sy = sqrt(t.yx * t.yx + t.yy * t.yy)
 
-  (sx + sy) * 0.5
+  sqrt(sx * sy)
 
 proc strokePath*(ctx: Context, path: Path) =
   let
     s = getAverageScale(ctx.transform)
-    strokeWidth = clamp(ctx.strokeWidth * s, 1, 200)
+    strokeWidth = max(ctx.strokeWidth * s, 0.01)
 
   var paint = ctx.strokeStyle
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
