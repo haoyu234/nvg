@@ -9,14 +9,43 @@ export
   math,
   path
 
-when defined(feature.nvg.opengl):
-  import nvg/gl
-  export gl
+when defined(feature.nvg.opengl) or defined(feature.nvg.sokol):
+  when defined(feature.nvg.opengl):
+    import nvg/gl
+    export gl
+  else:
+    import nvg/sokol
+    export sokol
 
-elif defined(feature.nvg.sokol):
-  import nvg/sokol
-  export sokol
+  import nvg/atlas
+  import nvg/fontstash
+
+  proc newContext*(
+    width, height: int32): Context =
+
+    let backendContext = createBackendContext(
+      width,
+      height,
+    )
+
+    createInternal(
+      newFonsStash(
+        TopLeftOrigin,
+        newAtlas(
+          2048,
+          2048,
+          backendContext),
+      ),
+      backendContext,
+    )
 
 else:
-  import nvg/dummy
-  export dummy
+  import nvg/backend
+
+  proc newContext*(
+    width, height: int32): Context =
+
+    createInternal(
+      nil,
+      BackendContext(),
+    )

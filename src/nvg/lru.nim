@@ -1,11 +1,11 @@
 type
   LruItem* = object
-    prev*: int32
-    next*: int32
+    prev*: int32 = high(int32)
+    next*: int32 = high(int32)
 
   LruHead* = object
-    head*: int32
-    tail*: int32
+    head*: int32 = high(int32)
+    tail*: int32 = high(int32)
 
   Lru = concept
     proc getLruHead(a: Self): ptr LruHead {.inline.}

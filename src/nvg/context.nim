@@ -1,9 +1,8 @@
-import ./atlas
+import ./backend
 import ./cache
 import ./core
 import ./fontstash
 import ./math
-import ./params
 import ./path
 
 import std/math
@@ -55,32 +54,19 @@ type
     fontId*: FontId
 
     #
-    ctx*: pointer
-    params*: BackendContextParams
-
     fons*: FonsStash
+    backendContext*: BackendContext
 
     tessTol: float32
     tessTolSq: float32
     distTol: float32
     distTolSq: float32
-    devicePxRatio: float32
+    devicePixelRatio: float32
 
     cache: Cache
     states: seq[ContextState]
 
     path: Path
-
-proc `=destroy`(ctx: var ContextObj) =
-  `=destroy`(ctx.dashArray)
-  `=destroy`(ctx.cache)
-  `=destroy`(ctx.states)
-  `=destroy`(ctx.path)
-
-  reset(ctx.fons)
-
-  if not ctx.params.destroyImpl.isNil:
-    ctx.params.destroyImpl(ctx.ctx)
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
@@ -105,12 +91,13 @@ proc resetState(ctx: Context) =
   ctx.textBaseline = AlphabeticBaseline
   ctx.fontId = default(FontId)
 
-proc setDevicePixelRatio(ctx: Context, ratio: float32) {.inline.} =
-  ctx.tessTol = 0.25 / ratio
-  ctx.distTol = 0.01 / ratio
+proc setDevicePixelRatio*(
+  ctx: Context, devicePixelRatio: float32) {.inline.} =
+  ctx.tessTol = 0.25 / devicePixelRatio
+  ctx.distTol = 0.01 / devicePixelRatio
   ctx.tessTolSq = ctx.tessTol * ctx.tessTol
   ctx.distTolSq = ctx.distTol * ctx.distTol
-  ctx.devicePxRatio = ratio
+  ctx.devicePixelRatio = devicePixelRatio
 
 proc state(ctx: Context): ContextState =
   result.fillRule = ctx.fillRule
@@ -163,21 +150,12 @@ proc restore*(ctx: Context) =
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(ctx: pointer, params: BackendContextParams, fons: FonsStash): Context =
-  if not params.initImpl.isNil:
-    params.initImpl(ctx)
-
+proc createInternal*(fons: FonsStash, backendContext: BackendContext): Context =
   result = Context()
-  result.params = params
-  result.ctx = ctx
-  result.resetState()
+  result.fons = fons
+  result.backendContext = backendContext
   result.setDevicePixelRatio(1)
-
-  if fons.isNil:
-    let atlas = createAtlas(2048, 2048)
-    result.fons = createFonsStash(TopLeftOrigin, atlas)
-  else:
-    result.fons = fons
+  result.resetState()
 
 proc translate*(ctx: Context, v: Vec2) {.inline.} =
   ctx.transform.translate(v)
@@ -202,31 +180,33 @@ proc transform*(ctx: Context, v: Mat2d) {.inline.} =
 
 proc loadFontFromMemory*(ctx: Context, data: sink seq[
     byte]): FontId {.inline.} =
-  cast[FontId](ctx.fons.loadFontFromMemory(data))
+  if ctx.fons.isNil:
+    return
+
+  ctx.fons.loadFontFromMemory(data)
 
 proc loadFontFromMemory*(ctx: Context, data: openArray[
     byte]): FontId {.inline.} =
-  cast[FontId](ctx.fons.loadFontFromMemory(data))
+  if ctx.fons.isNil:
+    return
+
+  ctx.fons.loadFontFromMemory(data)
 
 proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
 
-  var renderFlags = default(set[RenderFlags])
-  if ctx.fillRule == FillRule.EvenOdd:
-    renderFlags.incl(RenderFlags.EvenOdd)
-
   var paint = ctx.fillStyle
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
-  if not ctx.params.fillImpl.isNil:
-    ctx.params.fillImpl(
-      ctx.ctx, paint, ctx.compositeOperation, renderFlags,
-      ctx.cache.bounds,
-      ctx.cache.contours,
-    )
+  ctx.backendContext.renderContour(
+    paint,
+    ctx.cache.contours,
+    ctx.fillRule,
+    ctx.compositeOperation,
+  )
 
 proc getAverageScale(t: Mat2d): float32 {.inline.} =
   let
@@ -251,33 +231,22 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.cache.dashStroke(s, strokeWidth, ctx.dashOffset, ctx.dashArray)
 
   ctx.cache.expandStroke(
-    ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit, ctx.tessTolSq, ctx.distTolSq
+    ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit,
+    ctx.tessTolSq, ctx.distTolSq
   )
 
-  if not ctx.params.fillImpl.isNil:
-    ctx.params.fillImpl(
-      ctx.ctx,
-      ctx.strokeStyle,
-      ctx.compositeOperation,
-      default(set[RenderFlags]),
-      ctx.cache.bounds,
-      ctx.cache.contours,
-    )
+  ctx.backendContext.renderContour(
+    paint,
+    ctx.cache.contours,
+    NonZero,
+    ctx.compositeOperation,
+  )
 
-proc begin*(ctx: Context, view: Vec2, devicePixelRatio: float32) =
+proc flush*(ctx: Context) {.inline.} =
+  ctx.backendContext.flush()
+
   ctx.states.setLen(0)
   ctx.resetState()
-
-  ctx.setDevicePixelRatio(devicePixelRatio)
-
-  if not ctx.params.viewportImpl.isNil:
-    ctx.params.viewportImpl(ctx.ctx, view, devicePixelRatio)
-
-  ctx.fons.atlas.compact()
-
-proc flush*(ctx: Context) =
-  if not ctx.params.flushImpl.isNil:
-    ctx.params.flushImpl(ctx.ctx)
 
 proc beginPath*(ctx: Context) {.inline.} =
   ctx.path.clear()
@@ -396,23 +365,20 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
       continue
 
     let quad = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
-    if quad.image.isNil:
+    if quad.imageId.isNil:
       continue
 
-    if not paint.image.isNil:
-      if paint.image != quad.image:
-        if not ctx.params.trianglesImpl.isNil:
-          ctx.params.trianglesImpl(
-            ctx.ctx,
-            paint,
-            ctx.compositeOperation,
-            default(set[RenderFlags]),
-            verts,
-          )
+    if not paint.imageId.isNil:
+      if paint.imageId != quad.imageId:
+        ctx.backendContext.renderSdf(
+          paint,
+          verts,
+          ctx.compositeOperation,
+        )
 
-          verts.setLen(0)
+        verts.setLen(0)
 
-    paint.image = quad.image
+    paint.imageId = quad.imageId
 
     let
       p1 = vec2(quad.x1, quad.y1) * ctx.transform
@@ -428,11 +394,8 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
     verts.add(vertBuf)
 
   if verts.len > 0:
-    if not ctx.params.trianglesImpl.isNil:
-      ctx.params.trianglesImpl(
-        ctx.ctx,
-        paint,
-        ctx.compositeOperation,
-        default(set[RenderFlags]),
-        verts,
-      )
+    ctx.backendContext.renderSdf(
+      paint,
+      verts,
+      ctx.compositeOperation,
+    )

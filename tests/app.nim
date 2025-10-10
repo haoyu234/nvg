@@ -282,7 +282,9 @@ when defined(feature.nvg.opengl):
       e = sdl2.defaultEvent
       runGame = true
 
-      ctx = newContext()
+      ctx = newContext(w, h)
+
+    ctx.setDevicePixelRatio(1)
 
     app.initImpl(ctx)
 
@@ -299,8 +301,6 @@ when defined(feature.nvg.opengl):
       block: # render
         glClearColor(0.93f, 0.93f, 0.93f, 1.0f)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
-
-        ctx.begin([float32(w), float32(h)], float32(1))
 
         ctx.save()
         app.frameImpl(ctx)
@@ -432,7 +432,8 @@ elif defined(feature.nvg.sokol):
 
     setWindowTitle(fmt"{g_app.name} {queryBackend()}".cstring)
 
-    g_ctx = newContext()
+    g_ctx = newContext(width(), height())
+    g_ctx.setDevicePixelRatio(dpiScale())
 
     if not g_app.initImpl.isNil:
       g_app.initImpl(g_ctx)
@@ -604,8 +605,6 @@ elif defined(feature.nvg.sokol):
 
     block: # render
       beginPass(Pass(action: action, swapchain: swapchain()))
-
-      g_ctx.begin(vec2(float32(width()), float32(height())), dpiScale())
 
       if not g_app.frameImpl.isNil:
         g_ctx.save()

@@ -13,7 +13,7 @@ type
     BottomLeftOrigin
 
   Quad* = object
-    image*: Image
+    imageId*: ImageId
     x1*, y1*, x2*, y2*: float32
     s1*, t1*, s2*, t2*: float32
 
@@ -45,34 +45,34 @@ proc getPixelHeightScale*(font: Font, size: float32): float32 =
 proc loadFontFromMemory*(fons: FonsStash, data: sink seq[byte]): FontId =
   let
     p = Font()
-    fontId = cast[FontId](succ(fons.fonts.len))
+    nextId = uint32(succ(fons.fonts.len))
 
   p.storage = move data
   p.trueType = parseTrueType(p.storage, 0)
   p.metrics = p.trueType.getFontMetrics()
-  p.fontId = fontId
+  p.fontId = FontId(id: nextId)
   p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
   fons.fonts.add(p)
 
-  fontId
+  p.fontId
 
 proc loadFontFromMemory*(fons: FonsStash, data: openArray[byte]): FontId =
   let
     p = Font()
-    fontId = cast[FontId](succ(fons.fonts.len))
+    nextId = uint32(succ(fons.fonts.len))
 
   p.trueType = parseTrueType(data, 0)
   p.metrics = p.trueType.getFontMetrics()
-  p.fontId = fontId
+  p.fontId = FontId(id: nextId)
   p.atlasPixelScale = p.getPixelHeightScale(float32(fons.atlasFontSize))
 
   fons.fonts.add(p)
 
-  fontId
+  p.fontId
 
 proc getFont*(fons: FonsStash, fontId: FontId): Font =
-  let n = min(int32(len(fons.fonts)), int32(fontId))
+  let n = min(int32(len(fons.fonts)), int32(fontId.id))
 
   for idx in countdown(n - 1, 0):
     let font = fons.fonts[idx]
@@ -236,7 +236,7 @@ proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
 
     scale = size / float32(fons.atlasFontSize)
 
-  result.image = cell.image
+  result.imageId = cell.imageId
 
   result.x1 = x + scale * xoff
   result.y1 = y + scale * yoff * fons.signY
@@ -248,7 +248,7 @@ proc getGlyphQuad*(fons: FonsStash, glyph: Glyph, x, y,
   result.s2 = x2 * cell.scaleX
   result.t2 = y2 * cell.scaleY
 
-proc createFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
+proc newFonsStash*(origin: Origin, atlas: Atlas): FonsStash =
   result = FonsStash()
   result.atlas = atlas
   result.origin = origin

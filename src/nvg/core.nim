@@ -1,5 +1,3 @@
-import std/hashes
-
 type
   Vec2* = array[2, float32]
   Vec4* = array[4, float32]
@@ -9,7 +7,11 @@ type
     xy*, yy*: float32
     dx*, dy*: float32
 
-  FontId* = distinct uint32
+  FontId* = object
+    id*: uint32
+
+  ImageId* = object
+    id*: uint32
 
   ImageFlags* = enum
     ImageDefault
@@ -27,14 +29,6 @@ type
     PixelFormatA32f
     PixelFormatRGB32f
     PixelFormatRGBA32f
-
-  Image* = ref object
-    width*: int32
-    height*: int32
-    pixelFormat*: PixelFormat
-    imageFlags*: set[ImageFlags]
-    data*: seq[uint8]
-    version*: uint32
 
   LineCap* = enum
     ButtCap
@@ -68,7 +62,7 @@ type
     a*: float32
 
   Paint* = object
-    image*: Image
+    imageId*: ImageId
     transform*: Mat2d
     extent*: Vec2
     radius*: float32
@@ -104,11 +98,10 @@ type
   SomePaint* = Paint | Color
 
 proc isNil*(fontId: FontId): bool {.inline.} =
-  cast[uint32](fontId) == 0
+  fontId.id == 0
 
-proc `==`*(v1, v2: FontId): bool {.borrow, inline.}
-
-proc `hash`*(v: FontId): Hash {.borrow, inline.}
+proc isNil*(imageId: ImageId): bool {.inline.} =
+  imageId.id == 0
 
 proc vec2*(v1, v2: float32): Vec2 {.inline.} =
   [float32(v1), float32(v2)]
@@ -148,6 +141,12 @@ proc setColor(p: var Paint, color: Color) {.inline.} =
   p.feather = 1
   p.innerColor = color
   p.outerColor = color
+
+proc premultiplied*(c: Color): Color {.inline.} =
+  result.r = c.r * c.a
+  result.g = c.g * c.a
+  result.b = c.b * c.a
+  result.a = c.a
 
 converter parseSomePaint*(paint: SomePaint): Paint {.inline.} =
   when type(paint) is Color:

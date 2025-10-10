@@ -1,10 +1,8 @@
 import pkg/opengl
 
-import ./context
+import ./backend
 import ./core
-import ./fontstash
 import ./glsl
-import ./params
 import ./renderdata
 
 import std/math
@@ -30,42 +28,178 @@ type
 
     paintLoc: GLint
 
+  OpenglTexture = ref OpenglTextureObj
+  OpenglTextureObj = object
+    image: Image
+    texImage: GLuint
+    smp: GLuint
+    version: uint32
+
+  OpenglStorage = object
+    tex: GLuint
+    layerCount: int32
+
   OpenglBlend = object
     srcRGB: GLenum
     dstRGB: GLenum
     srcAlpha: GLenum
     dstAlpha: GLenum
 
-  OpenglTexture = ref object
-    image: Image
-    texImage: GLuint
-    smp: GLuint
-    version: uint32
-
-  OpenglBackendContextObj = object
+  OpenglBackendContext = ref OpenglBackendContextObj
+  OpenglBackendContextObj = object of BackendContext
     shaderProgram: OpenglShaderProgram
     vertArr: GLuint
     vertAndIndexDummyBuf: GLuint
-    instanceBuf: GLuint
-    texEdge: GLuint
-    texVert: GLuint
+
+    texEdge: OpenglStorage
+    texVert: OpenglStorage
+
     texDummy: GLuint
     smpDummy: GLuint
 
-    maxInstanceBufSize: int32
-    maxTexEdgeLayerCount: int32
-    maxTexVertLayerCount: int32
+    instanceBuf: GLuint
+    instanceBufSize: int32
 
-    viewBounds: Vec2
     renderData: RenderData
 
-    textures: Table[pointer, OpenglTexture]
+    textures: Table[ImageId, OpenglTexture]
+
+    initial: bool
 
 template tryCall(body: untyped) =
   try:
     body
   except:
     discard
+
+proc `=destroy`(tex: OpenglTextureObj) =
+  tryCall glDeleteSamplers(1, tex.smp.addr)
+  tryCall glDeleteTextures(1, tex.texImage.addr)
+
+proc `=destroy`(storage: OpenglStorage) =
+  tryCall glDeleteTextures(1, storage.tex.addr)
+
+proc `=destroy`(ctx: var OpenglBackendContextObj) =
+  if ctx.shaderProgram.vsShader != 0:
+    tryCall glDeleteShader(ctx.shaderProgram.vsShader)
+
+  if ctx.shaderProgram.fsShader != 0:
+    tryCall glDeleteShader(ctx.shaderProgram.fsShader)
+
+  if ctx.shaderProgram.program != 0:
+    tryCall glDeleteProgram(ctx.shaderProgram.program)
+
+  when NVG_USE_GLCORE:
+    if ctx.vertArr != 0:
+      tryCall glDeleteVertexArrays(1, ctx.vertArr.addr)
+
+  if ctx.vertAndIndexDummyBuf != 0:
+    tryCall glDeleteBuffers(1, ctx.vertAndIndexDummyBuf.addr)
+
+  if ctx.instanceBuf != 0:
+    tryCall glDeleteBuffers(1, ctx.instanceBuf.addr)
+
+  if ctx.texDummy != 0:
+    tryCall glDeleteTextures(1, ctx.texDummy.addr)
+
+  if ctx.smpDummy != 0:
+    tryCall glDeleteSamplers(1, ctx.smpDummy.addr)
+
+  `=destroy`(ctx.texEdge)
+  `=destroy`(ctx.texVert)
+  `=destroy`(ctx.textures)
+
+proc initStorage(storage: var OpenglStorage) {.inline.} =
+  glGenTextures(1, storage.tex.addr)
+  storage.layerCount = -1
+
+proc updateStorage(storage: var OpenglStorage, data: var seq[Vec4]) =
+  if data.len <= 0 and storage.layerCount >= 0:
+    return
+
+  let
+    layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
+    layerCount = block:
+      let n = if (data.len mod layerSize) > 0: 1 else: 0
+      data.len div layerSize + n
+
+    size = int32(ceil(float32(data.len) / float32(layerSize))) * layerSize
+
+  if capacity(data) < size:
+    data.setLen(size)
+
+  glActiveTexture(GL_TEXTURE0)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, storage.tex)
+
+  if storage.layerCount < layerCount:
+    storage.layerCount = int32(layerCount)
+
+    glTexImage3D(
+      GL_TEXTURE_2D_ARRAY,
+      0,
+      GLint(GL_RGBA32F),
+      TILE_IMAGE_WIDTH,
+      TILE_IMAGE_WIDTH,
+      GLsizei(layerCount),
+      0,
+      GL_RGBA,
+      cGL_FLOAT,
+      data[0].addr,
+    )
+  else:
+    glTexSubImage3D(
+      GL_TEXTURE_2D_ARRAY,
+      0,
+      0,
+      0,
+      0,
+      TILE_IMAGE_WIDTH,
+      TILE_IMAGE_WIDTH,
+      GLsizei(layerCount),
+      GL_RGBA,
+      cGL_FLOAT,
+      data[0].addr,
+    )
+
+proc addTexture(ctx: OpenglBackendContext, imageId: ImageId,
+    tex: OpenglTexture) {.inline.} =
+  ctx.textures[imageId] = tex
+
+proc getTexture(ctx: OpenglBackendContext,
+    imageId: ImageId): OpenglTexture {.inline.} =
+  ctx.textures.withValue(imageId, tex):
+    result = tex[]
+
+proc deleteTexture(ctx: OpenglBackendContext,
+    imageId: ImageId) {.inline.} =
+  ctx.textures.del(imageId)
+
+proc toOpenglBlend(op: CompositeOperation): OpenglBlend {.inline.} =
+  type BlendOp = object
+    src: GLenum
+    dst: GLenum
+
+  const blendOpTbl: array[CompositeOperation, BlendOp] = [
+    BlendOp(src: GL_ONE, dst: GL_ONE_MINUS_SRC_ALPHA),
+    BlendOp(src: GL_DST_ALPHA, dst: GL_ZERO),
+    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ZERO),
+    BlendOp(src: GL_DST_ALPHA, dst: GL_ONE_MINUS_SRC_ALPHA),
+    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ONE),
+    BlendOp(src: GL_ZERO, dst: GL_SRC_ALPHA),
+    BlendOp(src: GL_ZERO, dst: GL_ONE_MINUS_SRC_ALPHA),
+    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_SRC_ALPHA),
+    BlendOp(src: GL_ONE, dst: GL_ONE),
+    BlendOp(src: GL_ONE, dst: GL_ZERO),
+    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ONE_MINUS_SRC_ALPHA),
+  ]
+
+  let blendOp = blendOpTbl[op]
+  OpenglBlend(
+    srcRGB: blendOp.src,
+    dstRGB: blendOp.dst,
+    srcAlpha: blendOp.src,
+    dstAlpha: blendOp.dst,
+  )
 
 proc createGlShader(tp: GLenum, source: cstring): GLuint =
   let s = glCreateShader(tp)
@@ -118,8 +252,11 @@ proc createShaderProgram(vs, fs: cstring): OpenglShaderProgram =
   result.texVertLoc = glGetUniformLocation(program, "vertTex_smp3")
   result.paintLoc = glGetUniformLocation(program, "params")
 
-proc initImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+proc initIfNeeded(ctx: OpenglBackendContext) =
+  if ctx.initial:
+    return
+
+  ctx.initial = true
 
   when NVG_USE_GLCORE:
     ctx.shaderProgram = createShaderProgram(
@@ -133,9 +270,10 @@ proc initImpl(ctx: pointer) =
 
   glGenBuffers(1, ctx.instanceBuf.addr)
   glGenBuffers(1, ctx.vertAndIndexDummyBuf.addr)
-  glGenTextures(1, ctx.texEdge.addr)
-  glGenTextures(1, ctx.texVert.addr)
   glGenTextures(1, ctx.texDummy.addr)
+
+  ctx.texEdge.initStorage()
+  ctx.texVert.initStorage()
 
   const
     vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
@@ -161,52 +299,60 @@ proc initImpl(ctx: pointer) =
 
   glFinish()
 
-proc cancelImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  ctx.renderData.clear()
-
-proc viewportImpl(ctx: pointer, viewBounds: Vec2, devicePixelRatio: float32) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-
-  ctx.viewBounds = viewBounds
-  cancelImpl(ctx)
-
-proc fillImpl(
-    ctx: pointer,
-    paint: Paint,
-    compositeOperation: CompositeOperation,
-    renderFlags: set[RenderFlags],
-    bounds: Vec4,
-    contours: openArray[Contour],
-) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-  ctx.renderData.fillCall(
-    ctx.viewBounds,
-    paint,
-    compositeOperation,
-    renderFlags,
-    bounds,
-    contours,
-  )
-
-proc trianglesImpl(
-  ctx: pointer,
+proc renderSdfImpl(
+  ctx: BackendContext,
   paint: Paint,
-  compositeOperation: CompositeOperation,
-  renderFlags: set[RenderFlags],
   verts: openArray[Vec4],
+  compositeOperation: CompositeOperation,
 ) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
-  ctx.renderData.trianglesCall(
-    ctx.viewBounds,
+  let ctx = OpenglBackendContext(ctx)
+
+  var image = default(Image)
+  if not paint.imageId.isNil:
+    let tex = ctx.getTexture(paint.imageId)
+    if not tex.isNil:
+      image = tex.image
+
+  ctx.renderData.addRenderSdfCall(
+    vec2(float32(ctx.width), float32(ctx.height)),
     paint,
+    image,
+    verts,
     compositeOperation,
-    renderFlags,
-    verts
   )
 
-proc createTexture(image: Image): OpenglTexture =
+proc renderContourImpl(
+  ctx: BackendContext,
+  paint: Paint,
+  contours: openArray[Contour],
+  fillRule: FillRule,
+  compositeOperation: CompositeOperation,
+) =
+  let ctx = OpenglBackendContext(ctx)
+
+  var image = default(Image)
+  if not paint.imageId.isNil:
+    let tex = ctx.getTexture(paint.imageId)
+    if not tex.isNil:
+      image = tex.image
+
+  ctx.renderData.addRenderContourCall(
+    vec2(float32(ctx.width), float32(ctx.height)),
+    paint,
+    image,
+    contours,
+    fillRule,
+    compositeOperation,
+  )
+
+proc allocImageImpl(
+  ctx: BackendContext,
+  w, h: int32,
+  pixelFormat: PixelFormat,
+  imageFlags: set[ImageFlags]): ImageId =
+
+  let ctx = OpenglBackendContext(ctx)
+
   var
     wrapX = GL_CLAMP_TO_EDGE
     wrapY = GL_CLAMP_TO_EDGE
@@ -214,26 +360,27 @@ proc createTexture(image: Image): OpenglTexture =
     magFilter = GL_NEAREST
     mipmapFilter = GL_NEAREST_MIPMAP_NEAREST
 
-  if ImageRepeatX in image.imageFlags:
+  if ImageRepeatX in imageFlags:
     wrapX = GL_REPEAT
 
-  if ImageRepeatY in image.imageFlags:
+  if ImageRepeatY in imageFlags:
     wrapY = GL_REPEAT
 
-  if ImageNearest in image.imageFlags:
+  if ImageNearest in imageFlags:
     magFilter = GL_NEAREST
     mipmapFilter = GL_NEAREST_MIPMAP_NEAREST
   else:
     magFilter = GL_LINEAR
     mipmapFilter = GL_LINEAR_MIPMAP_LINEAR
 
-  if ImageGenerateMipmaps in image.imageFlags:
+  if ImageGenerateMipmaps in imageFlags:
     minFilter = mipmapFilter
   else:
     minFilter = magFilter
 
   let
     tex = OpenglTexture()
+    image = ctx.renderData.createImage(w, h, pixelFormat, imageFlags)
 
   tex.image = image
 
@@ -241,33 +388,30 @@ proc createTexture(image: Image): OpenglTexture =
   glBindTexture(GL_TEXTURE_2D, tex.texImage)
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, image.width *
-      image.pixelFormat.bytesPerPixel)
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, w * image.pixelFormat.bytesPerPixel)
 
   case image.pixelFormat
   of PixelFormatA8:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R8), image.width, image.height, 0,
-        GL_RED, GL_UNSIGNED_BYTE, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R8), w, h, 0, GL_RED,
+        GL_UNSIGNED_BYTE, nil)
 
   of PixelFormatRGB8:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB8), image.width, image.height, 0,
-        GL_RGB, GL_UNSIGNED_BYTE, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB8), w, h, 0, GL_RGB,
+        GL_UNSIGNED_BYTE, nil)
 
   of PixelFormatRGBA8:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), image.width, image.height,
-        0, GL_RGBA, GL_UNSIGNED_BYTE, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), w, h, 0, GL_RGBA,
+        GL_UNSIGNED_BYTE, nil)
 
   of PixelFormatA32f:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R32F), image.width, image.height, 0,
-        GL_RED, cGL_FLOAT, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R32F), w, h, 0, GL_RED, cGL_FLOAT, nil)
 
   of PixelFormatRGB32f:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB32F), image.width, image.height,
-        0, GL_RGB, cGL_FLOAT, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB32F), w, h, 0, GL_RGB, cGL_FLOAT, nil)
 
   of PixelFormatRGBA32f:
-    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32F), image.width, image.height,
-        0, GL_RGBA, cGL_FLOAT, image.data[0].addr)
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32F), w, h, 0, GL_RGBA,
+        cGL_FLOAT, nil)
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
@@ -278,160 +422,79 @@ proc createTexture(image: Image): OpenglTexture =
   glSamplerParameteri(tex.smp, GL_TEXTURE_WRAP_S, wrapX)
   glSamplerParameteri(tex.smp, GL_TEXTURE_WRAP_T, wrapY)
 
-  if image.data.len > 0:
-    if ImageGenerateMipmaps in image.imageFlags:
-      glGenerateMipmap(GL_TEXTURE_2D)
-
   glBindTexture(GL_TEXTURE_2D, 0)
 
-  tex
+  ctx.addTexture(image.imageId, tex)
+  image.imageId
 
-proc updateTexture(tex: OpenglTexture) =
+proc updateImageImpl(
+  ctx: BackendContext,
+  imageId: ImageId,
+  x, y, w, h, stride: int32, data: pointer,
+) =
   let
-    image = tex.image
+    ctx = OpenglBackendContext(ctx)
+    tex = ctx.getTexture(imageId)
 
-  tex.version = image.version
+  if not tex.isNil:
+    let
+      image = tex.image
 
-  glBindTexture(GL_TEXTURE_2D, tex.texImage)
+    glBindTexture(GL_TEXTURE_2D, tex.texImage)
 
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, image.width *
-      image.pixelFormat.bytesPerPixel)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, w * image.pixelFormat.bytesPerPixel)
 
-  case image.pixelFormat
-  of PixelFormatA8:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-        GL_RED, GL_UNSIGNED_BYTE, image.data[0].addr)
+    case image.pixelFormat
+    of PixelFormatA8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RED, GL_UNSIGNED_BYTE, data)
 
-  of PixelFormatRGB8:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-        GL_RGB, GL_UNSIGNED_BYTE, image.data[0].addr)
+    of PixelFormatRGB8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RGB, GL_UNSIGNED_BYTE, data)
 
-  of PixelFormatRGBA8:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-        GL_RGBA, GL_UNSIGNED_BYTE, image.data[0].addr)
+    of PixelFormatRGBA8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RGBA, GL_UNSIGNED_BYTE, data)
 
-  of PixelFormatA32f:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-        GL_RED, cGL_FLOAT, image.data[0].addr)
+    of PixelFormatA32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RED, cGL_FLOAT, data)
 
-  of PixelFormatRGB32f:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-       GL_RGB, cGL_FLOAT, image.data[0].addr)
+    of PixelFormatRGB32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+        GL_RGB, cGL_FLOAT, data)
 
-  of PixelFormatRGBA32f:
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height,
-       GL_RGBA, cGL_FLOAT, image.data[0].addr)
+    of PixelFormatRGBA32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+        GL_RGBA, cGL_FLOAT, data)
 
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
 
-  glBindTexture(GL_TEXTURE_2D, 0)
+    if image.data.len > 0:
+      if ImageGenerateMipmaps in image.imageFlags:
+        glGenerateMipmap(GL_TEXTURE_2D)
 
-proc destroyTexture(tex: OpenglTexture) {.inline.} =
-  tryCall glDeleteSamplers(1, tex.smp.addr)
-  tryCall glDeleteTextures(1, tex.texImage.addr)
+    glBindTexture(GL_TEXTURE_2D, 0)
 
-  tex.image = nil
-
-proc addTexture(ctx: ptr OpenglBackendContextObj,
-    image: Image, tex: OpenglTexture) {.inline.} =
-  ctx.textures[cast[pointer](image)] = tex
-
-proc getTexture(ctx: ptr OpenglBackendContextObj,
-    image: Image): OpenglTexture {.inline.} =
-  ctx.textures.withValue(cast[pointer](image), tex):
-    result = tex[]
-
-# proc deleteTexture(ctx: ptr OpenglBackendContextObj,
-#     tex: OpenglTexture) {.inline.} =
-#   ctx.textures.del(cast[pointer](tex.image))
-
-proc toOpenglBlend(op: CompositeOperation): OpenglBlend {.inline.} =
-  type BlendOp = object
-    src: GLenum
-    dst: GLenum
-
-  const blendOpTbl: array[CompositeOperation, BlendOp] = [
-    BlendOp(src: GL_ONE, dst: GL_ONE_MINUS_SRC_ALPHA),
-    BlendOp(src: GL_DST_ALPHA, dst: GL_ZERO),
-    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ZERO),
-    BlendOp(src: GL_DST_ALPHA, dst: GL_ONE_MINUS_SRC_ALPHA),
-    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ONE),
-    BlendOp(src: GL_ZERO, dst: GL_SRC_ALPHA),
-    BlendOp(src: GL_ZERO, dst: GL_ONE_MINUS_SRC_ALPHA),
-    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_SRC_ALPHA),
-    BlendOp(src: GL_ONE, dst: GL_ONE),
-    BlendOp(src: GL_ONE, dst: GL_ZERO),
-    BlendOp(src: GL_ONE_MINUS_DST_ALPHA, dst: GL_ONE_MINUS_SRC_ALPHA),
-  ]
-
-  let blendOp = blendOpTbl[op]
-  OpenglBlend(
-    srcRGB: blendOp.src,
-    dstRGB: blendOp.dst,
-    srcAlpha: blendOp.src,
-    dstAlpha: blendOp.dst,
-  )
-
-proc updateTex(ctx: ptr OpenglBackendContextObj, target: GLuint, data: var seq[
-    Vec4], maxLayerCount: var int32) =
-  if data.len <= 0:
-    return
-
+proc deleteImageImpl(
+  ctx: BackendContext,
+  imageId: ImageId,
+) =
   let
-    layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
-    layerCount = block:
-      let n = if (data.len mod layerSize) > 0: 1 else: 0
-      data.len div layerSize + n
+    ctx = OpenglBackendContext(ctx)
+  ctx.deleteTexture(imageId)
 
-    size = int32(ceil(float32(data.len) / float32(layerSize))) * layerSize
-
-  if capacity(data) < size:
-    data.setLen(size)
-
-  glActiveTexture(GL_TEXTURE0)
-  glBindTexture(GL_TEXTURE_2D_ARRAY, target)
-  glBindSampler(0, 0)
-
-  if maxLayerCount < layerCount:
-    maxLayerCount = int32(layerCount)
-
-    glTexImage3D(
-      GL_TEXTURE_2D_ARRAY,
-      0,
-      GLint(GL_RGBA32F),
-      TILE_IMAGE_WIDTH,
-      TILE_IMAGE_WIDTH,
-      GLsizei(layerCount),
-      0,
-      GL_RGBA,
-      cGL_FLOAT,
-      data[0].addr,
-    )
-  else:
-    glTexSubImage3D(
-      GL_TEXTURE_2D_ARRAY,
-      0,
-      0,
-      0,
-      0,
-      TILE_IMAGE_WIDTH,
-      TILE_IMAGE_WIDTH,
-      GLsizei(layerCount),
-      GL_RGBA,
-      cGL_FLOAT,
-      data[0].addr,
-    )
-
-proc updateInstanceBuf(ctx: ptr OpenglBackendContextObj) =
+proc updateInstanceBuf(ctx: OpenglBackendContext) =
   if ctx.renderData.instances.len <= 0:
     return
 
   glBindBuffer(GL_ARRAY_BUFFER, ctx.instanceBuf)
 
-  if ctx.maxInstanceBufSize < ctx.renderData.instances.len:
-    ctx.maxInstanceBufSize = int32(ctx.renderData.instances.len)
+  if ctx.instanceBufSize < ctx.renderData.instances.len:
+    ctx.instanceBufSize = int32(ctx.renderData.instances.len)
 
     glBufferData(
       GL_ARRAY_BUFFER,
@@ -447,8 +510,50 @@ proc updateInstanceBuf(ctx: ptr OpenglBackendContextObj) =
       ctx.renderData.instances[0].addr,
     )
 
-proc flushImpl(ctx: pointer) =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+proc renderCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
+    prevBlend: CompositeOperation) =
+  if idx <= 0 or call.uniformIndex != ctx.renderData.calls[idx -
+      1].uniformIndex:
+    let uniform = ctx.renderData.uniforms[call.uniformIndex].addr
+    glUniform4fv(ctx.shaderProgram.paintLoc, 6, cast[ptr GLfloat](uniform))
+
+  glUniform1i(ctx.shaderProgram.triangleOffsetLoc, call.triangleOffset)
+
+  if idx <= 0 or call.blend != prevBlend:
+    let blend = toOpenglBlend(call.blend)
+    glBlendFuncSeparate(blend.srcRGB, blend.dstRGB, blend.srcAlpha,
+        blend.dstAlpha)
+
+  glActiveTexture(GL_TEXTURE0)
+
+  var tex = default(OpenglTexture)
+  if not call.imageId.isNil:
+    tex = ctx.getTexture(call.imageId)
+
+  if tex.isNil:
+    glBindTexture(GL_TEXTURE_2D, ctx.texDummy)
+    glBindSampler(0, ctx.smpDummy)
+  else:
+    glBindTexture(GL_TEXTURE_2D, tex.texImage)
+    glBindSampler(0, tex.smp)
+
+  let offset = call.instanceOffset * int32(sizeof(InstanceParam))
+  glVertexAttribIPointer(1, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[
+      pointer](offset))
+  glVertexAttribDivisor(1, 1)
+
+  glVertexAttribIPointer(
+    2, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[pointer](offset +
+        sizeof(int32))
+  )
+  glVertexAttribDivisor(2, 1)
+
+  glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nil,
+      call.instanceCount)
+
+proc flushImpl(ctx: BackendContext) =
+  let ctx = OpenglBackendContext(ctx)
+  ctx.initIfNeeded()
 
   if ctx.renderData.calls.len <= 0:
     return
@@ -462,8 +567,8 @@ proc flushImpl(ctx: pointer) =
     glBindVertexArray(ctx.vertArr)
 
   ctx.updateInstanceBuf()
-  ctx.updateTex(ctx.texEdge, ctx.renderData.edges, ctx.maxTexEdgeLayerCount)
-  ctx.updateTex(ctx.texVert, ctx.renderData.verts, ctx.maxTexVertLayerCount)
+  ctx.texEdge.updateStorage(ctx.renderData.edges)
+  ctx.texVert.updateStorage(ctx.renderData.verts)
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
 
@@ -480,8 +585,9 @@ proc flushImpl(ctx: pointer) =
   )
   glEnableVertexAttribArray(2)
 
+  let view = vec2(float32(ctx.width), float32(ctx.height))
   glUniform2fv(
-    ctx.shaderProgram.viewSizeLoc, 1, cast[ptr GLfloat](ctx.viewBounds[0].addr)
+    ctx.shaderProgram.viewSizeLoc, 1, cast[ptr GLfloat](view[0].addr)
   )
 
   glUniform1i(ctx.shaderProgram.texLoc, 0)
@@ -489,70 +595,22 @@ proc flushImpl(ctx: pointer) =
   glUniform1i(ctx.shaderProgram.texEdgeLoc, 2)
 
   glActiveTexture(GL_TEXTURE1)
-  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texVert)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texVert.tex)
   glBindSampler(1, ctx.smpDummy)
 
   glActiveTexture(GL_TEXTURE2)
-  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texEdge)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texEdge.tex)
   glBindSampler(2, ctx.smpDummy)
 
-  for idx in 0 ..< ctx.renderData.calls.len:
+  for idx in 0 ..< int32(ctx.renderData.calls.len):
     let
-      call = ctx.renderData.calls[idx].addr
-      blend = call.blend
-
       prevBlend = block:
         if idx > 0:
           ctx.renderData.calls[idx - 1].blend
         else:
           default(CompositeOperation)
 
-    if idx <= 0 or call.uniformIndex != ctx.renderData.calls[idx -
-        1].uniformIndex:
-      let uniform = ctx.renderData.uniforms[call.uniformIndex].addr
-      glUniform4fv(ctx.shaderProgram.paintLoc, 6, cast[ptr GLfloat](uniform))
-
-    glUniform1i(ctx.shaderProgram.triangleOffsetLoc, call.triangleOffset)
-
-    if idx <= 0 or blend != prevBlend:
-      let blend = toOpenglBlend(blend)
-      glBlendFuncSeparate(blend.srcRGB, blend.dstRGB, blend.srcAlpha,
-          blend.dstAlpha)
-
-    glActiveTexture(GL_TEXTURE0)
-    if call.image.isNil:
-      glBindTexture(GL_TEXTURE_2D, ctx.texDummy)
-      glBindSampler(0, ctx.smpDummy)
-    else:
-      var
-        tex = ctx.getTexture(call.image)
-        isDirty = false
-
-      if tex.isNil:
-        tex = createTexture(call.image)
-        ctx.addTexture(call.image, tex)
-      elif tex.version != call.image.version:
-        isDirty = true
-
-      if isDirty:
-        tex.updateTexture()
-
-      glBindTexture(GL_TEXTURE_2D, tex.texImage)
-      glBindSampler(0, tex.smp)
-
-    let offset = call.instanceOffset * int32(sizeof(InstanceParam))
-    glVertexAttribIPointer(1, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[
-        pointer](offset))
-    glVertexAttribDivisor(1, 1)
-
-    glVertexAttribIPointer(
-      2, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[pointer](offset +
-          sizeof(int32))
-    )
-    glVertexAttribDivisor(2, 1)
-
-    glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nil,
-        call.instanceCount)
+    ctx.renderCall(idx, ctx.renderData.calls[idx], prevBlend)
 
   glDisableVertexAttribArray(0)
   glDisableVertexAttribArray(1)
@@ -577,59 +635,20 @@ proc flushImpl(ctx: pointer) =
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
   glBindSampler(2, 0)
 
-proc destroyImpl(ctx: pointer) {.raises: [].} =
-  let ctx = cast[ptr OpenglBackendContextObj](ctx)
+  #
+  ctx.renderData.clear()
 
-  if ctx.shaderProgram.vsShader != 0:
-    tryCall glDeleteShader(ctx.shaderProgram.vsShader)
+proc createBackendContext*(
+  width, height: int32): BackendContext =
 
-  if ctx.shaderProgram.fsShader != 0:
-    tryCall glDeleteShader(ctx.shaderProgram.fsShader)
+  OpenglBackendContext(
+    width: width,
+    height: height,
 
-  if ctx.shaderProgram.program != 0:
-    tryCall glDeleteProgram(ctx.shaderProgram.program)
-
-  when NVG_USE_GLCORE:
-    if ctx.vertArr != 0:
-      tryCall glDeleteVertexArrays(1, ctx.vertArr.addr)
-
-  if ctx.vertAndIndexDummyBuf != 0:
-    tryCall glDeleteBuffers(1, ctx.vertAndIndexDummyBuf.addr)
-
-  if ctx.instanceBuf != 0:
-    tryCall glDeleteBuffers(1, ctx.instanceBuf.addr)
-
-  if ctx.texEdge != 0:
-    tryCall glDeleteTextures(1, ctx.texEdge.addr)
-
-  if ctx.texVert != 0:
-    tryCall glDeleteTextures(1, ctx.texVert.addr)
-
-  if ctx.texDummy != 0:
-    tryCall glDeleteTextures(1, ctx.texDummy.addr)
-
-  if ctx.smpDummy != 0:
-    tryCall glDeleteSamplers(1, ctx.smpDummy.addr)
-
-  for tex in ctx.textures.values:
-    tex.destroyTexture()
-
-  reset(ctx[])
-  dealloc(ctx)
-
-proc newContext*(fons: FonsStash = nil): Context =
-  let ctx = create(OpenglBackendContextObj)
-
-  createInternal(
-    ctx,
-    BackendContextParams(
-      initImpl: initImpl,
-      destroyImpl: destroyImpl,
-      fillImpl: fillImpl,
-      trianglesImpl: trianglesImpl,
-      viewportImpl: viewportImpl,
-      cancelImpl: cancelImpl,
-      flushImpl: flushImpl,
-    ),
-    fons,
+    renderSdfImpl: renderSdfImpl,
+    renderContourImpl: renderContourImpl,
+    allocImageImpl: allocImageImpl,
+    updateImageImpl: updateImageImpl,
+    deleteImageImpl: deleteImageImpl,
+    flushImpl: flushImpl,
   )

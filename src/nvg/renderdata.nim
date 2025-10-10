@@ -1,6 +1,6 @@
+import ./backend
 import ./core
 import ./math
-import ./params
 import ./pieces
 import ./tiles
 
@@ -9,10 +9,18 @@ import std/tables
 
 type
   ShaderType* {.size: 4.} = enum
-    Solid = 1
-    Gradient
-    Image
-    Text
+    ShaderSolid = 1
+    ShaderGradient
+    ShaderImage
+    ShaderSdf
+
+  Image* = ref object
+    imageId*: ImageId
+    width*: int32
+    height*: int32
+    pixelFormat*: PixelFormat
+    imageFlags*: set[ImageFlags]
+    data*: seq[byte]
 
   UniformParam* = object
     innerColor*: Color
@@ -34,7 +42,7 @@ type
     fillOffset*: int32
 
   InstanceCall* = object
-    image*: Image
+    imageId*: ImageId
     triangleOffset*: int32
     triangleCount*: int32
     instanceOffset*: int32
@@ -43,7 +51,7 @@ type
     blend*: CompositeOperation
 
   RenderData* = object
-    idgen: uint32
+    lastId: uint32
     tiles: Tiles
     verts*: seq[Vec4]
     edges*: seq[Vec4]
@@ -82,8 +90,8 @@ proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
     c = n + s.len
 
   if capacity(s) < c:
-    s.setLen(c)
-    s.setLen(l)
+    s.setLenUninit(c)
+    s.setLenUninit(l)
 
 proc clear*(ctx: var RenderData) =
   ctx.verts.setLen(0)
@@ -101,7 +109,7 @@ proc addUniform(ctx: var RenderData, uniform: UniformParam): int32 =
 proc addCall(ctx: var RenderData, call: InstanceCall) =
   if ctx.calls.len > 0:
     let prev = ctx.calls[^1].addr
-    if prev.blend == call.blend and prev.image == call.image and
+    if prev.blend == call.blend and prev.imageId == call.imageId and
       prev.uniformIndex == call.uniformIndex:
       prev.instanceCount = prev.instanceCount + call.instanceCount
       prev.triangleCount = prev.triangleCount + call.triangleCount
@@ -109,14 +117,46 @@ proc addCall(ctx: var RenderData, call: InstanceCall) =
 
   ctx.calls.add(call)
 
-proc premultiplied(c: Color): Color {.inline.} =
-  result.r = c.r * c.a
-  result.g = c.g * c.a
-  result.b = c.b * c.a
-  result.a = c.a
+proc allocId*(ctx: var RenderData): uint32 =
+  while ctx.lastId == 0:
+    inc ctx.lastId, 1
+
+  ctx.lastId
+
+proc createImage*(
+  ctx: var RenderData,
+  w, h: int32,
+  pixelFormat: PixelFormat,
+  imageFlags: set[ImageFlags]): Image =
+
+  result = Image()
+  result.imageId.id = ctx.allocId()
+  result.width = w
+  result.height = h
+  result.pixelFormat = pixelFormat
+  result.imageFlags = imageFlags
+
+proc updatePixels*(image: Image, x, y, w, h, stride: int32, data: pointer) =
+  if image.data.len <= 0:
+    image.data.setLen(
+      image.width * image.height * image.pixelFormat.bytesPerPixel)
+
+  let
+    bytesPerPixel = image.pixelFormat.bytesPerPixel
+    offset = x + y * image.width
+    lineBytes = w * bytesPerPixel
+    sourceStrideBytes = stride * bytesPerPixel
+    sourcePixels = cast[ptr UncheckedArray[uint8]](data)
+    destinationStrideBytes = image.width * bytesPerPixel
+    destinationPixels = cast[ptr UncheckedArray[uint8]](image.data[offset *
+        bytesPerPixel].addr)
+
+  for idx in 0 ..< h:
+    copyMem(destinationPixels[idx * destinationStrideBytes].addr, sourcePixels[
+        idx * sourceStrideBytes].addr, lineBytes)
 
 proc toUniform(call: var InstanceCall, paint: Paint,
-    shaderType: ShaderType, renderFlags: set[RenderFlags]): UniformParam =
+    shaderType: ShaderType, image: Image, fillRule: FillRule): UniformParam =
   result.shaderType = float32(shaderType)
   result.fillType = 0
   result.feather = paint.feather
@@ -130,10 +170,9 @@ proc toUniform(call: var InstanceCall, paint: Paint,
   result.transform3[0] = paint.transform.dx
   result.transform3[1] = paint.transform.dy
 
-  if EvenOdd in renderFlags:
+  if fillRule == EvenOdd:
     result.fillType = float32(1 shl 0)
 
-  let image = paint.image
   if not image.isNil:
     let pixelFormat = uint8(image.pixelFormat)
     let premultiplied = uint8(ImagePremultiplied in image.imageFlags)
@@ -150,16 +189,38 @@ proc toUniform(call: var InstanceCall, paint: Paint,
 
     result.texSize = vec2(float32(image.width), float32(image.height))
 
-    call.image = image
+    call.imageId = image.imageId
 
-proc fillCall*(
-    ctx: var RenderData,
-    view: Vec2,
-    paint: Paint,
-    compositeOperation: CompositeOperation,
-    renderFlags: set[RenderFlags],
-    bounds: Vec4,
-    contours: openArray[Contour],
+proc calcBounds(contours: openArray[Contour]): Vec4 =
+  result = vec4(1e6, 1e6, -1e6, -1e6)
+
+  for idx in 0 ..< contours.len:
+    let p = contours[idx].addr
+
+    p.bounds = vec4(1e6, 1e6, -1e6, -1e6)
+
+    if p.fill.len <= 0:
+      continue
+
+    for v in p.fill.toOpenArray:
+      p.bounds[0] = min(p.bounds[0], v[2])
+      p.bounds[1] = min(p.bounds[1], v[3])
+      p.bounds[2] = max(p.bounds[2], v[2])
+      p.bounds[3] = max(p.bounds[3], v[3])
+
+    result[0] = min(p.bounds[0], result[0])
+    result[1] = min(p.bounds[1], result[1])
+    result[2] = max(p.bounds[2], result[2])
+    result[3] = max(p.bounds[3], result[3])
+
+proc addRenderContourCall*(
+  ctx: var RenderData,
+  viewBound: Vec2,
+  paint: Paint,
+  image: Image,
+  contours: openArray[Contour],
+  fillRule: FillRule,
+  compositeOperation: CompositeOperation,
 ) =
   let edgeCount =
     block:
@@ -173,14 +234,14 @@ proc fillCall*(
     return
 
   var
-    ltrb: array[4, float32]
     callw = default(float32)
     callh = default(float32)
+    ltrb = calcBounds(contours)
 
-  ltrb[0] = clamp(bounds[0], 0, view[0 and 0x1])
-  ltrb[1] = clamp(bounds[1], 0, view[1 and 0x1])
-  ltrb[2] = clamp(bounds[2], 0, view[2 and 0x1])
-  ltrb[3] = clamp(bounds[3], 0, view[3 and 0x1])
+  ltrb[0] = clamp(ltrb[0], 0, viewBound[0 and 0x1])
+  ltrb[1] = clamp(ltrb[1], 0, viewBound[1 and 0x1])
+  ltrb[2] = clamp(ltrb[2], 0, viewBound[2 and 0x1])
+  ltrb[3] = clamp(ltrb[3], 0, viewBound[3 and 0x1])
 
   callw = ltrb[2] - ltrb[0]
   callh = ltrb[3] - ltrb[1]
@@ -190,7 +251,7 @@ proc fillCall*(
 
   var
     call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, Solid, renderFlags)
+    uniformParam = call.toUniform(paint, ShaderSolid, image, fillRule)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation
@@ -316,17 +377,17 @@ proc fillCall*(
 
     ctx.addCall(call)
 
-proc trianglesCall*(
-    ctx: var RenderData,
-    view: Vec2,
-    paint: Paint,
-    compositeOperation: CompositeOperation,
-    renderFlags: set[RenderFlags],
-    verts: openArray[Vec4],
+proc addRenderSdfCall*(
+  ctx: var RenderData,
+  view: Vec2,
+  paint: Paint,
+  image: Image,
+  verts: openArray[Vec4],
+  compositeOperation: CompositeOperation,
 ) =
   var
     call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, Text, renderFlags)
+    uniformParam = call.toUniform(paint, ShaderSdf, image, NonZero)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation

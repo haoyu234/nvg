@@ -1,6 +1,6 @@
+import ./backend
 import ./core
 import ./math
-import ./params
 import ./path
 import ./pieces
 
@@ -9,7 +9,6 @@ import std/math
 type Cache* = object
   points: seq[Vec2]
   contours*: seq[Contour]
-  bounds*: Vec4
   curPath: ptr Contour
   storage: seq[Vec4]
 
@@ -86,28 +85,6 @@ proc bezier(
 
   c.bezier(p1, p12, p123, p1234, level + 1, tessTolSq, distTolSq)
   c.bezier(p1234, p234, p34, p4, level + 1, tessTolSq, distTolSq)
-
-proc updateBounds(c: var Cache, distTolSq: float32) =
-  c.bounds = vec4(1e6, 1e6, -1e6, -1e6)
-
-  for idx in 0 ..< c.contours.len:
-    let p = c.contours[idx].addr
-
-    p.bounds = vec4(1e6, 1e6, -1e6, -1e6)
-
-    if p.fill.len <= 0:
-      continue
-
-    for v in p.fill.toOpenArray:
-      p.bounds[0] = min(p.bounds[0], v[2])
-      p.bounds[1] = min(p.bounds[1], v[3])
-      p.bounds[2] = max(p.bounds[2], v[2])
-      p.bounds[3] = max(p.bounds[3], v[3])
-
-    c.bounds[0] = min(p.bounds[0], c.bounds[0])
-    c.bounds[1] = min(p.bounds[1], c.bounds[1])
-    c.bounds[2] = max(p.bounds[2], c.bounds[2])
-    c.bounds[3] = max(p.bounds[3], c.bounds[3])
 
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
@@ -517,8 +494,6 @@ proc expandStroke*(
     offset = l2
     r = vertCount
 
-  c.updateBounds(distTolSq)
-
 proc expandFill*(c: var Cache, distTolSq: float32) =
   let vertCount = block:
     var count = 0
@@ -556,5 +531,3 @@ proc expandFill*(c: var Cache, distTolSq: float32) =
       p0 = p1
 
     p.fill = memory[oldPos ..< pos]
-
-  c.updateBounds(distTolSq)
