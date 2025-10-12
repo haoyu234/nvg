@@ -16,10 +16,7 @@ type
 
   Image* = ref object
     imageId*: ImageId
-    width*: int32
-    height*: int32
-    pixelFormat*: PixelFormat
-    imageFlags*: set[ImageFlags]
+    imageInfo*: ImageInfo
     data*: seq[byte]
 
   UniformParam* = object
@@ -125,29 +122,26 @@ proc allocId*(ctx: var RenderData): uint32 =
 
 proc createImage*(
   ctx: var RenderData,
-  w, h: int32,
-  pixelFormat: PixelFormat,
-  imageFlags: set[ImageFlags]): Image =
-
-  result = Image()
-  result.imageId.id = ctx.allocId()
-  result.width = w
-  result.height = h
-  result.pixelFormat = pixelFormat
-  result.imageFlags = imageFlags
+  imageInfo: ImageInfo): Image =
+  Image(
+    imageId: ImageId(id: ctx.allocId()),
+    imageInfo: imageInfo,
+  )
 
 proc updatePixels*(image: Image, x, y, w, h, stride: int32, data: pointer) =
+  let imageInfo = image.imageInfo
+
   if image.data.len <= 0:
     image.data.setLen(
-      image.width * image.height * image.pixelFormat.bytesPerPixel)
+      imageInfo.width * imageInfo.height * imageInfo.pixelFormat.bytesPerPixel)
 
   let
-    bytesPerPixel = image.pixelFormat.bytesPerPixel
-    offset = x + y * image.width
+    bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
+    offset = x + y * imageInfo.width
     lineBytes = w * bytesPerPixel
     sourceStrideBytes = stride * bytesPerPixel
     sourcePixels = cast[ptr UncheckedArray[uint8]](data)
-    destinationStrideBytes = image.width * bytesPerPixel
+    destinationStrideBytes = imageInfo.width * bytesPerPixel
     destinationPixels = cast[ptr UncheckedArray[uint8]](image.data[offset *
         bytesPerPixel].addr)
 
@@ -174,20 +168,22 @@ proc toUniform(call: var InstanceCall, paint: Paint,
     result.fillType = float32(1 shl 0)
 
   if not image.isNil:
-    let pixelFormat = uint8(image.pixelFormat)
-    let premultiplied = uint8(ImagePremultiplied in image.imageFlags)
-    result.texType = float32(pixelFormat or (premultiplied shl 7))
+    let
+      imageInfo = image.imageInfo
+      pixelFormat = uint8(imageInfo.pixelFormat)
+      premultiplied = imageInfo.alphaType == AlphaPremultiplied
 
-    case image.pixelFormat
+    result.texType = float32(pixelFormat or (uint8(premultiplied) shl 7))
+    result.texSize = vec2(float32(imageInfo.width), float32(imageInfo.height))
+
+    case imageInfo.pixelFormat
     of PixelFormatA8, PixelFormatA32f:
       result.texType = 2
     of PixelFormatRGB8, PixelFormatRGBA8, PixelFormatRGB32f, PixelFormatRGBA32f:
-      if ImagePremultiplied in image.imageFlags:
+      if premultiplied:
         result.texType = 3
       else:
         result.texType = 1
-
-    result.texSize = vec2(float32(image.width), float32(image.height))
 
     call.imageId = image.imageId
 

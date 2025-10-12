@@ -63,8 +63,16 @@ proc allocImage(a: Atlas, w, h: int32, pixelFormat: PixelFormat): ptr AtlasImage
   atlasImage.rp.expand(w, h)
   atlasImage.scaleX = 1 / float32(w)
   atlasImage.scaleY = 1 / float32(h)
-  atlasImage.imageId = a.backendContext.allocImage(w, h, pixelFormat, {})
   atlasImage.pixelFormat = pixelFormat
+  atlasImage.imageId = a.backendContext.allocImage(
+    ImageInfo(
+      width: w,
+      height: h,
+      pixelFormat: pixelFormat,
+    ),
+    {}
+  )
+
   atlasImage
 
 proc allocRectOrGrow(a: Atlas, w, h: int32, pixelFormat: PixelFormat): tuple[

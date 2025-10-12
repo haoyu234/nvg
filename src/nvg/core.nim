@@ -19,7 +19,6 @@ type
     ImageRepeatX
     ImageRepeatY
     ImageFlipY
-    ImagePremultiplied
     ImageNearest
 
   PixelFormat* = enum
@@ -29,6 +28,16 @@ type
     PixelFormatA32f
     PixelFormatRGB32f
     PixelFormatRGBA32f
+
+  AlphaType* = enum
+    AlphaDefault
+    AlphaPremultiplied
+
+  ImageInfo* = object
+    width*: int32
+    height*: int32
+    pixelFormat*: PixelFormat
+    alphaType*: AlphaType
 
   LineCap* = enum
     ButtCap

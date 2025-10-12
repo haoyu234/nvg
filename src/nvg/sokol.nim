@@ -1,4 +1,4 @@
-import pkg/sokol/gfx except Color, Image, PixelFormat
+import pkg/sokol/gfx except Color, Image, ImageInfo, PixelFormat
 
 import ./backend
 import ./core
@@ -20,6 +20,7 @@ type
   SokolTexture = ref SokolTextureObj
   SokolTextureObj = object
     image: Image
+    imageFlags: set[ImageFlags]
     texImage: gfx.Image
     texImageView: View
     smp: Sampler
@@ -346,9 +347,7 @@ proc toSokolBlend(op: CompositeOperation): SokolBlend {.inline.} =
     dstAlpha: blendOp.dst,
   )
 
-proc updatePipeline(
-    ctx: SokolBackendContext, blend: CompositeOperation
-) =
+proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
   const
     BLEND_MASK = uint32(1 shl 16 - 1)
     ACTIVE_MASK = uint32(1 shl 16)
@@ -400,15 +399,13 @@ proc updatePipeline(
     ),
     )
 
-proc renderSdfImpl(
-  ctx: BackendContext,
-  paint: Paint,
-  verts: openArray[Vec4],
-  compositeOperation: CompositeOperation,
-) =
+proc renderSdfImpl(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
+    compositeOperation: CompositeOperation) =
   let ctx = SokolBackendContext(ctx)
 
-  var image = default(Image)
+  var
+    image = default(Image)
+
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
@@ -422,16 +419,13 @@ proc renderSdfImpl(
     compositeOperation,
   )
 
-proc renderContourImpl(
-  ctx: BackendContext,
-  paint: Paint,
-  contours: openArray[Contour],
-  fillRule: FillRule,
-  compositeOperation: CompositeOperation,
-) =
+proc renderContourImpl(ctx: BackendContext, paint: Paint, contours: openArray[
+    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
   let ctx = SokolBackendContext(ctx)
 
-  var image = default(Image)
+  var
+    image = default(Image)
+
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
@@ -455,12 +449,8 @@ proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat {.inline.} =
   of PixelFormatRGB32f: gfx.pixelFormatRgba32f
   of PixelFormatRGBA32f: gfx.pixelFormatRgba32f
 
-proc allocImageImpl(
-  ctx: BackendContext,
-  w, h: int32,
-  pixelFormat: PixelFormat,
-  imageFlags: set[ImageFlags]): ImageId =
-
+proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
+    ImageFlags]): ImageId =
   let ctx = SokolBackendContext(ctx)
 
   var
@@ -492,16 +482,17 @@ proc allocImageImpl(
 
   let
     tex = SokolTexture()
-    image = ctx.renderData.createImage(w, h, pixelFormat, imageFlags)
+    image = ctx.renderData.createImage(imageInfo)
 
   tex.image = image
+  tex.imageFlags = imageFlags
   tex.texImage = makeImage(
     ImageDesc(
       type: imageType2d,
-      width: w,
-      height: h,
+      width: imageInfo.width,
+      height: imageInfo.height,
       usage: ImageUsage(dynamicUpdate: true),
-      pixelFormat: pixelFormat.toSokolPixelFormat,
+      pixelFormat: imageInfo.pixelFormat.toSokolPixelFormat,
       numMipmaps: 1,
       label: "nvg.image",
     )
@@ -528,11 +519,16 @@ proc allocImageImpl(
   ctx.addTexture(image.imageId, tex)
   image.imageId
 
-proc updateImageImpl(
-  ctx: BackendContext,
-  imageId: ImageId,
-  x, y, w, h, stride: int32, data: pointer,
-) =
+proc getImageInfoImpl(ctx: BackendContext, imageId: ImageId): ImageInfo =
+  let
+    ctx = SokolBackendContext(ctx)
+    tex = ctx.getTexture(imageId)
+
+  if not tex.isNil:
+    result = tex.image.imageInfo
+
+proc updateImageImpl(ctx: BackendContext, imageId: ImageId, x, y, w, h,
+    stride: int32, data: pointer) =
   let
     ctx = SokolBackendContext(ctx)
     tex = ctx.getTexture(imageId)
@@ -542,18 +538,19 @@ proc updateImageImpl(
     tex.image.updatePixels(x, y, w, h, stride, data)
 
 proc updateTexture(tex: SokolTexture) {.inline.} =
-  let image = tex.image
+  let
+    image = tex.image
+    imageInfo = image.imageInfo
+
   if image.data.len > 0:
     tex.texImage.updateImage(ImageData(mipLevels: [
       Range(
         addr: image.data[0].addr,
-        size: image.width * image.height * image.pixelFormat.bytesPerPixel)
+        size: imageInfo.width * imageInfo.height *
+            imageInfo.pixelFormat.bytesPerPixel)
     ]))
 
-proc deleteImageImpl(
-  ctx: BackendContext,
-  imageId: ImageId,
-) =
+proc deleteImageImpl(ctx: BackendContext, imageId: ImageId) =
   let
     ctx = SokolBackendContext(ctx)
   ctx.deleteTexture(imageId)
@@ -731,7 +728,6 @@ proc flushImpl(ctx: BackendContext) =
 
 proc createBackendContext*(
   width, height: int32): BackendContext =
-
   SokolBackendContext(
     width: width,
     height: height,
@@ -739,6 +735,7 @@ proc createBackendContext*(
     renderSdfImpl: renderSdfImpl,
     renderContourImpl: renderContourImpl,
     allocImageImpl: allocImageImpl,
+    getImageInfoImpl: getImageInfoImpl,
     updateImageImpl: updateImageImpl,
     deleteImageImpl: deleteImageImpl,
     flushImpl: flushImpl,

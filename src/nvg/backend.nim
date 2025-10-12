@@ -13,115 +13,54 @@ type
     width*: int32
     height*: int32
 
-    renderSdfImpl*: proc (
-      ctx: BackendContext,
-      paint: Paint,
-      verts: openArray[Vec4],
-      compositeOperation: CompositeOperation,
-    ) {.nimcall.}
+    renderSdfImpl*: proc (ctx: BackendContext, paint: Paint, verts: openArray[
+        Vec4], compositeOperation: CompositeOperation) {.nimcall.}
 
-    renderContourImpl*: proc (
-      ctx: BackendContext,
-      paint: Paint,
-      contours: openArray[Contour],
-      fillRule: FillRule,
-      compositeOperation: CompositeOperation,
-    ) {.nimcall.}
+    renderContourImpl*: proc (ctx: BackendContext, paint: Paint,
+        contours: openArray[Contour], fillRule: FillRule,
+        compositeOperation: CompositeOperation) {.nimcall.}
 
-    allocImageImpl*: proc (
-      ctx: BackendContext,
-      w, h: int32,
-      pixelFormat: PixelFormat,
-      imageFlags: set[ImageFlags],
-    ): ImageId {.nimcall.}
+    allocImageImpl*: proc (ctx: BackendContext,
+        imageInfo: ImageInfo, imageFlags: set[ImageFlags]): ImageId {.nimcall.}
 
-    updateImageImpl*: proc (
-      ctx: BackendContext,
-      imageId: ImageId,
-      x, y, w, h, stride: int32, data: pointer,
-    ) {.nimcall.}
+    getImageInfoImpl*: proc (ctx: BackendContext,
+        imageId: ImageId): ImageInfo {.nimcall.}
 
-    deleteImageImpl*: proc (
-      ctx: BackendContext,
-      imageId: ImageId,
-    ) {.nimcall.}
+    updateImageImpl*: proc (ctx: BackendContext, imageId: ImageId, x, y, w, h,
+        stride: int32, data: pointer) {.nimcall.}
 
-    flushImpl*: proc (
-      ctx: BackendContext,
-    ) {.nimcall.}
+    deleteImageImpl*: proc (ctx: BackendContext, imageId: ImageId) {.nimcall.}
 
-proc renderSdf*(
-  ctx: BackendContext,
-  paint: Paint,
-  verts: openArray[Vec4],
-  compositeOperation: CompositeOperation,
-) =
+    flushImpl*: proc (ctx: BackendContext) {.nimcall.}
+
+proc renderSdf*(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
+    compositeOperation: CompositeOperation) =
   if not ctx.renderSdfImpl.isNil:
-    ctx.renderSdfImpl(
-      ctx,
-      paint,
-      verts,
-      compositeOperation,
-    )
+    ctx.renderSdfImpl(ctx, paint, verts, compositeOperation)
 
-proc renderContour*(
-  ctx: BackendContext,
-  paint: Paint,
-  contours: openArray[Contour],
-  fillRule: FillRule,
-  compositeOperation: CompositeOperation,
-) =
+proc renderContour*(ctx: BackendContext, paint: Paint, contours: openArray[
+    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
   if not ctx.renderContourImpl.isNil:
-    ctx.renderContourImpl(
-      ctx,
-      paint,
-      contours,
-      fillRule,
-      compositeOperation,
-    )
+    ctx.renderContourImpl(ctx, paint, contours, fillRule, compositeOperation)
 
-proc allocImage*(
-  ctx: BackendContext,
-  w, h: int32,
-  pixelFormat: PixelFormat,
-  imageFlags: set[ImageFlags],
-): ImageId =
+proc allocImage*(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
+    ImageFlags]): ImageId =
   if not ctx.allocImageImpl.isNil:
-    result = ctx.allocImageImpl(
-      ctx,
-      w, h,
-      pixelFormat,
-      imageFlags,
-    )
+    result = ctx.allocImageImpl(ctx, imageInfo, imageFlags)
 
-proc updateImage*(
-  ctx: BackendContext,
-  imageId: ImageId,
-  x, y, w, h, stride: int32, data: pointer,
-) =
+proc getImageInfo*(ctx: BackendContext, imageId: ImageId): ImageInfo {.nimcall.} =
+  if not ctx.getImageInfoImpl.isNil:
+    result = ctx.getImageInfoImpl(ctx, imageId)
+
+proc updateImage*(ctx: BackendContext, imageId: ImageId, x, y, w, h,
+    stride: int32, data: pointer) =
   if not ctx.updateImageImpl.isNil:
-    ctx.updateImageImpl(
-      ctx,
-      imageId,
-      x, y, w, h,
-      stride,
-      data,
-    )
+    ctx.updateImageImpl(ctx, imageId, x, y, w, h, stride, data)
 
-proc deleteImage*(
-  ctx: BackendContext,
-  imageId: ImageId,
-) =
+proc deleteImage*(ctx: BackendContext, imageId: ImageId) =
   if not ctx.deleteImageImpl.isNil:
-    ctx.deleteImageImpl(
-      ctx,
-      imageId,
-    )
+    ctx.deleteImageImpl(ctx, imageId)
 
-proc flush*(
-  ctx: BackendContext,
-) =
+proc flush*(ctx: BackendContext) =
   if not ctx.flushImpl.isNil:
-    ctx.flushImpl(
-      ctx,
-    )
+    ctx.flushImpl(ctx)
