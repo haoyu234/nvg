@@ -48,7 +48,7 @@ proc allocImage*(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
   if not ctx.allocImageImpl.isNil:
     result = ctx.allocImageImpl(ctx, imageInfo, imageFlags)
 
-proc getImageInfo*(ctx: BackendContext, imageId: ImageId): ImageInfo {.nimcall.} =
+proc getImageInfo*(ctx: BackendContext, imageId: ImageId): ImageInfo =
   if not ctx.getImageInfoImpl.isNil:
     result = ctx.getImageInfoImpl(ctx, imageId)
 

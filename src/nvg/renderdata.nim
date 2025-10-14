@@ -115,76 +115,90 @@ proc addCall(ctx: var RenderData, call: InstanceCall) =
   ctx.calls.add(call)
 
 proc allocId*(ctx: var RenderData): uint32 =
+  inc ctx.lastId, 1
   while ctx.lastId == 0:
     inc ctx.lastId, 1
 
   ctx.lastId
 
-proc createImage*(
-  ctx: var RenderData,
-  imageInfo: ImageInfo): Image =
+proc createImage*(ctx: var RenderData, imageInfo: ImageInfo): Image =
   Image(
     imageId: ImageId(id: ctx.allocId()),
     imageInfo: imageInfo,
   )
 
 proc updatePixels*(image: Image, x, y, w, h, stride: int32, data: pointer) =
-  let imageInfo = image.imageInfo
+  let
+    imageInfo = image.imageInfo
+    width = imageInfo.width
+    height = imageInfo.height
+    bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
 
   if image.data.len <= 0:
-    image.data.setLen(
-      imageInfo.width * imageInfo.height * imageInfo.pixelFormat.bytesPerPixel)
+    image.data.setLen(width * height * bytesPerPixel)
 
   let
-    bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
-    offset = x + y * imageInfo.width
+    offset = x + y * width
     lineBytes = w * bytesPerPixel
     sourceStrideBytes = stride * bytesPerPixel
     sourcePixels = cast[ptr UncheckedArray[uint8]](data)
-    destinationStrideBytes = imageInfo.width * bytesPerPixel
+    destinationStrideBytes = width * bytesPerPixel
     destinationPixels = cast[ptr UncheckedArray[uint8]](image.data[offset *
         bytesPerPixel].addr)
+
+  if x == 0 and w == stride and w == width:
+    copyMem(destinationPixels, sourcePixels, h * lineBytes)
+    return
 
   for idx in 0 ..< h:
     copyMem(destinationPixels[idx * destinationStrideBytes].addr, sourcePixels[
         idx * sourceStrideBytes].addr, lineBytes)
 
-proc toUniform(call: var InstanceCall, paint: Paint,
-    shaderType: ShaderType, image: Image, fillRule: FillRule): UniformParam =
+proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
+    image: Image, imageFlags: set[ImageFlags],
+    fillRule: FillRule): UniformParam =
   result.shaderType = float32(shaderType)
   result.fillType = 0
   result.feather = paint.feather
   result.innerColor = paint.innerColor.premultiplied
   result.outerColor = paint.outerColor.premultiplied
   result.extent = paint.extent
-  result.transform1[0] = paint.transform.xx
-  result.transform1[1] = paint.transform.yx
-  result.transform2[0] = paint.transform.xy
-  result.transform2[1] = paint.transform.yy
-  result.transform3[0] = paint.transform.dx
-  result.transform3[1] = paint.transform.dy
 
   if fillRule == EvenOdd:
     result.fillType = float32(1 shl 0)
 
+  if not paint.imageId.isNil or paint.innerColor != paint.outerColor:
+    var transform = paint.transform
+
+    if ImageFlipY in imageFlags:
+      let dx = paint.extent[1] * 0.5
+      transform.translate(vec2(0, dx))
+      transform.scale(vec2(1, -1))
+      transform.translate(vec2(0, -dx))
+
+    transform.inverse()
+
+    result.transform1[0] = transform.xx
+    result.transform1[1] = transform.yx
+    result.transform2[0] = transform.xy
+    result.transform2[1] = transform.yy
+    result.transform3[0] = transform.dx
+    result.transform3[1] = transform.dy
+
   if not image.isNil:
     let
       imageInfo = image.imageInfo
-      pixelFormat = uint8(imageInfo.pixelFormat)
-      premultiplied = imageInfo.alphaType == AlphaPremultiplied
-
-    result.texType = float32(pixelFormat or (uint8(premultiplied) shl 7))
-    result.texSize = vec2(float32(imageInfo.width), float32(imageInfo.height))
 
     case imageInfo.pixelFormat
     of PixelFormatA8, PixelFormatA32f:
       result.texType = 2
     of PixelFormatRGB8, PixelFormatRGBA8, PixelFormatRGB32f, PixelFormatRGBA32f:
-      if premultiplied:
+      if imageInfo.alphaType == AlphaPremultiplied:
         result.texType = 3
       else:
         result.texType = 1
 
+    result.texSize = vec2(float32(imageInfo.width), float32(imageInfo.height))
     call.imageId = image.imageId
 
 proc calcBounds(contours: openArray[Contour]): Vec4 =
@@ -209,15 +223,9 @@ proc calcBounds(contours: openArray[Contour]): Vec4 =
     result[2] = max(p.bounds[2], result[2])
     result[3] = max(p.bounds[3], result[3])
 
-proc addRenderContourCall*(
-  ctx: var RenderData,
-  viewBound: Vec2,
-  paint: Paint,
-  image: Image,
-  contours: openArray[Contour],
-  fillRule: FillRule,
-  compositeOperation: CompositeOperation,
-) =
+proc addRenderContourCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
+    image: Image, imageFlags: set[ImageFlags], contours: openArray[Contour],
+    fillRule: FillRule, compositeOperation: CompositeOperation) =
   let edgeCount =
     block:
       var edgeCount = uint32(0)
@@ -245,9 +253,13 @@ proc addRenderContourCall*(
   if callw <= 0 or callh <= 0:
     return
 
+  var shaderType = ShaderSolid
+  if not image.isNil:
+    shaderType = ShaderImage
+
   var
     call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, ShaderSolid, image, fillRule)
+    uniformParam = call.toUniform(paint, shaderType, image, imageFlags, fillRule)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation
@@ -373,17 +385,12 @@ proc addRenderContourCall*(
 
     ctx.addCall(call)
 
-proc addRenderSdfCall*(
-  ctx: var RenderData,
-  view: Vec2,
-  paint: Paint,
-  image: Image,
-  verts: openArray[Vec4],
-  compositeOperation: CompositeOperation,
-) =
+proc addRenderSdfCall*(ctx: var RenderData, view: Vec2, paint: Paint,
+    image: Image, imageFlags: set[ImageFlags], verts: openArray[Vec4],
+    compositeOperation: CompositeOperation) =
   var
     call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, ShaderSdf, image, NonZero)
+    uniformParam = call.toUniform(paint, ShaderSdf, image, imageFlags, NonZero)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation

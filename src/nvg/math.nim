@@ -143,3 +143,47 @@ proc rotated*(matrix: Mat2d, radians: float32): Mat2d {.inline.} =
 proc rotate*(matrix: var Mat2d, radians: float32) {.inline.} =
   let r = rotated(radians)
   matrix.premultiply(r)
+
+proc inverse*(matrix: var Mat2d) {.inline.} =
+  let det = matrix.xx * matrix.yy - matrix.xy * matrix.yx
+  if det > -1e-6 and det < 1e-6:
+    matrix = mat2d()
+    return
+
+  let
+    xx = matrix.xx
+    yx = matrix.yx
+    xy = matrix.xy
+    yy = matrix.yy
+    dx = matrix.dx
+    dy = matrix.dy
+    invDet = float32(1) / det
+
+  matrix.xx = yy * invDet
+  matrix.yx = -yx * invDet
+  matrix.xy = -xy * invDet
+  matrix.yy = xx * invDet
+  matrix.dx = float32(float64(xy) * float64(dy) - float64(yy) * float64(dx)) * invDet
+  matrix.dy = float32(float64(yx) * float64(dx) - float64(xx) * float64(dy)) * invDet
+
+proc inversed*(matrix: Mat2d): Mat2d {.inline.} =
+  let det = matrix.xx * matrix.yy - matrix.xy * matrix.yx
+  if det > -1e-6 and det < 1e-6:
+    result = mat2d()
+    return
+
+  let
+    xx = matrix.xx
+    yx = matrix.yx
+    xy = matrix.xy
+    yy = matrix.yy
+    dx = matrix.dx
+    dy = matrix.dy
+    invDet = float32(1) / det
+
+  result.xx = yy * invDet
+  result.yx = -yx * invDet
+  result.xy = -xy * invDet
+  result.yy = xx * invDet
+  result.dx = float32(float64(xy) * float64(dy) - float64(yy) * float64(dx)) * invDet
+  result.dy = float32(float64(yx) * float64(dx) - float64(xx) * float64(dy)) * invDet

@@ -306,16 +306,19 @@ proc renderSdfImpl(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
 
   var
     image = default(Image)
+    imageFlags = default(set[ImageFlags])
 
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
       image = tex.image
+      imageFlags = tex.imageFlags
 
   ctx.renderData.addRenderSdfCall(
     vec2(float32(ctx.width), float32(ctx.height)),
     paint,
     image,
+    imageFlags,
     verts,
     compositeOperation,
   )
@@ -326,25 +329,26 @@ proc renderContourImpl(ctx: BackendContext, paint: Paint, contours: openArray[
 
   var
     image = default(Image)
+    imageFlags = default(set[ImageFlags])
 
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
       image = tex.image
+      imageFlags = tex.imageFlags
 
   ctx.renderData.addRenderContourCall(
     vec2(float32(ctx.width), float32(ctx.height)),
     paint,
     image,
+    imageFlags,
     contours,
     fillRule,
     compositeOperation,
   )
 
-proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
-    ImageFlags]): ImageId =
-  let ctx = OpenglBackendContext(ctx)
-
+proc createTexture(ctx: OpenglBackendContext, image: Image, imageFlags: set[
+    ImageFlags]): OpenglTexture =
   var
     wrapX = GL_CLAMP_TO_EDGE
     wrapY = GL_CLAMP_TO_EDGE
@@ -370,56 +374,65 @@ proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
   else:
     minFilter = magFilter
 
-  let
-    tex = OpenglTexture()
-    image = ctx.renderData.createImage(imageInfo)
+  let imageInfo = image.imageInfo
 
-  tex.image = image
-  tex.imageFlags = imageFlags
+  result = OpenglTexture()
+  result.image = image
+  result.imageFlags = imageFlags
 
-  glGenTextures(1, tex.texImage.addr)
-  glBindTexture(GL_TEXTURE_2D, tex.texImage)
+  glGenTextures(1, result.texImage.addr)
+  glBindTexture(GL_TEXTURE_2D, result.texImage)
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
   glPixelStorei(GL_UNPACK_ROW_LENGTH, imageInfo.width *
       imageInfo.pixelFormat.bytesPerPixel)
 
+  var pixels = default(pointer)
+  if image.data.len > 0:
+    pixels = image.data[0].addr
+
   case imageInfo.pixelFormat
   of PixelFormatA8:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R8), imageInfo.width,
-        imageInfo.height, 0, GL_RED, GL_UNSIGNED_BYTE, nil)
+        imageInfo.height, 0, GL_RED, GL_UNSIGNED_BYTE, pixels)
 
   of PixelFormatRGB8:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB8), imageInfo.width,
-        imageInfo.height, 0, GL_RGB, GL_UNSIGNED_BYTE, nil)
+        imageInfo.height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels)
 
   of PixelFormatRGBA8:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), imageInfo.width,
-        imageInfo.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nil)
+        imageInfo.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels)
 
   of PixelFormatA32f:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_R32F), imageInfo.width,
-        imageInfo.height, 0, GL_RED, cGL_FLOAT, nil)
+        imageInfo.height, 0, GL_RED, cGL_FLOAT, pixels)
 
   of PixelFormatRGB32f:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB32F), imageInfo.width,
-        imageInfo.height, 0, GL_RGB, cGL_FLOAT, nil)
+        imageInfo.height, 0, GL_RGB, cGL_FLOAT, pixels)
 
   of PixelFormatRGBA32f:
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32F), imageInfo.width,
-        imageInfo.height, 0, GL_RGBA, cGL_FLOAT, nil)
+        imageInfo.height, 0, GL_RGBA, cGL_FLOAT, pixels)
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
 
-  glGenSamplers(1, tex.smp.addr)
-  glSamplerParameteri(tex.smp, GL_TEXTURE_MIN_FILTER, minFilter)
-  glSamplerParameteri(tex.smp, GL_TEXTURE_MAG_FILTER, magFilter)
-  glSamplerParameteri(tex.smp, GL_TEXTURE_WRAP_S, wrapX)
-  glSamplerParameteri(tex.smp, GL_TEXTURE_WRAP_T, wrapY)
+  glGenSamplers(1, result.smp.addr)
+  glSamplerParameteri(result.smp, GL_TEXTURE_MIN_FILTER, minFilter)
+  glSamplerParameteri(result.smp, GL_TEXTURE_MAG_FILTER, magFilter)
+  glSamplerParameteri(result.smp, GL_TEXTURE_WRAP_S, wrapX)
+  glSamplerParameteri(result.smp, GL_TEXTURE_WRAP_T, wrapY)
 
   glBindTexture(GL_TEXTURE_2D, 0)
 
+proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
+    ImageFlags]): ImageId =
+  let
+    ctx = OpenglBackendContext(ctx)
+    image = ctx.renderData.createImage(imageInfo)
+    tex = ctx.createTexture(image, imageFlags)
   ctx.addTexture(image.imageId, tex)
   image.imageId
 
@@ -445,7 +458,7 @@ proc updateImageImpl(ctx: BackendContext, imageId: ImageId, x, y, w, h,
     glBindTexture(GL_TEXTURE_2D, tex.texImage)
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, w * imageInfo.pixelFormat.bytesPerPixel)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, stride)
 
     case imageInfo.pixelFormat
     of PixelFormatA8:

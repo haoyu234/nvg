@@ -405,16 +405,19 @@ proc renderSdfImpl(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
 
   var
     image = default(Image)
+    imageFlags = default(set[ImageFlags])
 
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
       image = tex.image
+      imageFlags = tex.imageFlags
 
   ctx.renderData.addRenderSdfCall(
     vec2(float32(ctx.width), float32(ctx.height)),
     paint,
     image,
+    imageFlags,
     verts,
     compositeOperation,
   )
@@ -425,16 +428,19 @@ proc renderContourImpl(ctx: BackendContext, paint: Paint, contours: openArray[
 
   var
     image = default(Image)
+    imageFlags = default(set[ImageFlags])
 
   if not paint.imageId.isNil:
     let tex = ctx.getTexture(paint.imageId)
     if not tex.isNil:
       image = tex.image
+      imageFlags = tex.imageFlags
 
   ctx.renderData.addRenderContourCall(
     vec2(float32(ctx.width), float32(ctx.height)),
     paint,
     image,
+    imageFlags,
     contours,
     fillRule,
     compositeOperation,
@@ -449,10 +455,8 @@ proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat {.inline.} =
   of PixelFormatRGB32f: gfx.pixelFormatRgba32f
   of PixelFormatRGBA32f: gfx.pixelFormatRgba32f
 
-proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
-    ImageFlags]): ImageId =
-  let ctx = SokolBackendContext(ctx)
-
+proc createTexture(ctx: SokolBackendContext, image: Image, imageFlags: set[
+    ImageFlags]): SokolTexture =
   var
     wrapX = wrapClampToEdge
     wrapY = wrapClampToEdge
@@ -480,13 +484,12 @@ proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
   else:
     mipmapFilter = filterDefault
 
-  let
-    tex = SokolTexture()
-    image = ctx.renderData.createImage(imageInfo)
+  let imageInfo = image.imageInfo
 
-  tex.image = image
-  tex.imageFlags = imageFlags
-  tex.texImage = makeImage(
+  result = SokolTexture()
+  result.image = image
+  result.imageFlags = imageFlags
+  result.texImage = makeImage(
     ImageDesc(
       type: imageType2d,
       width: imageInfo.width,
@@ -498,7 +501,7 @@ proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
     )
   )
 
-  tex.smp = makeSampler(
+  result.smp = makeSampler(
     SamplerDesc(
       minFilter: minFilter,
       magFilter: magFilter,
@@ -508,14 +511,20 @@ proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
     )
   )
 
-  tex.texImageView = makeView(
+  result.texImageView = makeView(
     ViewDesc(
       texture: TextureViewDesc(
-        image: tex.texImage
+        image: result.texImage
     ),
   )
   )
 
+proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
+    ImageFlags]): ImageId =
+  let
+    ctx = SokolBackendContext(ctx)
+    image = ctx.renderData.createImage(imageInfo)
+    tex = ctx.createTexture(image, imageFlags)
   ctx.addTexture(image.imageId, tex)
   image.imageId
 

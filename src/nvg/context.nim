@@ -163,8 +163,8 @@ proc translate*(ctx: Context, v: Vec2) {.inline.} =
 proc scale*(ctx: Context, v: Vec2) {.inline.} =
   ctx.transform.scale(v)
 
-proc rotate*(ctx: Context, v: float32) {.inline.} =
-  ctx.transform.rotate(v)
+proc rotate*(ctx: Context, radians: float32) {.inline.} =
+  ctx.transform.rotate(radians)
 
 proc resetTransform*(ctx: Context) {.inline.} =
   ctx.transform = mat2d()
@@ -198,6 +198,7 @@ proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.expandFill(ctx.distTolSq)
 
   var paint = ctx.fillStyle
+  paint.transform.multiply(ctx.transform)
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
@@ -221,6 +222,7 @@ proc strokePath*(ctx: Context, path: Path) =
     strokeWidth = max(ctx.strokeWidth * s, 0.01)
 
   var paint = ctx.strokeStyle
+  paint.transform.multiply(ctx.transform)
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
@@ -298,6 +300,20 @@ proc fill*(ctx: Context) {.inline.} =
 
 proc stroke*(ctx: Context) {.inline.} =
   ctx.strokePath(ctx.path)
+
+proc imagePattern*(ctx: Context, xywh: Vec4, radians: float32,
+    imageId: ImageId, alpha: float32): Paint {.inline.} =
+  result.transform = rotated(radians)
+  result.transform.dx = xywh[0]
+  result.transform.dy = xywh[1]
+  result.extent[0] = xywh[2]
+  result.extent[1] = xywh[3]
+  result.imageId = imageId
+  result.innerColor = color(1, 1, 1, alpha)
+  result.outerColor = color(1, 1, 1, alpha)
+
+proc getImageInfo*(ctx: Context, imageId: ImageId): ImageInfo {.inline.} =
+  ctx.backendContext.getImageInfo(imageId)
 
 proc measureText*(ctx: Context, text: openArray[char]): float32 =
   if ctx.fons.isNil:
