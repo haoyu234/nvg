@@ -4,15 +4,22 @@ import ./math
 import ./path
 import ./pieces
 
+import std/hashes
 import std/math
 
 type Cache* = object
+  lastId: uint
+  lastVersion: uint32
+  lastHash: Hash
   points: seq[Vec2]
   contours*: seq[Contour]
   curPath: ptr Contour
   storage: seq[Vec4]
 
 proc clear*(c: var Cache) {.inline, raises: [].} =
+  c.lastId = 0
+  c.lastVersion = 0
+  c.lastHash = default(Hash)
   c.curPath = nil
   c.points.setLen(0)
   c.contours.setLen(0)
@@ -89,9 +96,18 @@ proc bezier(
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
 ) =
-  if c.contours.len > 0:
-    c.curPath = nil
-    c.contours.setLen(0)
+  let
+    hash = hash(matrix)
+    id = cast[uint](path.data[0].addr)
+
+  if c.lastId == id and
+    c.lastVersion == path.version and c.lastHash == hash:
+    return
+
+  c.clear()
+  c.lastHash = hash
+  c.lastId = id
+  c.lastVersion = path.version
 
   for command, vals in path.commands:
     case command
@@ -390,7 +406,7 @@ proc expandStroke*(
         l01Sq = d01.lengthSq
         l12Sq = d12.lengthSq
 
-        join = if lineJoin == MiterJoin and mLenSq <= mLimSq and 
+        join = if lineJoin == MiterJoin and mLenSq <= mLimSq and
           miterDenom > 1e-6f: MiterJoin else: BevelJoin
         outerJoin = if lineJoin == RoundJoin: RoundJoin else: join
         innerJoin = if l01Sq < mLenSq or l12Sq < mLenSq: BevelJoin else: join

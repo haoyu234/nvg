@@ -11,7 +11,14 @@ const
 proc empty*(p: Path): bool =
   p.data.len <= 0
 
+proc markDirty(p: var Path) {.inline.} =
+  inc p.version, 1
+  while p.version == 0:
+    inc p.version, 1
+
 proc clear*(p: var Path) {.inline.} =
+  p.markDirty()
+  p.startPos = vec2(0, 0)
   p.currentPos = vec2(0, 0)
   p.data.setLen(0)
 
@@ -66,6 +73,7 @@ proc appendCommands*(p: var Path, commands: openArray[float32]) {.inline.} =
     of Command.CLOSE:
       p.currentPos = p.startPos
 
+  p.markDirty()
   p.data.add(commands)
 
 proc rect*(p: var Path, xywh: Vec4) {.inline.} =

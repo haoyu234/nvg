@@ -193,7 +193,6 @@ proc loadFontFromMemory*(ctx: Context, data: openArray[
   ctx.fons.loadFontFromMemory(data)
 
 proc fillPath*(ctx: Context, path: Path) =
-  ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
   ctx.cache.expandFill(ctx.distTolSq)
 
@@ -226,7 +225,6 @@ proc strokePath*(ctx: Context, path: Path) =
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
-  ctx.cache.clear()
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
 
   if len(ctx.dashArray) > 0 and ctx.dashArray[0] > 0:

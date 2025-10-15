@@ -100,6 +100,7 @@ type
     CLOSE
 
   Path* = object
+    version*: uint32
     startPos*: Vec2
     currentPos*: Vec2
     data*: seq[float32]
