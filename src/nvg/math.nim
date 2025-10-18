@@ -144,6 +144,22 @@ proc rotate*(matrix: var Mat2d, radians: float32) {.inline.} =
   let r = rotated(radians)
   matrix.premultiply(r)
 
+proc skewed*(radians: Vec2): Mat2d {.inline.} =
+  result.xx = 1
+  result.yx = tan(radians[1])
+  result.xy = tan(radians[0])
+  result.yy = 1
+  result.dx = 0
+  result.dy = 0
+
+proc skewed*(matrix: Mat2d, radians: Vec2): Mat2d {.inline.} =
+  result = skewed(radians)
+  result.multiply(matrix)
+
+proc skew*(matrix: var Mat2d, radians: Vec2) {.inline.} =
+  let sk = skewed(radians)
+  matrix.premultiply(sk)
+
 proc inverse*(matrix: var Mat2d) {.inline.} =
   let det = matrix.xx * matrix.yy - matrix.xy * matrix.yx
   if det > -1e-6 and det < 1e-6:

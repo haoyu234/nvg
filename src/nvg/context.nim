@@ -166,6 +166,9 @@ proc scale*(ctx: Context, v: Vec2) {.inline.} =
 proc rotate*(ctx: Context, radians: float32) {.inline.} =
   ctx.transform.rotate(radians)
 
+proc skew*(ctx: Context, radians: Vec2) {.inline.} =
+  ctx.transform.skew(radians)
+
 proc resetTransform*(ctx: Context) {.inline.} =
   ctx.transform = mat2d()
 
