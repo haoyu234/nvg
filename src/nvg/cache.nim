@@ -12,7 +12,11 @@ type Cache* = object
   lastVersion: uint32
   lastHash: Hash
   points: seq[Vec2]
-  contours*: seq[Contour]
+  flattenedContourCount: int32
+  flattenedContourPointCount: int32
+  strokeOffset: int32
+  strokeEndOffset: int32
+  contours: seq[Contour]
   curPath: ptr Contour
   storage: seq[Vec4]
 
@@ -22,6 +26,10 @@ proc clear*(c: var Cache) {.inline, raises: [].} =
   c.lastHash = default(Hash)
   c.curPath = nil
   c.points.setLen(0)
+  c.flattenedContourCount = 0
+  c.flattenedContourPointCount = 0
+  c.strokeOffset = 0
+  c.strokeEndOffset = 0
   c.contours.setLen(0)
 
 proc addContour(c: var Cache) {.inline, raises: [].} =
@@ -153,7 +161,9 @@ proc flattenPaths*(
       if not c.curPath.isNil:
         c.curPath.closed = true
 
-  for idx in 0 ..< c.contours.len:
+  let contourCount = int32(c.contours.len)
+
+  for idx in 0 ..< contourCount:
     let p = c.contours[idx].addr
 
     if p.pointCount <= 1:
@@ -168,6 +178,11 @@ proc flattenPaths*(
       dec p.pointCount
 
       p.closed = true
+
+  c.strokeOffset = 0
+  c.strokeEndOffset = contourCount
+  c.flattenedContourCount = contourCount
+  c.flattenedContourPointCount = int32(c.points.len)
 
 proc curveDivs(r, arc, tol: float32): int32 {.inline.} =
   let da = arccos(r / (r + tol)) * 2
@@ -227,13 +242,18 @@ proc dashStroke*(
     dashOffset = dashOffset - dashArray[dash0]
     dash0 = succ(dash0) mod dashArray.len
 
-  let contours = move c.contours
   c.curPath = nil
+  if c.contours.len > c.flattenedContourCount:
+    c.contours.setLenUninit(c.flattenedContourCount)
+    c.points.setLenUninit(c.flattenedContourPointCount)
 
-  for idx in 0 ..< contours.len:
-    let p = contours[idx].addr
+  for idx in 0 ..< c.flattenedContourCount:
+    let
+      p = c.contours[idx].addr
+      pointCount = p.pointCount
+      pointOffset = p.offset
 
-    if p.pointCount <= 1:
+    if pointCount <= 1:
       continue
 
     var
@@ -242,21 +262,21 @@ proc dashStroke*(
       dashState = true
       dashIdx = dash0
 
-      p0 = c.points[p.offset]
+      p0 = c.points[pointOffset]
 
-      i = p.offset + 1
+      i = pointOffset + 1
       j =
         if p.closed:
-          p.offset + p.pointCount
+          pointOffset + pointCount
         else:
-          p.offset + p.pointCount - 1
+          pointOffset + pointCount - 1
 
     c.addContour()
     c.addPoint(p0)
 
     while i <= j:
       let
-        k = p.offset + (i - p.offset) mod p.pointCount
+        k = pointOffset + (i - pointOffset) mod pointCount
         dp = c.points[k] - p0
         dist = dp.length
 
@@ -281,13 +301,16 @@ proc dashStroke*(
           c.addPoint(p0)
         inc i, 1
 
+  c.strokeOffset = c.flattenedContourCount
+  c.strokeEndOffset = int32(c.contours.len)
+
 proc expandStroke*(
     c: var Cache,
     lineCap: LineCap,
     lineJoin: LineJoin,
     strokeWidth, miterLimit: float32,
     tessTol, distTolSq: float32,
-) =
+): Piece[Contour] =
   let
     w = float32(0.5 * strokeWidth)
     nCap = curveDivs(w, PI, tessTol)
@@ -322,7 +345,11 @@ proc expandStroke*(
     dec r
     memory[r] = vec4(v1[0], v1[1], v2[0], v2[1])
 
-  for idx in 0 ..< c.contours.len:
+  let
+    strokeOffset = c.strokeOffset
+    strokeEndOffset = c.strokeEndOffset
+
+  for idx in strokeOffset ..< strokeEndOffset:
     let p = c.contours[idx].addr
 
     if p.pointCount <= 0:
@@ -510,7 +537,9 @@ proc expandStroke*(
     offset = l2
     r = vertCount
 
-proc expandFill*(c: var Cache, distTolSq: float32) =
+  result = piece(c.contours.toOpenArray(strokeOffset, strokeEndOffset - 1))
+
+proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
   let vertCount = block:
     var count = 0
 
@@ -524,7 +553,11 @@ proc expandFill*(c: var Cache, distTolSq: float32) =
   var pos = 0
   let memory = piece(c.storage)
 
-  for idx in 0 ..< c.contours.len:
+  let
+    fillOffset = 0
+    fillEndOffset = c.flattenedContourCount
+
+  for idx in fillOffset ..< fillEndOffset:
     let
       p = c.contours[idx].addr
       oldPos = pos
@@ -547,3 +580,5 @@ proc expandFill*(c: var Cache, distTolSq: float32) =
       p0 = p1
 
     p.fill = memory[oldPos ..< pos]
+
+  result = piece(c.contours.toOpenArray(fillOffset, fillEndOffset - 1))

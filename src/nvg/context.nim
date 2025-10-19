@@ -4,6 +4,7 @@ import ./core
 import ./fontstash
 import ./math
 import ./path
+import ./pieces
 
 import std/math
 
@@ -197,7 +198,8 @@ proc loadFontFromMemory*(ctx: Context, data: openArray[
 
 proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
-  ctx.cache.expandFill(ctx.distTolSq)
+  
+  let contours = ctx.cache.expandFill(ctx.distTolSq)
 
   var paint = ctx.fillStyle
   paint.transform.multiply(ctx.transform)
@@ -206,7 +208,7 @@ proc fillPath*(ctx: Context, path: Path) =
 
   ctx.backendContext.renderContour(
     paint,
-    ctx.cache.contours,
+    contours.toOpenArray,
     ctx.fillRule,
     ctx.compositeOperation,
   )
@@ -233,14 +235,14 @@ proc strokePath*(ctx: Context, path: Path) =
   if len(ctx.dashArray) > 0 and ctx.dashArray[0] > 0:
     ctx.cache.dashStroke(s, strokeWidth, ctx.dashOffset, ctx.dashArray)
 
-  ctx.cache.expandStroke(
+  let contours = ctx.cache.expandStroke(
     ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit,
     ctx.tessTolSq, ctx.distTolSq
   )
 
   ctx.backendContext.renderContour(
     paint,
-    ctx.cache.contours,
+    contours.toOpenArray,
     NonZero,
     ctx.compositeOperation,
   )
