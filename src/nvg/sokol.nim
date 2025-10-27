@@ -56,10 +56,13 @@ type
     supportDrawBaseVertex: bool
     supportDrawBaseInstance: bool
 
-proc `=destroy`(tex: SokolTextureObj) =
+proc `=destroy`(tex: var SokolTextureObj) =
   destroyView(tex.texImageView)
   destroyImage(tex.texImage)
   destroySampler(tex.smp)
+
+  `=destroy`(tex.image)
+  `=destroy`(tex.imageFlags)
 
 proc `=destroy`(storage: SokolStorage) =
   destroyView(storage.view)
@@ -73,6 +76,8 @@ proc `=destroy`(ctx: var SokolBackendContextObj) =
   destroyBuffer(ctx.vertAndIndexDummyBuf)
   destroyBuffer(ctx.instanceBuf)
   destroyPipeline(ctx.pipeline)
+
+  `=destroy`(ctx.renderData)
 
   `=destroy`(ctx.texEdge)
   `=destroy`(ctx.texVert)

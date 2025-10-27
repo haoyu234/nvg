@@ -73,9 +73,12 @@ template tryCall(body: untyped) =
   except:
     discard
 
-proc `=destroy`(tex: OpenglTextureObj) =
+proc `=destroy`(tex: var OpenglTextureObj) =
   tryCall glDeleteSamplers(1, tex.smp.addr)
   tryCall glDeleteTextures(1, tex.texImage.addr)
+
+  `=destroy`(tex.image)
+  `=destroy`(tex.imageFlags)
 
 proc `=destroy`(storage: OpenglStorage) =
   tryCall glDeleteTextures(1, storage.tex.addr)
@@ -105,6 +108,8 @@ proc `=destroy`(ctx: var OpenglBackendContextObj) =
 
   if ctx.smpDummy != 0:
     tryCall glDeleteSamplers(1, ctx.smpDummy.addr)
+
+  `=destroy`(ctx.renderData)
 
   `=destroy`(ctx.texEdge)
   `=destroy`(ctx.texVert)

@@ -269,12 +269,12 @@ when defined(feature.nvg.opengl):
     else: KEY_CODE_NONE
 
   proc launch*(w, h: int32, app: App) =
-    var
+    let
       name = fmt"{app.name} SDL2"
       window = createWindow(name.cstring, 100, 100, cint(w), cint(h),
           SDL_WINDOW_SHOWN or SDL_WINDOW_OPENGL)
 
-    discard window.glCreateContext()
+      glCtx = window.glCreateContext()
 
     loadExtensions()
 
@@ -379,7 +379,9 @@ when defined(feature.nvg.opengl):
         if not app.eventImpl.isNil:
           app.eventImpl(ctx, event)
 
-    destroy window
+    sdl2.glDeleteContext(glCtx)
+    sdl2.destroyWindow(window)
+  sdl2.quit()
 
 elif defined(feature.nvg.sokol):
   import pkg/sokol/app as sapp
