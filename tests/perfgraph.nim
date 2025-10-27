@@ -40,7 +40,10 @@ proc average*(p: PerfGraph): float32 =
       inc n, 1
       sum = sum + v
 
-  sum / float32(n)
+  if n > 0:
+    sum / float32(n)
+  else:
+    high(float32)
 
 proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   let
