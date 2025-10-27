@@ -12,7 +12,7 @@ A **Nim** port of [nanovgXC](https://github.com/styluslabs/nanovgXC) with some o
 * dashed strokes
 
 # Build and run samples
-* `nimble install sokol-nim`
+* `nimble install sokol`
 * `nim -d:feature.nvg.sokol c -d:release -d:danger tests/tdemo.nim`
 * or `nim -d:feature.nvg.sokol -d:gl c -d:release -d:danger tests/tdemo.nim`
 
