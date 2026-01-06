@@ -38,6 +38,11 @@ type
     height*: int32
     pixelFormat*: PixelFormat
     alphaType*: AlphaType
+  
+  Quad* = object
+    imageId*: ImageId
+    x1*, y1*, x2*, y2*: float32
+    s1*, t1*, s2*, t2*: float32
 
   LineCap* = enum
     ButtCap

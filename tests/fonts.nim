@@ -12,16 +12,19 @@ var
   fontId_emoji = default(FontId)
 
 proc getDefaultFont*(ctx: Context): FontId =
-  if fontId.isNil:
-    fontId = ctx.loadFontFromMemory(cast[seq[byte]](FONT))
+  # TODO:
+  # if fontId.isNil:
+  #   fontId = ctx.loadFontFromMemory(cast[seq[byte]](FONT))
   fontId
 
 proc getMonoFont*(ctx: Context): FontId =
-  if fontId_mono.isNil:
-    fontId_mono = ctx.loadFontFromMemory(cast[seq[byte]](FONT_mono))
+  # TODO:
+  # if fontId_mono.isNil:
+  #   fontId_mono = ctx.loadFontFromMemory(cast[seq[byte]](FONT_mono))
   fontId_mono
 
 proc getEmojiFont*(ctx: Context): FontId =
-  if fontId_emoji.isNil:
-    fontId_emoji = ctx.loadFontFromMemory(cast[seq[byte]](FONT_emoji))
+  # TODO:
+  # if fontId_emoji.isNil:
+  #   fontId_emoji = ctx.loadFontFromMemory(cast[seq[byte]](FONT_emoji))
   fontId_emoji

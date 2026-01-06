@@ -1,7 +1,6 @@
 import ./backend
 import ./cache
 import ./core
-import ./fontstash
 import ./math
 import ./path
 import ./pieces
@@ -55,7 +54,6 @@ type
     fontId*: FontId
 
     #
-    fons*: FonsStash
     backendContext*: BackendContext
 
     tessTol: float32
@@ -151,9 +149,8 @@ proc restore*(ctx: Context) =
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(fons: FonsStash, backendContext: BackendContext): Context =
+proc createInternal*(backendContext: BackendContext): Context =
   result = Context()
-  result.fons = fons
   result.backendContext = backendContext
   result.setDevicePixelRatio(1)
   result.resetState()
@@ -181,20 +178,6 @@ proc setTransform*(ctx: Context, v: Mat2d) {.inline.} =
 
 proc transform*(ctx: Context, v: Mat2d) {.inline.} =
   ctx.transform.premultiply(v)
-
-proc loadFontFromMemory*(ctx: Context, data: sink seq[
-    byte]): FontId {.inline.} =
-  if ctx.fons.isNil:
-    return
-
-  ctx.fons.loadFontFromMemory(data)
-
-proc loadFontFromMemory*(ctx: Context, data: openArray[
-    byte]): FontId {.inline.} =
-  if ctx.fons.isNil:
-    return
-
-  ctx.fons.loadFontFromMemory(data)
 
 proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
@@ -318,87 +301,22 @@ proc imagePattern*(ctx: Context, xywh: Vec4, radians: float32,
 proc getImageInfo*(ctx: Context, imageId: ImageId): ImageInfo {.inline.} =
   ctx.backendContext.getImageInfo(imageId)
 
-proc measureText*(ctx: Context, text: openArray[char]): float32 =
-  if ctx.fons.isNil:
-    return
-
-  let font = ctx.fons.getFont(ctx.fontId)
-  if font.isNil:
-    return
-
-  ctx.fons.measureText(font, text, ctx.fontSize, ctx.letterSpacing)
-
-proc text*(ctx: Context, text: openArray[char], pos: Vec2) =
-  if ctx.fons.isNil:
-    return
-
-  let font = ctx.fons.getFont(ctx.fontId)
-  if font.isNil:
-    return
-
-  let scale = font.getPixelHeightScale(ctx.fontSize)
-
-  for x, y, glyphId in ctx.fons.arrange(
-    font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
-        ctx.letterSpacing
-  ):
-    let glyph = font.getGlyph(glyphId)
-    if glyph.isNil:
-      continue
-
-    let path = font.getGlyphPath(glyph)
-    if path.empty:
-      continue
-
-    let matrix = mat2d(scale, 0, 0, -scale, x, y)
-    ctx.path.addPath(path, multiplied(matrix, ctx.transform))
-
-proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
-  if ctx.fons.isNil:
-    return
-
-  let font = ctx.fons.getFont(ctx.fontId)
-  if font.isNil:
-    return
-
-  var
-    rev = default(int32)
-    verts = newSeqOfCap[Vec4](text.len * 4)
-    vertBuf: array[4, Vec4]
-
-  if ctx.transform.xx * ctx.transform.yy < 0:
-    rev = 2
-
+proc fillQuad*(ctx: Context, quads: openArray[Quad]) =
   var paint = default(Paint)
   paint.innerColor = ctx.fillStyle.innerColor
   paint.outerColor = ctx.fillStyle.outerColor
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
-  for x, y, glyphId in ctx.fons.arrange(
-    font, text, pos[0], pos[1], ctx.textAlign, ctx.textBaseline, ctx.fontSize,
-        ctx.letterSpacing
-  ):
-    let glyph = font.getGlyph(glyphId)
-    if glyph.isNil:
-      continue
+  var
+    rev = default(int32)
+    vertBuf: array[4, Vec4]
+    verts = newSeqOfCap[Vec4](len(quads) * 4)
 
-    let quad = ctx.fons.getGlyphQuad(glyph, x, y, ctx.fontSize)
-    if quad.imageId.isNil:
-      continue
+  if ctx.transform.xx * ctx.transform.yy < 0:
+    rev = 2
 
-    if not paint.imageId.isNil:
-      if paint.imageId != quad.imageId:
-        ctx.backendContext.renderSdf(
-          paint,
-          verts,
-          ctx.compositeOperation,
-        )
-
-        verts.setLen(0)
-
-    paint.imageId = quad.imageId
-
+  for quad in quads:
     let
       p1 = vec2(quad.x1, quad.y1) * ctx.transform
       p2 = vec2(quad.x2, quad.y1) * ctx.transform
@@ -412,9 +330,8 @@ proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
 
     verts.add(vertBuf)
 
-  if verts.len > 0:
-    ctx.backendContext.renderSdf(
-      paint,
-      verts,
-      ctx.compositeOperation,
-    )
+  ctx.backendContext.renderSdf(
+    paint,
+    verts,
+    ctx.compositeOperation,
+  )

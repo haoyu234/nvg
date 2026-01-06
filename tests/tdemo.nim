@@ -96,7 +96,8 @@ proc frameImpl(ctx: Context) =
   ctx.fontSize = 32
   ctx.textBaseline = MiddleBaseline
   ctx.fillStyle = color(0, 0, 0, 1)
-  ctx.fillText(name, vec2(10, float32(SCREEN_H - 20)))
+  # TODO:
+  # ctx.fillText(name, vec2(10, float32(SCREEN_H - 20)))
 
   # page indicator
   let

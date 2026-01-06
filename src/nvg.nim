@@ -17,18 +17,12 @@ when defined(feature.nvg.opengl) or defined(feature.nvg.sokol):
     import nvg/sokol
     export sokol
 
-  import nvg/atlas
-  import nvg/fontstash
-
   proc newContext*(width, height: int32): Context =
-    let
-      backendContext = createBackendContext(width, height)
-      atlas = newAtlas(2048, 2048, backendContext)
-      fons = newFonsStash(TopLeftOrigin, atlas)
-    createInternal(fons, backendContext)
+    let backendContext = createBackendContext(width, height)
+    createInternal(backendContext)
 
 else:
   import nvg/backend
 
   proc newContext*(width, height: int32): Context =
-    createInternal(nil, BackendContext())
+    createInternal(BackendContext())

@@ -18,3 +18,5 @@ feature "opengl":
 
 feature "dev":
   requires "sdl2 >= 2.0.5"
+  requires "sokol >= 0.6.0"
+  requires "opengl >= 1.2.9"
