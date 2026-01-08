@@ -1,4 +1,5 @@
 import nvg
+import nvg/backend
 
 type
   AppEventType* = enum
@@ -282,7 +283,8 @@ when defined(feature.nvg.opengl):
       e = sdl2.defaultEvent
       runGame = true
 
-      ctx = newContext(w, h)
+      backendContext = createOpenglBackendContext(w, h)
+      ctx = createContext(backendContext)
 
     ctx.setDevicePixelRatio(1)
 
@@ -407,6 +409,7 @@ elif defined(feature.nvg.sokol):
   var
     g_app = default(App)
     g_ctx = default(Context)
+    g_backendCtx = default(BackendContext)
 
   var
     g_frameStartTime = default(MonoTime)
@@ -434,7 +437,8 @@ elif defined(feature.nvg.sokol):
 
     setWindowTitle(fmt"{g_app.name} {queryBackend()}".cstring)
 
-    g_ctx = newContext(width(), height())
+    g_backendCtx = createSokolBackendContext(width(), height())
+    g_ctx = createContext(g_backendCtx)
     g_ctx.setDevicePixelRatio(dpiScale())
 
     if not g_app.initImpl.isNil:

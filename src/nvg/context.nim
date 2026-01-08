@@ -189,7 +189,7 @@ proc fillPath*(ctx: Context, path: Path) =
   paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
   paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
 
-  ctx.backendContext.renderContour(
+  ctx.backendContext.drawContours(
     paint,
     contours.toOpenArray,
     ctx.fillRule,
@@ -223,7 +223,7 @@ proc strokePath*(ctx: Context, path: Path) =
     ctx.tessTolSq, ctx.distTolSq
   )
 
-  ctx.backendContext.renderContour(
+  ctx.backendContext.drawContours(
     paint,
     contours.toOpenArray,
     NonZero,
@@ -330,8 +330,8 @@ proc fillQuad*(ctx: Context, quads: openArray[Quad]) =
 
     verts.add(vertBuf)
 
-  ctx.backendContext.renderSdf(
-    paint,
-    verts,
-    ctx.compositeOperation,
-  )
+  # ctx.backendContext.renderSdf(
+  #   paint,
+  #   verts,
+  #   ctx.compositeOperation,
+  # )

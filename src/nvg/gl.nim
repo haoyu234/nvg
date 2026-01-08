@@ -3,7 +3,7 @@ import pkg/opengl
 import ./backend
 import ./core
 import ./glsl
-import ./renderdata
+import ./render_data
 
 import std/math
 import std/tables
@@ -48,6 +48,9 @@ type
 
   OpenglBackendContext = ref OpenglBackendContextObj
   OpenglBackendContextObj = object of BackendContext
+    width: int32
+    height: int32
+
     shaderProgram: OpenglShaderProgram
     vertArr: GLuint
     vertAndIndexDummyBuf: GLuint
@@ -305,53 +308,6 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
 
   glFinish()
 
-proc renderSdfImpl(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
-    compositeOperation: CompositeOperation) =
-  let ctx = OpenglBackendContext(ctx)
-
-  var
-    image = default(Image)
-    imageFlags = default(set[ImageFlags])
-
-  if not paint.imageId.isNil:
-    let tex = ctx.getTexture(paint.imageId)
-    if not tex.isNil:
-      image = tex.image
-      imageFlags = tex.imageFlags
-
-  ctx.renderData.addRenderSdfCall(
-    vec2(float32(ctx.width), float32(ctx.height)),
-    paint,
-    image,
-    imageFlags,
-    verts,
-    compositeOperation,
-  )
-
-proc renderContourImpl(ctx: BackendContext, paint: Paint, contours: openArray[
-    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
-  let ctx = OpenglBackendContext(ctx)
-
-  var
-    image = default(Image)
-    imageFlags = default(set[ImageFlags])
-
-  if not paint.imageId.isNil:
-    let tex = ctx.getTexture(paint.imageId)
-    if not tex.isNil:
-      image = tex.image
-      imageFlags = tex.imageFlags
-
-  ctx.renderData.addRenderContourCall(
-    vec2(float32(ctx.width), float32(ctx.height)),
-    paint,
-    image,
-    imageFlags,
-    contours,
-    fillRule,
-    compositeOperation,
-  )
-
 proc createTexture(ctx: OpenglBackendContext, image: Image, imageFlags: set[
     ImageFlags]): OpenglTexture =
   var
@@ -432,78 +388,6 @@ proc createTexture(ctx: OpenglBackendContext, image: Image, imageFlags: set[
 
   glBindTexture(GL_TEXTURE_2D, 0)
 
-proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
-    ImageFlags]): ImageId =
-  let
-    ctx = OpenglBackendContext(ctx)
-    image = ctx.renderData.createImage(imageInfo)
-    tex = ctx.createTexture(image, imageFlags)
-  ctx.addTexture(image.imageId, tex)
-  image.imageId
-
-proc getImageInfoImpl(ctx: BackendContext, imageId: ImageId): ImageInfo =
-  let
-    ctx = OpenglBackendContext(ctx)
-    tex = ctx.getTexture(imageId)
-
-  if not tex.isNil:
-    result = tex.image.imageInfo
-
-proc updateImageImpl(ctx: BackendContext, imageId: ImageId, x, y, w, h,
-    stride: int32, data: pointer) =
-  let
-    ctx = OpenglBackendContext(ctx)
-    tex = ctx.getTexture(imageId)
-
-  if not tex.isNil:
-    let
-      image = tex.image
-      imageInfo = image.imageInfo
-
-    glBindTexture(GL_TEXTURE_2D, tex.texImage)
-
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, stride)
-
-    case imageInfo.pixelFormat
-    of PixelFormatA8:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-          GL_RED, GL_UNSIGNED_BYTE, data)
-
-    of PixelFormatRGB8:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-          GL_RGB, GL_UNSIGNED_BYTE, data)
-
-    of PixelFormatRGBA8:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-          GL_RGBA, GL_UNSIGNED_BYTE, data)
-
-    of PixelFormatA32f:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-          GL_RED, cGL_FLOAT, data)
-
-    of PixelFormatRGB32f:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-        GL_RGB, cGL_FLOAT, data)
-
-    of PixelFormatRGBA32f:
-      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
-        GL_RGBA, cGL_FLOAT, data)
-
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
-
-    if image.data.len > 0:
-      if ImageGenerateMipmaps in tex.imageFlags:
-        glGenerateMipmap(GL_TEXTURE_2D)
-
-    glBindTexture(GL_TEXTURE_2D, 0)
-
-proc deleteImageImpl(ctx: BackendContext, imageId: ImageId) =
-  let
-    ctx = OpenglBackendContext(ctx)
-  ctx.deleteTexture(imageId)
-
 proc updateInstanceBuf(ctx: OpenglBackendContext) =
   if ctx.renderData.instances.len <= 0:
     return
@@ -527,7 +411,7 @@ proc updateInstanceBuf(ctx: OpenglBackendContext) =
       ctx.renderData.instances[0].addr,
     )
 
-proc renderCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
+proc drawCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
     prevBlend: CompositeOperation) =
   if idx <= 0 or call.uniformIndex != ctx.renderData.calls[idx -
       1].uniformIndex:
@@ -568,8 +452,98 @@ proc renderCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
   glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nil,
       call.instanceCount)
 
-proc flushImpl(ctx: BackendContext) =
-  let ctx = OpenglBackendContext(ctx)
+method drawContours(ctx: OpenglBackendContext, paint: Paint,
+    contours: openArray[
+
+Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
+  var
+    image = default(Image)
+    imageFlags = default(set[ImageFlags])
+
+  if not paint.imageId.isNil:
+    let tex = ctx.getTexture(paint.imageId)
+    if not tex.isNil:
+      image = tex.image
+      imageFlags = tex.imageFlags
+
+  ctx.renderData.addCall(
+    vec2(float32(ctx.width), float32(ctx.height)),
+    paint,
+    image,
+    imageFlags,
+    contours,
+    fillRule,
+    compositeOperation,
+  )
+
+method allocImage(ctx: OpenglBackendContext, imageInfo: ImageInfo,
+    imageFlags: set[ImageFlags]): ImageId =
+  let
+    image = ctx.renderData.createImage(imageInfo)
+    tex = ctx.createTexture(image, imageFlags)
+  ctx.addTexture(image.imageId, tex)
+  image.imageId
+
+method getImageInfo(ctx: OpenglBackendContext, imageId: ImageId): ImageInfo =
+  let
+    tex = ctx.getTexture(imageId)
+
+  if not tex.isNil:
+    result = tex.image.imageInfo
+
+method updateImage(ctx: OpenglBackendContext, imageId: ImageId, x, y, w, h,
+    strideBytes: int32, data: pointer) =
+  let
+    tex = ctx.getTexture(imageId)
+
+  if not tex.isNil:
+    let
+      image = tex.image
+      imageInfo = image.imageInfo
+
+    glBindTexture(GL_TEXTURE_2D, tex.texImage)
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, strideBytes)
+
+    case imageInfo.pixelFormat
+    of PixelFormatA8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RED, GL_UNSIGNED_BYTE, data)
+
+    of PixelFormatRGB8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RGB, GL_UNSIGNED_BYTE, data)
+
+    of PixelFormatRGBA8:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RGBA, GL_UNSIGNED_BYTE, data)
+
+    of PixelFormatA32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+          GL_RED, cGL_FLOAT, data)
+
+    of PixelFormatRGB32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+        GL_RGB, cGL_FLOAT, data)
+
+    of PixelFormatRGBA32f:
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h,
+        GL_RGBA, cGL_FLOAT, data)
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
+
+    if image.data.len > 0:
+      if ImageGenerateMipmaps in tex.imageFlags:
+        glGenerateMipmap(GL_TEXTURE_2D)
+
+    glBindTexture(GL_TEXTURE_2D, 0)
+
+method deleteImage(ctx: OpenglBackendContext, imageId: ImageId) =
+  ctx.deleteTexture(imageId)
+
+method flush(ctx: OpenglBackendContext) =
   ctx.initIfNeeded()
 
   if ctx.renderData.calls.len <= 0:
@@ -627,7 +601,7 @@ proc flushImpl(ctx: BackendContext) =
         else:
           default(CompositeOperation)
 
-    ctx.renderCall(idx, ctx.renderData.calls[idx], prevBlend)
+    ctx.drawCall(idx, ctx.renderData.calls[idx], prevBlend)
 
   glDisableVertexAttribArray(0)
   glDisableVertexAttribArray(1)
@@ -655,17 +629,9 @@ proc flushImpl(ctx: BackendContext) =
   #
   ctx.renderData.clear()
 
-proc createBackendContext*(
+proc createOpenglBackendContext*(
   width, height: int32): BackendContext =
-  OpenglBackendContext(
-    width: width,
-    height: height,
-
-    renderSdfImpl: renderSdfImpl,
-    renderContourImpl: renderContourImpl,
-    allocImageImpl: allocImageImpl,
-    getImageInfoImpl: getImageInfoImpl,
-    updateImageImpl: updateImageImpl,
-    deleteImageImpl: deleteImageImpl,
-    flushImpl: flushImpl,
-  )
+  let backendContext = OpenglBackendContext()
+  backendContext.width = width
+  backendContext.height = height
+  backendContext

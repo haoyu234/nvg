@@ -12,7 +12,7 @@ type
     ShaderSolid = 1
     ShaderGradient
     ShaderImage
-    ShaderSdf
+    # ShaderSdf
 
   Image* = ref object
     imageId*: ImageId
@@ -122,37 +122,41 @@ proc allocId*(ctx: var RenderData): uint32 =
   ctx.lastId
 
 proc createImage*(ctx: var RenderData, imageInfo: ImageInfo): Image =
-  Image(
-    imageId: ImageId(id: ctx.allocId()),
-    imageInfo: imageInfo,
-  )
+  result = Image()
+  result.imageId.id = ctx.allocId()
+  result.imageInfo.width = imageInfo.width
+  result.imageInfo.height = imageInfo.height
+  result.imageInfo.pixelFormat = imageInfo.pixelFormat
+  result.imageInfo.alphaType = imageInfo.alphaType
 
-proc updatePixels*(image: Image, x, y, w, h, stride: int32, data: pointer) =
+  if imageInfo.strideBytes <= 0:
+    let
+      width = imageInfo.width
+      bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
+
+    result.imageInfo.strideBytes = width * bytesPerPixel
+
+proc updatePixels*(image: Image, x, y, w, h, strideBytes: int32,
+    data: pointer) =
   let
     imageInfo = image.imageInfo
-    width = imageInfo.width
-    height = imageInfo.height
     bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
 
   if image.data.len <= 0:
-    image.data.setLen(width * height * bytesPerPixel)
+    image.data.setLen(imageInfo.height * strideBytes)
 
   let
-    offset = x + y * width
-    lineBytes = w * bytesPerPixel
-    sourceStrideBytes = stride * bytesPerPixel
+    sourceRowBytes = w * bytesPerPixel
+    sourceStrideBytes = strideBytes
     sourcePixels = cast[ptr UncheckedArray[uint8]](data)
-    destinationStrideBytes = width * bytesPerPixel
-    destinationPixels = cast[ptr UncheckedArray[uint8]](image.data[offset *
-        bytesPerPixel].addr)
-
-  if x == 0 and w == stride and w == width:
-    copyMem(destinationPixels, sourcePixels, h * lineBytes)
-    return
+    destinationStrideBytes = imageInfo.strideBytes
+    destinationOffset = x + y * destinationStrideBytes
+    destinationPixels = cast[ptr UncheckedArray[uint8]](image.data[
+        destinationOffset].addr)
 
   for idx in 0 ..< h:
     copyMem(destinationPixels[idx * destinationStrideBytes].addr, sourcePixels[
-        idx * sourceStrideBytes].addr, lineBytes)
+        idx * sourceStrideBytes].addr, sourceRowBytes)
 
 proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
     image: Image, imageFlags: set[ImageFlags],
@@ -223,7 +227,7 @@ proc calcBounds(contours: openArray[Contour]): Vec4 =
     result[2] = max(p.bounds[2], result[2])
     result[3] = max(p.bounds[3], result[3])
 
-proc addRenderContourCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
+proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
     image: Image, imageFlags: set[ImageFlags], contours: openArray[Contour],
     fillRule: FillRule, compositeOperation: CompositeOperation) =
   let edgeCount =
@@ -377,37 +381,6 @@ proc addRenderContourCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
 
     ctx.verts.addQuad(ltrb, 0.5)
     ctx.instances.add(instanceParam)
-
-  if ctx.instances.len > call.instanceOffset:
-    call.triangleCount = int32(ctx.verts.len) - call.triangleOffset
-    call.instanceCount = int32(ctx.instances.len) - call.instanceOffset
-    call.uniformIndex = ctx.addUniform(uniformParam)
-
-    ctx.addCall(call)
-
-proc addRenderSdfCall*(ctx: var RenderData, view: Vec2, paint: Paint,
-    image: Image, imageFlags: set[ImageFlags], verts: openArray[Vec4],
-    compositeOperation: CompositeOperation) =
-  var
-    call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, ShaderSdf, image, imageFlags, NonZero)
-    instanceParam = default(InstanceParam)
-
-  call.blend = compositeOperation
-  call.triangleOffset = int32(ctx.verts.len)
-  call.triangleCount = 0
-  call.instanceOffset = int32(ctx.instances.len)
-  call.instanceCount = 0
-
-  ctx.verts.add(verts)
-
-  instanceParam.fillOffset = int32(ctx.edges.len)
-  instanceParam.fillCount = 0
-
-  var idx = 0
-  while idx < verts.len:
-    ctx.instances.add(instanceParam)
-    inc idx, 4
 
   if ctx.instances.len > call.instanceOffset:
     call.triangleCount = int32(ctx.verts.len) - call.triangleOffset

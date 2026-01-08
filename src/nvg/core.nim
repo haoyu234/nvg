@@ -36,9 +36,10 @@ type
   ImageInfo* = object
     width*: int32
     height*: int32
+    strideBytes*: int32
     pixelFormat*: PixelFormat
     alphaType*: AlphaType
-  
+
   Quad* = object
     imageId*: ImageId
     x1*, y1*, x2*, y2*: float32

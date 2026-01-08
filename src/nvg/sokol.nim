@@ -3,7 +3,7 @@ import pkg/sokol/gfx except Color, Image, ImageInfo, PixelFormat
 import ./backend
 import ./core
 import ./glsl
-import ./renderdata
+import ./render_data
 
 import std/math
 import std/tables
@@ -33,6 +33,9 @@ type
 
   SokolBackendContext = ref SokolBackendContextObj
   SokolBackendContextObj = object of BackendContext
+    width: int32
+    height: int32
+
     shader: Shader
     smpDummy: Sampler
     texDummy: gfx.Image
@@ -404,53 +407,6 @@ proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
     ),
     )
 
-proc renderSdfImpl(ctx: BackendContext, paint: Paint, verts: openArray[Vec4],
-    compositeOperation: CompositeOperation) =
-  let ctx = SokolBackendContext(ctx)
-
-  var
-    image = default(Image)
-    imageFlags = default(set[ImageFlags])
-
-  if not paint.imageId.isNil:
-    let tex = ctx.getTexture(paint.imageId)
-    if not tex.isNil:
-      image = tex.image
-      imageFlags = tex.imageFlags
-
-  ctx.renderData.addRenderSdfCall(
-    vec2(float32(ctx.width), float32(ctx.height)),
-    paint,
-    image,
-    imageFlags,
-    verts,
-    compositeOperation,
-  )
-
-proc renderContourImpl(ctx: BackendContext, paint: Paint, contours: openArray[
-    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
-  let ctx = SokolBackendContext(ctx)
-
-  var
-    image = default(Image)
-    imageFlags = default(set[ImageFlags])
-
-  if not paint.imageId.isNil:
-    let tex = ctx.getTexture(paint.imageId)
-    if not tex.isNil:
-      image = tex.image
-      imageFlags = tex.imageFlags
-
-  ctx.renderData.addRenderContourCall(
-    vec2(float32(ctx.width), float32(ctx.height)),
-    paint,
-    image,
-    imageFlags,
-    contours,
-    fillRule,
-    compositeOperation,
-  )
-
 proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat {.inline.} =
   case typ
   of PixelFormatA8: gfx.pixelFormatR8
@@ -524,33 +480,6 @@ proc createTexture(ctx: SokolBackendContext, image: Image, imageFlags: set[
   )
   )
 
-proc allocImageImpl(ctx: BackendContext, imageInfo: ImageInfo, imageFlags: set[
-    ImageFlags]): ImageId =
-  let
-    ctx = SokolBackendContext(ctx)
-    image = ctx.renderData.createImage(imageInfo)
-    tex = ctx.createTexture(image, imageFlags)
-  ctx.addTexture(image.imageId, tex)
-  image.imageId
-
-proc getImageInfoImpl(ctx: BackendContext, imageId: ImageId): ImageInfo =
-  let
-    ctx = SokolBackendContext(ctx)
-    tex = ctx.getTexture(imageId)
-
-  if not tex.isNil:
-    result = tex.image.imageInfo
-
-proc updateImageImpl(ctx: BackendContext, imageId: ImageId, x, y, w, h,
-    stride: int32, data: pointer) =
-  let
-    ctx = SokolBackendContext(ctx)
-    tex = ctx.getTexture(imageId)
-
-  if not tex.isNil:
-    tex.dirty = true
-    tex.image.updatePixels(x, y, w, h, stride, data)
-
 proc updateTexture(tex: SokolTexture) {.inline.} =
   let
     image = tex.image
@@ -563,11 +492,6 @@ proc updateTexture(tex: SokolTexture) {.inline.} =
         size: imageInfo.width * imageInfo.height *
             imageInfo.pixelFormat.bytesPerPixel)
     ]))
-
-proc deleteImageImpl(ctx: BackendContext, imageId: ImageId) =
-  let
-    ctx = SokolBackendContext(ctx)
-  ctx.deleteTexture(imageId)
 
 proc updateInstanceBuf(ctx: SokolBackendContext) =
   if ctx.instanceBufSize < ctx.renderData.instances.len:
@@ -660,7 +584,7 @@ proc initIfNeeded(ctx: SokolBackendContext) =
   ctx.supportDrawBaseVertex = features.drawBaseVertex
   ctx.supportDrawBaseInstance = features.drawBaseInstance
 
-proc renderCall(ctx: SokolBackendContext, call: InstanceCall) =
+proc drawCall(ctx: SokolBackendContext, call: InstanceCall) =
   ctx.updatePipeline(call.blend)
 
   applyPipeline(ctx.pipeline)
@@ -725,8 +649,56 @@ proc renderCall(ctx: SokolBackendContext, call: InstanceCall) =
   else:
     drawEx(0, 6, call.instanceCount, 0, call.instanceOffset)
 
-proc flushImpl(ctx: BackendContext) =
-  let ctx = SokolBackendContext(ctx)
+method drawContours(ctx: SokolBackendContext, paint: Paint, contours: openArray[
+    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
+  var
+    image = default(Image)
+    imageFlags = default(set[ImageFlags])
+
+  if not paint.imageId.isNil:
+    let tex = ctx.getTexture(paint.imageId)
+    if not tex.isNil:
+      image = tex.image
+      imageFlags = tex.imageFlags
+
+  ctx.renderData.addCall(
+    vec2(float32(ctx.width), float32(ctx.height)),
+    paint,
+    image,
+    imageFlags,
+    contours,
+    fillRule,
+    compositeOperation,
+  )
+
+method allocImage(ctx: SokolBackendContext, imageInfo: ImageInfo,
+    imageFlags: set[ImageFlags]): ImageId =
+  let
+    image = ctx.renderData.createImage(imageInfo)
+    tex = ctx.createTexture(image, imageFlags)
+  ctx.addTexture(image.imageId, tex)
+  image.imageId
+
+method getImageInfo(ctx: SokolBackendContext, imageId: ImageId): ImageInfo =
+  let
+    tex = ctx.getTexture(imageId)
+
+  if not tex.isNil:
+    result = tex.image.imageInfo
+
+method updateImage(ctx: SokolBackendContext, imageId: ImageId, x, y, w, h,
+    strideBytes: int32, data: pointer) =
+  let
+    tex = ctx.getTexture(imageId)
+
+  if not tex.isNil:
+    tex.dirty = true
+    tex.image.updatePixels(x, y, w, h, strideBytes, data)
+
+method deleteImage(ctx: SokolBackendContext, imageId: ImageId) =
+  ctx.deleteTexture(imageId)
+
+method flush(ctx: SokolBackendContext) =
   ctx.initIfNeeded()
 
   if ctx.renderData.verts.len > 0:
@@ -735,22 +707,14 @@ proc flushImpl(ctx: BackendContext) =
     ctx.texVert.updateStorage("nvg.texVert", ctx.renderData.verts)
 
     for call in ctx.renderData.calls:
-      ctx.renderCall(call)
+      ctx.drawCall(call)
 
   #
   ctx.renderData.clear()
 
-proc createBackendContext*(
+proc createSokolBackendContext*(
   width, height: int32): BackendContext =
-  SokolBackendContext(
-    width: width,
-    height: height,
-
-    renderSdfImpl: renderSdfImpl,
-    renderContourImpl: renderContourImpl,
-    allocImageImpl: allocImageImpl,
-    getImageInfoImpl: getImageInfoImpl,
-    updateImageImpl: updateImageImpl,
-    deleteImageImpl: deleteImageImpl,
-    flushImpl: flushImpl,
-  )
+  let backendContext = SokolBackendContext()
+  backendContext.width = width
+  backendContext.height = height
+  backendContext
