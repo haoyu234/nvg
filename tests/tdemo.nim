@@ -8,6 +8,7 @@ import ./demo4
 import ./demo5
 import ./demo6
 import ./fonts
+import ./images
 
 const
   SCREEN_W = 500
@@ -38,7 +39,7 @@ var
   mouseY = int32(0)
 
 proc initImpl(ctx: Context) =
-  discard
+  ctx.addDefaultImages()
 
 proc eventImpl(ctx: Context, event: AppEvent) =
   case event.typ
