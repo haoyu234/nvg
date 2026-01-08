@@ -1,5 +1,6 @@
-import nvg
-import nvg/backend
+import ./backend
+import ./context
+import ./core
 
 import std/os
 
