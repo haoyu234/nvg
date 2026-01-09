@@ -2,30 +2,30 @@ import ./core
 import ./math
 import ./pieces
 
-const N = uint32(16)
+const N = int32(16)
 
 type
   SegmentSeq = object
     len: uint16
     capacity: uint16
-    pos: uint32
-    next: uint32
-    tail: uint32
+    pos: int32
+    next: int32
+    tail: int32
 
   TileId* = distinct uint32
 
   Tiles* = object
-    stride: uint32
-    tail: uint32
+    stride: int32
+    tail: int32
     storage: seq[Vec4]
 
 proc setup*(tiles: var Tiles, w, h, capacity: Natural) {.inline.} =
   let
-    n = uint32(w * h)
-    len = uint32(float32(capacity) * 1.5) + n
+    n = int32(w * h)
+    len = int32(float32(capacity) * 1.5) + n
 
   tiles.tail = n
-  tiles.stride = uint32(w)
+  tiles.stride = int32(w)
   tiles.storage.setLenUninit(len)
 
   let s = cast[ptr UncheckedArray[SegmentSeq]](tiles.storage[0].addr)
@@ -41,7 +41,7 @@ template `[]`*(tiles: var Tiles, x, y: Natural): TileId =
   assert x >= 0
   assert y >= 0
 
-  TileId(uint32(y) * tiles.stride + uint32(x))
+  TileId(int32(y) * tiles.stride + int32(x))
 
 proc empty*(tiles: var Tiles, tileId: TileId): bool {.inline.} =
   let
@@ -65,7 +65,7 @@ proc tail*(tiles: var Tiles, tileId: TileId): ptr Vec4 {.inline.} =
     b = s[b.tail].addr
 
   if b.len > 0:
-    return tiles.storage[b.pos + b.len - 1].addr
+    return tiles.storage[b.pos + int32(b.len) - 1].addr
 
 proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
   let
@@ -74,7 +74,7 @@ proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
 
   var
     h = s[n].addr
-    pos = default(uint32)
+    pos = default(int32)
     b = h
 
   if b.tail > 0:
@@ -88,7 +88,7 @@ proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
 
     inc tiles.tail, N
   else:
-    pos = b.pos + b.len
+    pos = b.pos + int32(b.len)
 
     if b.len >= b.capacity:
       if pos == tiles.tail and b.len < high(typeof(b.len)):
@@ -113,7 +113,7 @@ proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
 
   inc b.len, 1
 
-  if pos + N >= uint32(tiles.storage.len):
+  if pos + N >= int32(tiles.storage.len):
     tiles.storage.setLenUninit(uint32(float32(pos) * 1.5))
 
   tiles.storage[pos] = val
@@ -126,7 +126,7 @@ iterator items*(tiles: var Tiles, tileId: TileId): Vec4 =
   var b = s[n].addr
 
   while true:
-    for idx in b.pos ..< b.pos + b.len:
+    for idx in b.pos ..< b.pos + int32(b.len):
       yield tiles.storage[idx]
 
     if b.next > 0:
