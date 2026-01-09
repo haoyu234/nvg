@@ -500,11 +500,20 @@ method updateImage(ctx: OpenglBackendContext, imageId: ImageId, x, y, w, h,
     let
       image = tex.image
       imageInfo = image.imageInfo
+      bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
 
     glBindTexture(GL_TEXTURE_2D, tex.texImage)
 
+    let
+      remainder = strideBytes mod bytesPerPixel
+      rowPixelCount = strideBytes div bytesPerPixel
+
+    assert remainder == 0
+
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, strideBytes)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, rowPixelCount)
+    glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0)
+    glPixelStorei(GL_UNPACK_SKIP_ROWS, 0)
 
     case imageInfo.pixelFormat
     of PixelFormatA8:
@@ -533,10 +542,11 @@ method updateImage(ctx: OpenglBackendContext, imageId: ImageId, x, y, w, h,
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
+    glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0)
+    glPixelStorei(GL_UNPACK_SKIP_ROWS, 0)
 
-    if image.data.len > 0:
-      if ImageGenerateMipmaps in tex.imageFlags:
-        glGenerateMipmap(GL_TEXTURE_2D)
+    if ImageGenerateMipmaps in tex.imageFlags:
+      glGenerateMipmap(GL_TEXTURE_2D)
 
     glBindTexture(GL_TEXTURE_2D, 0)
 

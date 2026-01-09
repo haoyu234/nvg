@@ -128,13 +128,11 @@ proc createImage*(ctx: var RenderData, imageInfo: ImageInfo): Image =
   result.imageInfo.height = imageInfo.height
   result.imageInfo.pixelFormat = imageInfo.pixelFormat
   result.imageInfo.alphaType = imageInfo.alphaType
-
-  if imageInfo.strideBytes <= 0:
-    let
-      width = imageInfo.width
-      bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
-
-    result.imageInfo.strideBytes = width * bytesPerPixel
+  result.imageInfo.strideBytes =
+    if imageInfo.strideBytes > 0: imageInfo.strideBytes else:
+      let
+        bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
+      imageInfo.width * bytesPerPixel
 
 proc updatePixels*(image: Image, x, y, w, h, strideBytes: int32,
     data: pointer) =
@@ -143,7 +141,7 @@ proc updatePixels*(image: Image, x, y, w, h, strideBytes: int32,
     bytesPerPixel = imageInfo.pixelFormat.bytesPerPixel
 
   if image.data.len <= 0:
-    image.data.setLen(imageInfo.height * strideBytes)
+    image.data.setLen(imageInfo.height * imageInfo.strideBytes)
 
   let
     sourceRowBytes = w * bytesPerPixel

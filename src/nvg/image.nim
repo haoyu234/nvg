@@ -78,7 +78,7 @@ proc loadImageFromMemory*(ctx: Context, data: openArray[byte], imageFlags: set[
   ctx.backendContext.updateImage(
     result,
     0, 0, int32(width), int32(height),
-    int32(width),
+    int32(width) * 4,
     p
   )
 
