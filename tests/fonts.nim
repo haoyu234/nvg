@@ -4,7 +4,7 @@ import nvg/core
 const
   FONT = staticRead("../assets/vivoSans-Regular.ttf")
   FONT_mono = staticRead("../assets/MapleMono.ttf")
-  FONT_emoji = staticRead("../assets/OpenMoji-color-glyf_colr_0.ttf")
+  FONT_emoji = staticRead("../assets/NotoColorEmoji-Regular.ttf")
 
 var
   fontId = default(FontId)
