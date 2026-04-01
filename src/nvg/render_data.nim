@@ -59,25 +59,19 @@ type
     colors*: seq[Color32f]
     instances*: seq[InstanceParam]
 
-proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
-  let
-    xMin = bounds[0]
-    yMin = bounds[1]
-    xMax = bounds[2]
-    yMax = bounds[3]
+proc addQuad(verts: var seq[Vec4], bounds: Bounds) {.inline.} =
+  verts.add(vec4(bounds.xMin, bounds.yMin, 0, 0))
+  verts.add(vec4(bounds.xMax, bounds.yMin, 0, 0))
+  verts.add(vec4(bounds.xMax, bounds.yMax, 0, 0))
+  verts.add(vec4(bounds.xMin, bounds.yMax, 0, 0))
 
-  verts.add(vec4(xMin, yMin, 0, 0))
-  verts.add(vec4(xMax, yMin, 0, 0))
-  verts.add(vec4(xMax, yMax, 0, 0))
-  verts.add(vec4(xMin, yMax, 0, 0))
-
-proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
+proc addQuad(verts: var seq[Vec4], bounds: Bounds,
     pad: float32) {.inline.} =
   let
-    xMin = bounds[0] - pad
-    yMin = bounds[1] - pad
-    xMax = bounds[2] + pad
-    yMax = bounds[3] + pad
+    xMin = bounds.xMin - pad
+    yMin = bounds.yMin - pad
+    xMax = bounds.xMax + pad
+    yMax = bounds.yMax + pad
 
   verts.add(vec4(xMin, yMin, 0, 0))
   verts.add(vec4(xMax, yMin, 0, 0))
@@ -218,27 +212,24 @@ proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
     result.texSize[0] = float32(imageInfo.width)
     result.texSize[1] = float32(imageInfo.height)
 
-proc calcBounds(contours: openArray[Contour]): Vec4 =
-  result = vec4(1e6, 1e6, -1e6, -1e6)
+proc calcBounds(contours: openArray[Contour]): Bounds =
+  if contours.len <= 0:
+    return
+
+  result.xMin = 1e6
+  result.yMin = 1e6
+  result.xMax = -1e6
+  result.yMax = -1e6
 
   for idx in 0 ..< contours.len:
     let p = contours[idx].addr
-
-    p.bounds = vec4(1e6, 1e6, -1e6, -1e6)
-
     if p.fill.len <= 0:
       continue
 
-    for v in p.fill.toOpenArray:
-      p.bounds[0] = min(p.bounds[0], v[2])
-      p.bounds[1] = min(p.bounds[1], v[3])
-      p.bounds[2] = max(p.bounds[2], v[2])
-      p.bounds[3] = max(p.bounds[3], v[3])
-
-    result[0] = min(p.bounds[0], result[0])
-    result[1] = min(p.bounds[1], result[1])
-    result[2] = max(p.bounds[2], result[2])
-    result[3] = max(p.bounds[3], result[3])
+    result.xMin = min(p.bounds.xMin, result.xMin)
+    result.yMin = min(p.bounds.yMin, result.yMin)
+    result.xMax = max(p.bounds.xMax, result.xMax)
+    result.yMax = max(p.bounds.yMax, result.yMax)
 
 proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
     image: Image, imageFlags: set[ImageFlags], contours: openArray[Contour],
@@ -255,18 +246,15 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
     return
 
   var
-    callw = default(float32)
-    callh = default(float32)
-    ltrb = calcBounds(contours)
+    bounds = calcBounds(contours)
+  bounds.xMin = clamp(bounds.xMin, 0, viewBound[0 and 0x1])
+  bounds.yMin = clamp(bounds.yMin, 0, viewBound[1 and 0x1])
+  bounds.xMax = clamp(bounds.xMax, 0, viewBound[2 and 0x1])
+  bounds.yMax = clamp(bounds.yMax, 0, viewBound[3 and 0x1])
 
-  ltrb[0] = clamp(ltrb[0], 0, viewBound[0 and 0x1])
-  ltrb[1] = clamp(ltrb[1], 0, viewBound[1 and 0x1])
-  ltrb[2] = clamp(ltrb[2], 0, viewBound[2 and 0x1])
-  ltrb[3] = clamp(ltrb[3], 0, viewBound[3 and 0x1])
-
-  callw = ltrb[2] - ltrb[0]
-  callh = ltrb[3] - ltrb[1]
-
+  var
+    callw = bounds.xMax - bounds.xMin
+    callh = bounds.yMax - bounds.yMin
   if callw <= 0 or callh <= 0:
     return
 
@@ -288,13 +276,13 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
   const tileSize = 32
 
   if edgeCount > 16 and (callw > 2 * tileSize or callh > 2 * tileSize):
-    ltrb[0] = floor(ltrb[0])
-    ltrb[1] = floor(ltrb[1])
-    ltrb[2] = ceil(ltrb[2])
-    ltrb[3] = ceil(ltrb[3])
+    bounds.xMin = floor(bounds.xMin)
+    bounds.yMin = floor(bounds.yMin)
+    bounds.xMax = ceil(bounds.xMax)
+    bounds.yMax = ceil(bounds.yMax)
 
-    callw = ltrb[2] - ltrb[0]
-    callh = ltrb[3] - ltrb[1]
+    callw = bounds.xMax - bounds.xMin
+    callh = bounds.yMax - bounds.yMin
 
     let
       xtiles = int32(ceil(callw / tileSize))
@@ -312,7 +300,7 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
       if p.fill.len <= 0:
         continue
 
-      let pymin = clamp(int32(p.bounds[1] - ltrb[1] - 0.5) div tileh, 0,
+      let pymin = clamp(int32(p.bounds.yMin - bounds.yMin - 0.5) div tileh, 0,
           ytiles - 1)
 
       for v in p.fill.toOpenArray:
@@ -326,11 +314,11 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
           continue
 
         let
-          vxmin = clamp(int32(min(x0, x1) - ltrb[0] - 0.5) div tilew, 0,
+          vxmin = clamp(int32(min(x0, x1) - bounds.xMin - 0.5) div tilew, 0,
               xtiles - 1)
-          vxmax = clamp(int32(max(x0, x1) - ltrb[0] + 0.5) div tilew, 0,
+          vxmax = clamp(int32(max(x0, x1) - bounds.xMin + 0.5) div tilew, 0,
               xtiles - 1)
-          vymax = clamp(int32(max(y0, y1) - ltrb[1] + 0.5) div tileh, 0,
+          vymax = clamp(int32(max(y0, y1) - bounds.yMin + 0.5) div tileh, 0,
               ytiles - 1)
 
         for ix in vxmin .. vxmax:
@@ -340,7 +328,7 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
               p = ctx.tiles.tail(tileId)
 
             if not p.isNil:
-              let tymax = float32((iy + 1) * tileh) + ltrb[1]
+              let tymax = float32((iy + 1) * tileh) + bounds.yMin
 
               if y0 > tymax and y1 > tymax and p[][1] > tymax and x0 == p[][
                   2] and y0 == p[][3]:
@@ -358,7 +346,7 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
     ctx.instances.reserve(xtiles * ytiles)
     ctx.verts.reserve(callIdx * 4)
 
-    var tileBounds: array[4, float32]
+    var tileBounds = default(Bounds)
 
     for ix in 0 ..< xtiles:
       for iy in 0 ..< ytiles:
@@ -376,10 +364,10 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
         instanceParam.fillCount = int32(ctx.edges.len) -
             instanceParam.fillOffset
 
-        tileBounds[0] = ltrb[0] + float32(ix * tilew)
-        tileBounds[1] = ltrb[1] + float32(iy * tileh)
-        tileBounds[2] = min(ltrb[2], ltrb[0] + float32((ix + 1) * tilew))
-        tileBounds[3] = min(ltrb[3], ltrb[1] + float32((iy + 1) * tileh))
+        tileBounds.xMin = bounds.xMin + float32(ix * tilew)
+        tileBounds.yMin = bounds.yMin + float32(iy * tileh)
+        tileBounds.xMax = min(bounds.xMax, bounds.xMin + float32((ix + 1) * tilew))
+        tileBounds.yMax = min(bounds.yMax, bounds.yMin + float32((iy + 1) * tileh))
 
         ctx.verts.addQuad(tileBounds)
         ctx.instances.add(instanceParam)
@@ -393,7 +381,7 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
 
     instanceParam.fillCount = int32(ctx.edges.len) - instanceParam.fillOffset
 
-    ctx.verts.addQuad(ltrb, 0.5)
+    ctx.verts.addQuad(bounds, 0.5)
     ctx.instances.add(instanceParam)
 
   if ctx.instances.len > call.instanceOffset:

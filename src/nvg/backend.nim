@@ -7,7 +7,7 @@ type
     pointCount*: int32
     fill*: Piece[Vec4]
     closed*: bool
-    bounds*: Vec4
+    bounds*: Bounds
 
   BackendContext* = ref object of RootObj
 

@@ -130,6 +130,12 @@ type
     BEZIER
     CLOSE
 
+  Bounds* = object
+    xMin*: float32
+    yMin*: float32
+    xMax*: float32
+    yMax*: float32
+
   Path* = object
     version*: uint32
     startPos*: Vec2

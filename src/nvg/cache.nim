@@ -101,6 +101,29 @@ proc bezier(
   c.bezier(p1, p12, p123, p1234, level + 1, tessTolSq, distTolSq)
   c.bezier(p1234, p234, p34, p4, level + 1, tessTolSq, distTolSq)
 
+proc udpateBounds(contours: openArray[Contour]) =
+  if contours.len <= 0:
+    return
+
+  for idx in 0 ..< contours.len:
+    let p = contours[idx].addr
+    if p.fill.len <= 0:
+      continue
+
+    var bounds = default(Bounds)
+    bounds.xMin = 1e6
+    bounds.yMin = 1e6
+    bounds.xMax = -1e6
+    bounds.yMax = -1e6
+
+    for v in p.fill.toOpenArray:
+      bounds.xMin = min(bounds.xMin, v[2])
+      bounds.yMin = min(bounds.yMin, v[3])
+      bounds.xMax = max(bounds.xMax, v[2])
+      bounds.yMax = max(bounds.yMax, v[3])
+
+    p.bounds = bounds
+
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
 ) =
@@ -548,6 +571,7 @@ proc expandStroke*(
     r = vertCount
 
   result = piece(c.contours.toOpenArray(strokeOffset, strokeEndOffset - 1))
+  udpateBounds(result.toOpenArray)
 
 proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
   let vertCount = block:
@@ -592,3 +616,4 @@ proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
     p.fill = memory[oldPos ..< pos]
 
   result = piece(c.contours.toOpenArray(fillOffset, fillEndOffset - 1))
+  udpateBounds(result.toOpenArray)
