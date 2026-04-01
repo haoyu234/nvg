@@ -1,9 +1,9 @@
 import ./core
-import ./path
 import ./truetype
 import ./pieces
 
 import std/math
+import std/sequtils
 
 proc rayBezier(
     orig, ray, q1, q2, q3: Vec2, hits: var array[2, Vec2]
@@ -70,43 +70,35 @@ proc rayBezier(
       hits[1][1] = a * s2 + b
       result = 2
 
-iterator simplify(path: Path): (Command, Vec2, Piece[float32]) =
+iterator simplifyPath(path: Path): (Command, Vec2, PathEntry) =
   var
     s = default(Vec2)
     p = default(Vec2)
 
-  for command, data in path.commands:
-    case command
+  for cmd in path.commands:
+    case cmd.command
     of MOVE:
-      let p1 = vec2(data[0], data[1])
-      s = p1
-      p = p1
+      s = cmd.p1
+      p = cmd.p1
 
     of LINE:
-      let p1 = vec2(data[0], data[1])
-      if p != p1:
-        yield (command, p, data)
-        p = p1
+      if p != cmd.p1:
+        yield (LINE, p, cmd)
+        p = cmd.p1
 
     of CURVE:
-      let
-        p2 = vec2(data[2], data[3])
-
-      if p != p2:
-        yield (command, p, data)
-        p = p2
+      if p != cmd.p2:
+        yield (CURVE, p, cmd)
+        p = cmd.p2
 
     of BEZIER:
-      let
-        p3 = vec2(data[3], data[4])
-
-      if p != p3:
-        yield (command, p, data)
-        p = p3
+      if p != cmd.p3:
+        yield (BEZIER, p, cmd)
+        p = cmd.p3
 
     of CLOSE:
       if p != s:
-        yield (LINE, p, piece(s))
+        yield (LINE, p, PathEntry(command: LINE, p1: s))
         p = s
 
 proc computeCrossX(x, y: float32, path: Path): int32 =
@@ -139,16 +131,16 @@ proc computeCrossX(x, y: float32, path: Path): int32 =
         else:
           dec winding, 1
 
-  for command, p, data in path.simplify:
+  for command, p, pathEntry in path.simplifyPath:
     case command
     of LINE:
-      let c = vec2(data[0], data[1])
+      let c = pathEntry.p1
       check()
 
     of CURVE:
       let
-        cp = vec2(data[0], data[1])
-        c = vec2(data[2], data[3])
+        cp = pathEntry.p1
+        c = pathEntry.p2
 
       let
         ax = min(p[0], min(cp[0], c[0]))
@@ -250,14 +242,14 @@ proc generateGlyphSDF*(
   var
     data2 = newSeq[float32]()
 
-  for command, p, data in path.simplify:
+  for command, p, pathEntry in path.simplifyPath:
     case command
     of LINE:
       let
         x2 = p[0] * scaleX
         y2 = p[1] * scaleY
-        x1 = data[0] * scaleX
-        y1 = data[1] * scaleY
+        x1 = pathEntry.p1[0] * scaleX
+        y1 = pathEntry.p1[1] * scaleY
 
         dx = x2 - x1
         dy = y2 - y1
@@ -273,10 +265,10 @@ proc generateGlyphSDF*(
       let
         x3 = p[0] * scaleX
         y3 = p[1] * scaleY
-        x2 = data[0] * scaleX
-        y2 = data[1] * scaleY
-        x1 = data[2] * scaleX
-        y1 = data[3] * scaleY
+        x2 = pathEntry.p1[0] * scaleX
+        y2 = pathEntry.p1[1] * scaleY
+        x1 = pathEntry.p2[0] * scaleX
+        y1 = pathEntry.p2[1] * scaleY
 
         bx = x1 - 2 * x2 + x3
         by = y1 - 2 * y2 + y3
@@ -308,15 +300,15 @@ proc generateGlyphSDF*(
 
       let winding = computeCrossX(xSpace, ySpace, path)
 
-      for command, p, data in path.simplify:
+      for command, p, pathEntry in path.simplifyPath:
         case command
         of LINE:
           if data2[idx] != 0:
             let
               x2 = p[0] * scaleX
               y2 = p[1] * scaleY
-              x1 = data[0] * scaleX
-              y1 = data[1] * scaleY
+              x1 = pathEntry.p1[0] * scaleX
+              y1 = pathEntry.p1[1] * scaleY
 
               dx = x2 - x1
               dy = y2 - y1
@@ -338,10 +330,10 @@ proc generateGlyphSDF*(
           let
             x3 = p[0] * scaleX
             y3 = p[1] * scaleY
-            x2 = data[0] * scaleX
-            y2 = data[1] * scaleY
-            x1 = data[2] * scaleX
-            y1 = data[3] * scaleY
+            x2 = pathEntry.p1[0] * scaleX
+            y2 = pathEntry.p1[1] * scaleY
+            x1 = pathEntry.p2[0] * scaleX
+            y1 = pathEntry.p2[1] * scaleY
 
           let
             bx1 = min(min(x1, x2), x3)

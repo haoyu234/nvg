@@ -13,8 +13,8 @@ import ./fonts
 import ./images
 
 const
-  SCREEN_W = 1568
-  SCREEN_H = 940
+  SCREEN_W = 500
+  SCREEN_H = 400
 
 const demos = [
   (demo1.demo_tiger, "tiger"),

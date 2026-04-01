@@ -136,11 +136,17 @@ type
     xMax*: float32
     yMax*: float32
 
+  PathEntry* = object
+    command*: Command
+    p1*: Vec2
+    p2*: Vec2
+    p3*: Vec2
+
   Path* = object
     version*: uint32
-    startPos*: Vec2
-    currentPos*: Vec2
-    data*: seq[float32]
+    start*: Vec2
+    last*: Vec2
+    commands*: seq[PathEntry]
 
   SomePaint* = Paint | Color
 

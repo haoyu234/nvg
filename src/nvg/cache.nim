@@ -127,25 +127,27 @@ proc udpateBounds(contours: openArray[Contour]) =
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
 ) =
-  let
+  var
+    id = default(uint)
     hash = hash(matrix)
-    id = cast[uint](path.data[0].addr)
 
-  if c.lastId == id and
-    c.lastVersion == path.version and c.lastHash == hash:
-    return
+  if c.lastVersion == path.version and c.lastHash == hash:
+    if not path.isEmpty:
+      id = cast[uint](path.commands[0].addr)
+      if c.lastId == id:
+        return
 
   c.clear()
   c.lastHash = hash
   c.lastId = id
   c.lastVersion = path.version
 
-  for command, vals in path.commands:
-    case command
+  for cmd in path.commands:
+    case cmd.command
     of Command.MOVE:
       c.addContour()
 
-      let p = vec2(vals[0], vals[1]) * matrix
+      let p = cmd.p1 * matrix
       c.addPoint(p)
 
     of Command.LINE:
@@ -154,7 +156,7 @@ proc flattenPaths*(
         c.addPoint(vec2(0, 0))
 
       if not c.curPath.isNil:
-        let p = vec2(vals[0], vals[1]) * matrix
+        let p = cmd.p1 * matrix
 
         if c.curPath.pointCount > 0:
           let idx = c.curPath.offset + c.curPath.pointCount - 1
@@ -171,8 +173,8 @@ proc flattenPaths*(
       if c.curPath.pointCount > 0:
         let
           idx = c.curPath.offset + c.curPath.pointCount - 1
-          cp = vec2(vals[0], vals[1]) * matrix
-          p = vec2(vals[2], vals[3]) * matrix
+          cp = cmd.p1 * matrix
+          p = cmd.p2 * matrix
 
         c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
@@ -184,9 +186,9 @@ proc flattenPaths*(
       if c.curPath.pointCount > 0:
         let
           idx = c.curPath.offset + c.curPath.pointCount - 1
-          cp1 = vec2(vals[0], vals[1]) * matrix
-          cp2 = vec2(vals[2], vals[3]) * matrix
-          p = vec2(vals[4], vals[5]) * matrix
+          cp1 = cmd.p1 * matrix
+          cp2 = cmd.p2 * matrix
+          p = cmd.p3 * matrix
 
         c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 

@@ -10,10 +10,10 @@ import std/math
 type
   GlyphId* = distinct uint32
 
-  GlyphPoint = object
-    flags: uint8
-    contourEndIdx: uint16
-    x, y, cx, cy: int32
+  GlyphPoint* = object
+    flags*: uint8
+    contourEndIdx*: uint16
+    x*, y*, cx*, cy*: int32
 
   GlyphBox* = object
     xMin*, yMin*: int32
@@ -582,9 +582,6 @@ proc loadCompositeGlyphAux(loader: var GlyphLoader, font: TrueType,
       xy = next(2, int32) shl 2
       yy = next(2, int32) shl 2
 
-    # echo arg1, " ", arg2
-    # echo xx, " ", xy, " ", yx, " ", yy
-
     let loaderCopy = loader
 
     result = loader.loadGlyphAux(font, subGlyphId, points)
@@ -647,8 +644,6 @@ proc loadCompositeGlyphAux(loader: var GlyphLoader, font: TrueType,
       x = p1.x - p2.x
       y = p1.y - p2.y
 
-    # echo "x: ", x, " y: ", y
-
     if x != 0 or y != 0:
       for idx in baseLen ..< uint32(points.len):
         let p = points[idx].addr
@@ -670,7 +665,7 @@ proc loadGlyphAux(loader: var GlyphLoader, font: TrueType, glyphId: GlyphId,
       elif contourCount < 0:
         result = loader.loadCompositeGlyphAux(font, offset, points)
 
-proc getGlyphPath(loader: GlyphLoader, points: seq[GlyphPoint]): Path =
+proc toPath(points: openArray[GlyphPoint]): Path =
   var
     pointIdx = default(int32)
 
@@ -725,13 +720,13 @@ proc getGlyphPath(loader: GlyphLoader, points: seq[GlyphPoint]): Path =
                 x = float32(int32(cx + float32(points[pointIdx].x)) div 2)
                 y = float32(int32(cy + float32(points[pointIdx].y)) div 2)
 
-              result.quadCurveTo(vec2(cx, cy), vec2(x, y))
+              result.quadCurveTo( vec2(cx, cy), vec2(x, y))
 
               cx = float32(points[pointIdx].x)
               cy = float32(points[pointIdx].y)
               continue
           else:
-            result.quadCurveTo(vec2(cx, cy), vec2(sx, sy))
+            result.quadCurveTo( vec2(cx, cy), vec2(sx, sy))
             closed = true
           break
 
@@ -755,12 +750,7 @@ proc getGlyphPath*(font: TrueType, glyphId: GlyphId): Path {.inline.} =
         let p = points[idx].addr
         p.x = p.x - loader.pp1X
 
-    # var idx = 0
-    # for p in points:
-    #   echo "idx: ", idx, " ", p
-    #   inc idx, 1
-
-    result = loader.getGlyphPath(points)
+    result = points.toPath()
 
 proc getCoverageIndex(
     font: TrueType, coverageTable: uint32, glyphId: GlyphId
