@@ -126,6 +126,10 @@ proc flattenPaths*(
       c.addPoint(p)
 
     of Command.LINE:
+      if c.curPath.isNil:
+        c.addContour()
+        c.addPoint(vec2(0, 0))
+
       if not c.curPath.isNil:
         let p = vec2(vals[0], vals[1]) * matrix
 
@@ -137,25 +141,31 @@ proc flattenPaths*(
         c.addPoint(p)
 
     of Command.CURVE:
-      if not c.curPath.isNil:
-        if c.curPath.pointCount > 0:
-          let
-            idx = c.curPath.offset + c.curPath.pointCount - 1
-            cp = vec2(vals[0], vals[1]) * matrix
-            p = vec2(vals[2], vals[3]) * matrix
+      if c.curPath.isNil:
+        c.addContour()
+        c.addPoint(vec2(0, 0))
 
-          c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
+      if c.curPath.pointCount > 0:
+        let
+          idx = c.curPath.offset + c.curPath.pointCount - 1
+          cp = vec2(vals[0], vals[1]) * matrix
+          p = vec2(vals[2], vals[3]) * matrix
+
+        c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
     of Command.BEZIER:
-      if not c.curPath.isNil:
-        if c.curPath.pointCount > 0:
-          let
-            idx = c.curPath.offset + c.curPath.pointCount - 1
-            cp1 = vec2(vals[0], vals[1]) * matrix
-            cp2 = vec2(vals[2], vals[3]) * matrix
-            p = vec2(vals[4], vals[5]) * matrix
+      if c.curPath.isNil:
+        c.addContour()
+        c.addPoint(vec2(0, 0))
 
-          c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
+      if c.curPath.pointCount > 0:
+        let
+          idx = c.curPath.offset + c.curPath.pointCount - 1
+          cp1 = vec2(vals[0], vals[1]) * matrix
+          cp2 = vec2(vals[2], vals[3]) * matrix
+          p = vec2(vals[4], vals[5]) * matrix
+
+        c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 
     of Command.CLOSE:
       if not c.curPath.isNil:

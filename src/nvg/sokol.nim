@@ -3,6 +3,7 @@ import pkg/sokol/gfx except Color, Image, ImageInfo, PixelFormat
 import ./backend
 import ./core
 import ./glsl
+import ./math
 import ./render_data
 
 import std/math
@@ -43,6 +44,7 @@ type
 
     texEdge: SokolStorage
     texVert: SokolStorage
+    texColor: SokolStorage
 
     vertAndIndexDummyBuf: Buffer
     instanceBuf: Buffer
@@ -84,6 +86,7 @@ proc `=destroy`(ctx: var SokolBackendContextObj) =
 
   `=destroy`(ctx.texEdge)
   `=destroy`(ctx.texVert)
+  `=destroy`(ctx.texColor)
   `=destroy`(ctx.textures)
 
 proc initStorage(storage: var SokolStorage) {.inline.} =
@@ -91,20 +94,25 @@ proc initStorage(storage: var SokolStorage) {.inline.} =
   storage.view = allocView()
   storage.layerCount = -1
 
-proc updateStorage(storage: var SokolStorage, name: cstring, data: var seq[Vec4]) =
-  if data.len <= 0 and storage.layerCount >= 0:
-    return
+proc updateStorage[T: Vec2 | Vec4 | Color | Color32f](storage: var SokolStorage,
+    name: cstring, data: var seq[T]) =
+  const layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
 
-  let
-    layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
-    layerCount = block:
-      let n = if (data.len mod layerSize) > 0: 1 else: 0
-      data.len div layerSize + n
+  var
+    layerCount = default(int32)
+    dataCount = default(int32)
 
-    size = int32(ceil(float32(data.len) / float32(layerSize))) * layerSize
+  if data.len <= 0:
+    layerCount = 1
+  elif data.len mod layerSize > 0:
+    layerCount = int32(data.len) div layerSize + 1
+  else:
+    layerCount = int32(data.len) div layerSize
 
-  if capacity(data) < size:
-    data.setLen(size)
+  dataCount = layerSize * layerCount
+
+  if data.len < dataCount:
+    data.setLen(dataCount)
 
   if storage.layerCount != layerCount:
     if storage.layerCount > 0:
@@ -113,13 +121,25 @@ proc updateStorage(storage: var SokolStorage, name: cstring, data: var seq[Vec4]
 
     storage.layerCount = int32(layerCount)
 
+    const pixelFormat =
+      when T is float32:
+        pixelFormatR32f
+      elif T is Vec2:
+        pixelFormatRg32f
+      elif T is Color:
+        pixelFormatRgba8
+      elif T is Vec4 or T is Color32f:
+        pixelFormatRgba32f
+      else:
+        assert false
+
     storage.tex.initImage(
       ImageDesc(
         type: imageTypeArray,
         width: TILE_IMAGE_WIDTH,
         height: TILE_IMAGE_WIDTH,
         usage: ImageUsage(dynamicUpdate: true),
-        pixelFormat: pixelFormatRgba32f,
+        pixelFormat: pixelFormat,
         numMipmaps: 0,
         numSlices: int32(layerCount),
         label: name,
@@ -134,9 +154,11 @@ proc updateStorage(storage: var SokolStorage, name: cstring, data: var seq[Vec4]
     )
     )
 
-  if data.len > 0:
-    let dataRange = Range(addr: data[0].addr, size: size * sizeof(Vec4))
-    storage.tex.updateImage(ImageData(mipLevels: [dataRange]))
+  let dataRange = Range(
+    addr: data[0].addr,
+    size: dataCount * sizeof(T)
+  )
+  storage.tex.updateImage(ImageData(mipLevels: [dataRange]))
 
 proc addTexture(ctx: SokolBackendContext, imageId: ImageId,
     tex: SokolTexture) {.inline.} =
@@ -156,9 +178,9 @@ proc getShader(): Shader =
 
   case queryBackend()
   of backendGlcore:
-    s.vertexFunc.source = cast[cstring](vsSourceGlsl410[0].addr)
+    s.vertexFunc.source = cast[cstring](vsContourSourceGlsl410[0].addr)
     s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsSourceGlsl410[0].addr)
+    s.fragmentFunc.source = cast[cstring](fsContourSourceGlsl410[0].addr)
     s.fragmentFunc.entry = "main"
     s.attrs[0].base_type = shaderAttrBaseTypeSint
     s.attrs[0].glslName = "v_idx"
@@ -166,55 +188,69 @@ proc getShader(): Shader =
     s.attrs[1].glslName = "v_fillCount"
     s.attrs[2].base_type = shaderAttrBaseTypeSint
     s.attrs[2].glslName = "v_fillOffset"
+    s.attrs[3].base_type = shaderAttrBaseTypeSint
+    s.attrs[3].glslName = "v_colorIndex"
+    s.attrs[4].base_type = shaderAttrBaseTypeSint
+    s.attrs[4].glslName = "v_pad"
     s.uniformBlocks[0].stage = shaderStageVertex
     s.uniformBlocks[0].layout = uniformLayoutStd140
     s.uniformBlocks[0].size = 16
     s.uniformBlocks[0].glslUniforms[0].type = uniformTypeFloat2
     s.uniformBlocks[0].glslUniforms[0].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[0].glslName = "_68.viewSize"
+    s.uniformBlocks[0].glslUniforms[0].glslName = "_70.viewSize"
     s.uniformBlocks[0].glslUniforms[1].type = uniformTypeInt
     s.uniformBlocks[0].glslUniforms[1].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[1].glslName = "_68.triangleOffset"
-    s.uniformBlocks[5].stage = shaderStageFragment
-    s.uniformBlocks[5].layout = uniformLayoutStd140
-    s.uniformBlocks[5].size = 96
-    s.uniformBlocks[5].glslUniforms[0].type = uniformTypeFloat4
-    s.uniformBlocks[5].glslUniforms[0].arrayCount = 6
-    s.uniformBlocks[5].glslUniforms[0].glslName = "params"
-    s.views[1].texture.stage = shaderStageFragment
+    s.uniformBlocks[0].glslUniforms[1].glslName = "_70.vertexOffset"
+    s.uniformBlocks[3].stage = shaderStageFragment
+    s.uniformBlocks[3].layout = uniformLayoutStd140
+    s.uniformBlocks[3].size = 96
+    s.uniformBlocks[3].glslUniforms[0].type = uniformTypeFloat4
+    s.uniformBlocks[3].glslUniforms[0].arrayCount = 6
+    s.uniformBlocks[3].glslUniforms[0].glslName = "f_params"
+    s.views[1].texture.stage = shaderStageVertex
     s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.imageType = imageTypeArray
     s.views[1].texture.sampleType = imageSampleTypeFloat
-    s.views[2].texture.stage = shaderStageFragment
-    s.views[2].texture.multisampled = false
-    s.views[2].texture.imageType = imageTypeArray
-    s.views[2].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.stage = shaderStageVertex
+    s.views[4].texture.stage = shaderStageFragment
+    s.views[4].texture.multisampled = false
+    s.views[4].texture.imageType = imageType2d
+    s.views[4].texture.sampleType = imageSampleTypeFloat
+    s.views[6].texture.stage = shaderStageFragment
     s.views[6].texture.multisampled = false
     s.views[6].texture.imageType = imageTypeArray
     s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.samplers[3].stage = shaderStageFragment
-    s.samplers[3].samplerType = samplerTypeFiltering
-    s.samplers[4].stage = shaderStageFragment
-    s.samplers[4].samplerType = samplerTypeFiltering
-    s.samplers[7].stage = shaderStageVertex
+    s.views[8].texture.stage = shaderStageVertex
+    s.views[8].texture.multisampled = false
+    s.views[8].texture.imageType = imageTypeArray
+    s.views[8].texture.sampleType = imageSampleTypeFloat
+    s.samplers[2].stage = shaderStageVertex
+    s.samplers[2].samplerType = samplerTypeFiltering
+    s.samplers[5].stage = shaderStageFragment
+    s.samplers[5].samplerType = samplerTypeFiltering
+    s.samplers[7].stage = shaderStageFragment
     s.samplers[7].samplerType = samplerTypeFiltering
+    s.samplers[9].stage = shaderStageVertex
+    s.samplers[9].samplerType = samplerTypeFiltering
     s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 6
-    s.textureSamplerPairs[0].samplerSlot = 7
-    s.textureSamplerPairs[0].glslName = "vertTex_smp3"
-    s.textureSamplerPairs[1].stage = shaderStageFragment
-    s.textureSamplerPairs[1].viewSlot = 2
-    s.textureSamplerPairs[1].samplerSlot = 4
-    s.textureSamplerPairs[1].glslName = "edgeTex_smp2"
+    s.textureSamplerPairs[0].viewSlot = 1
+    s.textureSamplerPairs[0].samplerSlot = 2
+    s.textureSamplerPairs[0].glslName = "vertTex_vertSmp"
+    s.textureSamplerPairs[1].stage = shaderStageVertex
+    s.textureSamplerPairs[1].viewSlot = 8
+    s.textureSamplerPairs[1].samplerSlot = 9
+    s.textureSamplerPairs[1].glslName = "colorTex_colorSmp"
     s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 1
-    s.textureSamplerPairs[2].samplerSlot = 3
-    s.textureSamplerPairs[2].glslName = "imageTex_smp1"
+    s.textureSamplerPairs[2].viewSlot = 6
+    s.textureSamplerPairs[2].samplerSlot = 7
+    s.textureSamplerPairs[2].glslName = "edgeTex_edgeSmp"
+    s.textureSamplerPairs[3].stage = shaderStageFragment
+    s.textureSamplerPairs[3].viewSlot = 4
+    s.textureSamplerPairs[3].samplerSlot = 5
+    s.textureSamplerPairs[3].glslName = "imageTex_imageSmp"
   of backendGles3:
-    s.vertexFunc.source = cast[cstring](vsSourceGlsl300es[0].addr)
+    s.vertexFunc.source = cast[cstring](vsContourSourceGlsl300es[0].addr)
     s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsSourceGlsl300es[0].addr)
+    s.fragmentFunc.source = cast[cstring](fsContourSourceGlsl300es[0].addr)
     s.fragmentFunc.entry = "main"
     s.attrs[0].base_type = shaderAttrBaseTypeSint
     s.attrs[0].glslName = "v_idx"
@@ -222,56 +258,70 @@ proc getShader(): Shader =
     s.attrs[1].glslName = "v_fillCount"
     s.attrs[2].base_type = shaderAttrBaseTypeSint
     s.attrs[2].glslName = "v_fillOffset"
+    s.attrs[3].base_type = shaderAttrBaseTypeSint
+    s.attrs[3].glslName = "v_colorIndex"
+    s.attrs[4].base_type = shaderAttrBaseTypeSint
+    s.attrs[4].glslName = "v_pad"
     s.uniformBlocks[0].stage = shaderStageVertex
     s.uniformBlocks[0].layout = uniformLayoutStd140
     s.uniformBlocks[0].size = 16
     s.uniformBlocks[0].glslUniforms[0].type = uniformTypeFloat2
     s.uniformBlocks[0].glslUniforms[0].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[0].glslName = "_68.viewSize"
+    s.uniformBlocks[0].glslUniforms[0].glslName = "_70.viewSize"
     s.uniformBlocks[0].glslUniforms[1].type = uniformTypeInt
     s.uniformBlocks[0].glslUniforms[1].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[1].glslName = "_68.triangleOffset"
-    s.uniformBlocks[5].stage = shaderStageFragment
-    s.uniformBlocks[5].layout = uniformLayoutStd140
-    s.uniformBlocks[5].size = 96
-    s.uniformBlocks[5].glslUniforms[0].type = uniformTypeFloat4
-    s.uniformBlocks[5].glslUniforms[0].arrayCount = 6
-    s.uniformBlocks[5].glslUniforms[0].glslName = "params"
-    s.views[1].texture.stage = shaderStageFragment
+    s.uniformBlocks[0].glslUniforms[1].glslName = "_70.vertexOffset"
+    s.uniformBlocks[3].stage = shaderStageFragment
+    s.uniformBlocks[3].layout = uniformLayoutStd140
+    s.uniformBlocks[3].size = 96
+    s.uniformBlocks[3].glslUniforms[0].type = uniformTypeFloat4
+    s.uniformBlocks[3].glslUniforms[0].arrayCount = 6
+    s.uniformBlocks[3].glslUniforms[0].glslName = "f_params"
+    s.views[1].texture.stage = shaderStageVertex
     s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.imageType = imageTypeArray
     s.views[1].texture.sampleType = imageSampleTypeFloat
-    s.views[2].texture.stage = shaderStageFragment
-    s.views[2].texture.multisampled = false
-    s.views[2].texture.imageType = imageTypeArray
-    s.views[2].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.stage = shaderStageVertex
+    s.views[4].texture.stage = shaderStageFragment
+    s.views[4].texture.multisampled = false
+    s.views[4].texture.imageType = imageType2d
+    s.views[4].texture.sampleType = imageSampleTypeFloat
+    s.views[6].texture.stage = shaderStageFragment
     s.views[6].texture.multisampled = false
     s.views[6].texture.imageType = imageTypeArray
     s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.samplers[3].stage = shaderStageFragment
-    s.samplers[3].samplerType = samplerTypeFiltering
-    s.samplers[4].stage = shaderStageFragment
-    s.samplers[4].samplerType = samplerTypeFiltering
-    s.samplers[7].stage = shaderStageVertex
+    s.views[8].texture.stage = shaderStageVertex
+    s.views[8].texture.multisampled = false
+    s.views[8].texture.imageType = imageTypeArray
+    s.views[8].texture.sampleType = imageSampleTypeFloat
+    s.samplers[2].stage = shaderStageVertex
+    s.samplers[2].samplerType = samplerTypeFiltering
+    s.samplers[5].stage = shaderStageFragment
+    s.samplers[5].samplerType = samplerTypeFiltering
+    s.samplers[7].stage = shaderStageFragment
     s.samplers[7].samplerType = samplerTypeFiltering
+    s.samplers[9].stage = shaderStageVertex
+    s.samplers[9].samplerType = samplerTypeFiltering
     s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 6
-    s.textureSamplerPairs[0].samplerSlot = 7
-    s.textureSamplerPairs[0].glslName = "vertTex_smp3"
-    s.textureSamplerPairs[1].stage = shaderStageFragment
-    s.textureSamplerPairs[1].viewSlot = 2
-    s.textureSamplerPairs[1].samplerSlot = 4
-    s.textureSamplerPairs[1].glslName = "edgeTex_smp2"
+    s.textureSamplerPairs[0].viewSlot = 1
+    s.textureSamplerPairs[0].samplerSlot = 2
+    s.textureSamplerPairs[0].glslName = "vertTex_vertSmp"
+    s.textureSamplerPairs[1].stage = shaderStageVertex
+    s.textureSamplerPairs[1].viewSlot = 8
+    s.textureSamplerPairs[1].samplerSlot = 9
+    s.textureSamplerPairs[1].glslName = "colorTex_colorSmp"
     s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 1
-    s.textureSamplerPairs[2].samplerSlot = 3
-    s.textureSamplerPairs[2].glslName = "imageTex_smp1"
+    s.textureSamplerPairs[2].viewSlot = 6
+    s.textureSamplerPairs[2].samplerSlot = 7
+    s.textureSamplerPairs[2].glslName = "edgeTex_edgeSmp"
+    s.textureSamplerPairs[3].stage = shaderStageFragment
+    s.textureSamplerPairs[3].viewSlot = 4
+    s.textureSamplerPairs[3].samplerSlot = 5
+    s.textureSamplerPairs[3].glslName = "imageTex_imageSmp"
   of backendD3d11:
-    s.vertexFunc.source = cast[cstring](vsSourceHlsl5[0].addr)
+    s.vertexFunc.source = cast[cstring](vsContourSourceHlsl5[0].addr)
     s.vertexFunc.d3d11Target = "vs_5_0"
     s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsSourceHlsl5[0].addr)
+    s.fragmentFunc.source = cast[cstring](fsContourSourceHlsl5[0].addr)
     s.fragmentFunc.d3d11Target = "ps_5_0"
     s.fragmentFunc.entry = "main"
     s.attrs[0].base_type = shaderAttrBaseTypeSint
@@ -283,47 +333,64 @@ proc getShader(): Shader =
     s.attrs[2].base_type = shaderAttrBaseTypeSint
     s.attrs[2].hlslSemName = "TEXCOORD"
     s.attrs[2].hlslSemIndex = 2
+    s.attrs[3].base_type = shaderAttrBaseTypeSint
+    s.attrs[3].hlslSemName = "TEXCOORD"
+    s.attrs[3].hlslSemIndex = 3
+    s.attrs[4].base_type = shaderAttrBaseTypeSint
+    s.attrs[4].hlslSemName = "TEXCOORD"
+    s.attrs[4].hlslSemIndex = 4
     s.uniformBlocks[0].stage = shaderStageVertex
     s.uniformBlocks[0].layout = uniformLayoutStd140
     s.uniformBlocks[0].size = 16
     s.uniformBlocks[0].hlslRegisterBN = 0
-    s.uniformBlocks[5].stage = shaderStageFragment
-    s.uniformBlocks[5].layout = uniformLayoutStd140
-    s.uniformBlocks[5].size = 96
-    s.uniformBlocks[5].hlslRegisterBN = 5
-    s.views[1].texture.stage = shaderStageFragment
+    s.uniformBlocks[3].stage = shaderStageFragment
+    s.uniformBlocks[3].layout = uniformLayoutStd140
+    s.uniformBlocks[3].size = 96
+    s.uniformBlocks[3].hlslRegisterBN = 3
+    s.views[1].texture.stage = shaderStageVertex
     s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageType2d
+    s.views[1].texture.imageType = imageTypeArray
     s.views[1].texture.sampleType = imageSampleTypeFloat
     s.views[1].texture.hlslRegisterTN = 0
-    s.views[2].texture.stage = shaderStageFragment
-    s.views[2].texture.multisampled = false
-    s.views[2].texture.imageType = imageTypeArray
-    s.views[2].texture.sampleType = imageSampleTypeFloat
-    s.views[2].texture.hlslRegisterTN = 1
-    s.views[6].texture.stage = shaderStageVertex
+    s.views[4].texture.stage = shaderStageFragment
+    s.views[4].texture.multisampled = false
+    s.views[4].texture.imageType = imageType2d
+    s.views[4].texture.sampleType = imageSampleTypeFloat
+    s.views[4].texture.hlslRegisterTN = 0
+    s.views[6].texture.stage = shaderStageFragment
     s.views[6].texture.multisampled = false
     s.views[6].texture.imageType = imageTypeArray
     s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.hlslRegisterTN = 0
-    s.samplers[3].stage = shaderStageFragment
-    s.samplers[3].samplerType = samplerTypeFiltering
-    s.samplers[3].hlslRegisterSN = 3
-    s.samplers[4].stage = shaderStageFragment
-    s.samplers[4].samplerType = samplerTypeFiltering
-    s.samplers[4].hlslRegisterSN = 4
-    s.samplers[7].stage = shaderStageVertex
+    s.views[6].texture.hlslRegisterTN = 1
+    s.views[8].texture.stage = shaderStageVertex
+    s.views[8].texture.multisampled = false
+    s.views[8].texture.imageType = imageTypeArray
+    s.views[8].texture.sampleType = imageSampleTypeFloat
+    s.views[8].texture.hlslRegisterTN = 1
+    s.samplers[2].stage = shaderStageVertex
+    s.samplers[2].samplerType = samplerTypeFiltering
+    s.samplers[2].hlslRegisterSN = 2
+    s.samplers[5].stage = shaderStageFragment
+    s.samplers[5].samplerType = samplerTypeFiltering
+    s.samplers[5].hlslRegisterSN = 5
+    s.samplers[7].stage = shaderStageFragment
     s.samplers[7].samplerType = samplerTypeFiltering
     s.samplers[7].hlslRegisterSN = 7
+    s.samplers[9].stage = shaderStageVertex
+    s.samplers[9].samplerType = samplerTypeFiltering
+    s.samplers[9].hlslRegisterSN = 9
     s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 6
-    s.textureSamplerPairs[0].samplerSlot = 7
-    s.textureSamplerPairs[1].stage = shaderStageFragment
-    s.textureSamplerPairs[1].viewSlot = 2
-    s.textureSamplerPairs[1].samplerSlot = 4
+    s.textureSamplerPairs[0].viewSlot = 1
+    s.textureSamplerPairs[0].samplerSlot = 2
+    s.textureSamplerPairs[1].stage = shaderStageVertex
+    s.textureSamplerPairs[1].viewSlot = 8
+    s.textureSamplerPairs[1].samplerSlot = 9
     s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 1
-    s.textureSamplerPairs[2].samplerSlot = 3
+    s.textureSamplerPairs[2].viewSlot = 6
+    s.textureSamplerPairs[2].samplerSlot = 7
+    s.textureSamplerPairs[3].stage = shaderStageFragment
+    s.textureSamplerPairs[3].viewSlot = 4
+    s.textureSamplerPairs[3].samplerSlot = 5
   else: discard
 
   makeShader(s)
@@ -395,6 +462,8 @@ proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
         VertexAttrState(format: vertexFormatInt, bufferIndex: 0),
         VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
         VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
+        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
+        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
       ]
       ),
       stencil: StencilState(enabled: false),
@@ -402,7 +471,7 @@ proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
       primitiveType: primitiveTypeTriangles,
       indexType: indexTypeUint32,
       cullMode: cullModeBack,
-      faceWinding: faceWindingCcw,
+      faceWinding: faceWindingCw,
       label: "nvg.pipeline",
     ),
     )
@@ -529,6 +598,7 @@ proc initIfNeeded(ctx: SokolBackendContext) =
 
   ctx.texEdge.initStorage()
   ctx.texVert.initStorage()
+  ctx.texColor.initStorage()
 
   ctx.smpDummy = makeSampler(
     SamplerDesc(
@@ -592,20 +662,20 @@ proc drawCall(ctx: SokolBackendContext, call: InstanceCall) =
   type
     VertexParam = object
       view: Vec2
-      triangleOffset: int32
-      pad: array[4, uint8]
+      vertexOffset: int32
+      pad: int32
 
   var param = default(VertexParam)
   param.view[0] = float32(ctx.width)
   param.view[1] = float32(ctx.height)
-  param.triangleOffset = call.triangleOffset
+  param.vertexOffset = call.vertexOffset
 
   applyUniforms(
     0, Range(addr: param.addr, size: sizeof(param))
   )
 
   applyUniforms(
-    5,
+    3,
     Range(
       addr: ctx.renderData.uniforms[call.uniformIndex].addr,
       size: sizeof(UniformParam)
@@ -621,22 +691,25 @@ proc drawCall(ctx: SokolBackendContext, call: InstanceCall) =
   if not call.imageId.isNil:
     tex = ctx.getTexture(call.imageId)
 
+  bindings.views[1] = ctx.texVert.view
+  bindings.samplers[2] = ctx.smpDummy
+
   if tex.isNil:
-    bindings.views[1] = ctx.texDummyView
-    bindings.samplers[3] = ctx.smpDummy
+    bindings.views[4] = ctx.texDummyView
+    bindings.samplers[5] = ctx.smpDummy
   else:
     if tex.dirty:
       tex.dirty = false
       tex.updateTexture()
 
-    bindings.views[1] = tex.texImageView
-    bindings.samplers[3] = tex.smp
+    bindings.views[4] = tex.texImageView
+    bindings.samplers[5] = tex.smp
 
-  bindings.views[2] = ctx.texEdge.view
-  bindings.samplers[4] = ctx.smpDummy
-
-  bindings.views[6] = ctx.texVert.view
+  bindings.views[6] = ctx.texEdge.view
   bindings.samplers[7] = ctx.smpDummy
+
+  bindings.views[8] = ctx.texColor.view
+  bindings.samplers[9] = ctx.smpDummy
 
   if not ctx.supportDrawBaseInstance:
     bindings.vertexBufferOffsets[0] = 0
@@ -648,6 +721,61 @@ proc drawCall(ctx: SokolBackendContext, call: InstanceCall) =
     draw(0, 6, call.instanceCount)
   else:
     drawEx(0, 6, call.instanceCount, 0, call.instanceOffset)
+
+method drawGlyphQuads(ctx: SokolBackendContext, paint: Paint, transform: Mat2d,
+    glyphQuads: openArray[GlyphQuad], compositeOperation: CompositeOperation) =
+  var
+    vertBuf: array[4, Vec4]
+    verts = newSeqOfCap[Vec4](glyphQuads.len * 4)
+
+    lastQuad: ptr GlyphQuad
+
+  template flush() =
+    var
+      image = default(Image)
+      imageFlags = default(set[ImageFlags])
+
+    if not lastQuad.imageId.isNil:
+      let tex = ctx.getTexture(lastQuad.imageId)
+      if not tex.isNil:
+        image = tex.image
+        imageFlags = tex.imageFlags
+
+    ctx.renderData.addCall(
+      vec2(float32(ctx.width), float32(ctx.height)),
+      paint,
+      image,
+      imageFlags,
+      lastQuad.isSdf,
+      lastQuad.color,
+      verts,
+      compositeOperation,
+    )
+
+  for idx in 0 ..< glyphQuads.len:
+    let quad = glyphQuads[idx].addr
+    if not lastQuad.isNil:
+      if lastQuad.imageId != quad.imageId or lastQuad.color != quad.color:
+        flush()
+        verts.setLenUninit(0)
+
+    lastQuad = quad
+
+    let
+      p1 = vec2(quad.x1, quad.y1) * transform
+      p2 = vec2(quad.x2, quad.y1) * transform
+      p3 = vec2(quad.x2, quad.y2) * transform
+      p4 = vec2(quad.x1, quad.y2) * transform
+
+    vertBuf[0] = vec4(p1, vec2(quad.s1, quad.t1))
+    vertBuf[1] = vec4(p2, vec2(quad.s2, quad.t1))
+    vertBuf[2] = vec4(p3, vec2(quad.s2, quad.t2))
+    vertBuf[3] = vec4(p4, vec2(quad.s1, quad.t2))
+
+    verts.add(vertBuf)
+
+  if verts.len > 0:
+    flush()
 
 method drawContours(ctx: SokolBackendContext, paint: Paint, contours: openArray[
     Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
@@ -705,6 +833,7 @@ method flush(ctx: SokolBackendContext) =
     ctx.updateInstanceBuf()
     ctx.texEdge.updateStorage("nvg.texEdge", ctx.renderData.edges)
     ctx.texVert.updateStorage("nvg.texVert", ctx.renderData.verts)
+    ctx.texColor.updateStorage("nvg.texColor", ctx.renderData.colors)
 
     for call in ctx.renderData.calls:
       ctx.drawCall(call)

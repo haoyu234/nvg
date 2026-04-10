@@ -10,6 +10,14 @@ type
   FontId* = object
     id*: uint32
 
+  FontFamily* = enum
+    FontFamilyDefault
+    FontFamilyEmoji
+    FontFamilySansSerif
+    FontFamilySerif
+    FontFamilyMonoSpace
+    FontFamilyMath
+
   ImageId* = object
     id*: uint32
 
@@ -40,7 +48,9 @@ type
     pixelFormat*: PixelFormat
     alphaType*: AlphaType
 
-  Quad* = object
+  GlyphQuad* = object
+    isSdf*: bool
+    color*: Color
     imageId*: ImageId
     x1*, y1*, x2*, y2*: float32
     s1*, t1*, s2*, t2*: float32
@@ -65,6 +75,15 @@ type
     TopBaseline
     MiddleBaseline
     BottomBaseline
+
+  TextWrap* = enum
+    NoWrap
+    WordWrap
+    WordCharWrap
+
+  TextOverflow* = enum
+    Hidden
+    Ellipsis
 
   FillRule* = enum
     NonZero

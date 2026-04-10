@@ -3,6 +3,7 @@ import pkg/opengl
 import ./backend
 import ./core
 import ./glsl
+import ./math
 import ./render_data
 
 import std/math
@@ -20,13 +21,14 @@ type
     vsShader: GLuint
 
     viewSizeLoc: GLint
-    triangleOffsetLoc: GLint
+    vertexOffsetLoc: GLint
 
     texLoc: GLint
     texEdgeLoc: GLint
     texVertLoc: GLint
+    texColorLoc: GLint
 
-    paintLoc: GLint
+    fParamsLoc: GLint
 
   OpenglTexture = ref OpenglTextureObj
   OpenglTextureObj = object
@@ -57,6 +59,7 @@ type
 
     texEdge: OpenglStorage
     texVert: OpenglStorage
+    texColor: OpenglStorage
 
     texDummy: GLuint
     smpDummy: GLuint
@@ -116,29 +119,61 @@ proc `=destroy`(ctx: var OpenglBackendContextObj) =
 
   `=destroy`(ctx.texEdge)
   `=destroy`(ctx.texVert)
+  `=destroy`(ctx.texColor)
   `=destroy`(ctx.textures)
 
 proc initStorage(storage: var OpenglStorage) {.inline.} =
   glGenTextures(1, storage.tex.addr)
   storage.layerCount = -1
 
-proc updateStorage(storage: var OpenglStorage, data: var seq[Vec4]) =
-  if data.len <= 0 and storage.layerCount >= 0:
+proc updateStorage[T: Vec2 | Vec4 | Color | Color32f](storage: var OpenglStorage,
+    data: var seq[T]) =
+  if data.len <= 0:
     return
 
-  let
-    layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
-    layerCount = block:
-      let n = if (data.len mod layerSize) > 0: 1 else: 0
-      data.len div layerSize + n
+  const layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
 
-    size = int32(ceil(float32(data.len) / float32(layerSize))) * layerSize
+  var
+    layerCount = default(int32)
+    dataCount = default(int32)
 
-  if capacity(data) < size:
-    data.setLen(size)
+  if data.len <= 0:
+    layerCount = 1
+  elif data.len mod layerSize > 0:
+    layerCount = int32(data.len) div layerSize + 1
+  else:
+    layerCount = int32(data.len) div layerSize
+
+  dataCount = layerSize * layerCount
+
+  if capacity(data) < dataCount:
+    data.setLen(dataCount)
 
   glActiveTexture(GL_TEXTURE0)
   glBindTexture(GL_TEXTURE_2D_ARRAY, storage.tex)
+
+  when T is float32:
+    const
+      pixelFormat = GL_RED
+      pixelType = cGL_FLOAT
+
+  elif T is Vec2:
+    const
+      pixelFormat = GL_RG
+      pixelType = cGL_FLOAT
+
+  elif T is Color:
+    const
+      pixelFormat = GL_RGBA
+      pixelType = cGL_UNSIGNED_BYTE
+
+  elif T is Vec4 or T is Color32f:
+    const
+      pixelFormat = GL_RGBA
+      pixelType = cGL_FLOAT
+
+  else:
+    assert false
 
   if storage.layerCount < layerCount:
     storage.layerCount = int32(layerCount)
@@ -151,8 +186,8 @@ proc updateStorage(storage: var OpenglStorage, data: var seq[Vec4]) =
       TILE_IMAGE_WIDTH,
       GLsizei(layerCount),
       0,
-      GL_RGBA,
-      cGL_FLOAT,
+      pixelFormat,
+      pixelType,
       data[0].addr,
     )
   else:
@@ -165,8 +200,8 @@ proc updateStorage(storage: var OpenglStorage, data: var seq[Vec4]) =
       TILE_IMAGE_WIDTH,
       TILE_IMAGE_WIDTH,
       GLsizei(layerCount),
-      GL_RGBA,
-      cGL_FLOAT,
+      pixelFormat,
+      pixelType,
       data[0].addr,
     )
 
@@ -242,6 +277,7 @@ proc createShaderProgram(vs, fs: cstring): OpenglShaderProgram =
   glBindAttribLocation(program, 0, "v_idx")
   glBindAttribLocation(program, 1, "v_fillCount")
   glBindAttribLocation(program, 2, "v_fillOffset")
+  glBindAttribLocation(program, 3, "v_colorIndex")
 
   glLinkProgram(program)
 
@@ -254,12 +290,13 @@ proc createShaderProgram(vs, fs: cstring): OpenglShaderProgram =
   result.program = program
   result.fsShader = fsShader
   result.vsShader = vsShader
-  result.viewSizeLoc = glGetUniformLocation(program, "_68.viewSize")
-  result.triangleOffsetLoc = glGetUniformLocation(program, "_68.triangleOffset")
-  result.texLoc = glGetUniformLocation(program, "imageTex_smp1")
-  result.texEdgeLoc = glGetUniformLocation(program, "edgeTex_smp2")
-  result.texVertLoc = glGetUniformLocation(program, "vertTex_smp3")
-  result.paintLoc = glGetUniformLocation(program, "params")
+  result.viewSizeLoc = glGetUniformLocation(program, "_70.viewSize")
+  result.vertexOffsetLoc = glGetUniformLocation(program, "_70.vertexOffset")
+  result.texLoc = glGetUniformLocation(program, "imageTex_imageSmp")
+  result.texEdgeLoc = glGetUniformLocation(program, "edgeTex_edgeSmp")
+  result.texVertLoc = glGetUniformLocation(program, "vertTex_vertSmp")
+  result.texColorLoc = glGetUniformLocation(program, "colorTex_colorSmp")
+  result.fParamsLoc = glGetUniformLocation(program, "f_params")
 
 proc initIfNeeded(ctx: OpenglBackendContext) =
   if ctx.initial:
@@ -269,12 +306,14 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
 
   when NVG_USE_GLCORE:
     ctx.shaderProgram = createShaderProgram(
-      cast[cstring](vsSourceGlsl410[0].addr), cast[cstring](fsSourceGlsl410[0].addr)
+      cast[cstring](vsContourSourceGlsl410[0].addr), cast[cstring](
+          fsContourSourceGlsl410[0].addr)
     )
     glGenVertexArrays(1, ctx.vertArr.addr)
   else:
     ctx.shaderProgram = createShaderProgram(
-      cast[cstring](vsSourceGlsl300es[0].addr), cast[cstring](fsSourceGlsl300es[0].addr)
+      cast[cstring](vsContourSourceGlsl300es[0].addr), cast[cstring](
+          fsContourSourceGlsl300es[0].addr)
     )
 
   glGenBuffers(1, ctx.instanceBuf.addr)
@@ -283,6 +322,7 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
 
   ctx.texEdge.initStorage()
   ctx.texVert.initStorage()
+  ctx.texColor.initStorage()
 
   const
     vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
@@ -298,7 +338,7 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
   glBindBuffer(GL_ARRAY_BUFFER, 0)
 
   glBindTexture(GL_TEXTURE_2D, ctx.texDummy)
-  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), 1, 1, 0, GL_RGBA,
+  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32f), 1, 1, 0, GL_RGBA,
       GL_UNSIGNED_BYTE, pixels[0].addr)
   glBindTexture(GL_TEXTURE_2D, 0)
 
@@ -416,9 +456,9 @@ proc drawCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
   if idx <= 0 or call.uniformIndex != ctx.renderData.calls[idx -
       1].uniformIndex:
     let uniform = ctx.renderData.uniforms[call.uniformIndex].addr
-    glUniform4fv(ctx.shaderProgram.paintLoc, 6, cast[ptr GLfloat](uniform))
+    glUniform4fv(ctx.shaderProgram.fParamsLoc, 6, cast[ptr GLfloat](uniform))
 
-  glUniform1i(ctx.shaderProgram.triangleOffsetLoc, call.triangleOffset)
+  glUniform1i(ctx.shaderProgram.vertexOffsetLoc, call.vertexOffset)
 
   if idx <= 0 or call.blend != prevBlend:
     let blend = toOpenglBlend(call.blend)
@@ -449,13 +489,18 @@ proc drawCall(ctx: OpenglBackendContext, idx: int32, call: InstanceCall,
   )
   glVertexAttribDivisor(2, 1)
 
+  glVertexAttribIPointer(
+    3, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[pointer](offset +
+        sizeof(int32) * 2)
+  )
+  glVertexAttribDivisor(3, 1)
+
   glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nil,
       call.instanceCount)
 
 method drawContours(ctx: OpenglBackendContext, paint: Paint,
-    contours: openArray[
-
-Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
+    contours: openArray[Contour], fillRule: FillRule,
+        compositeOperation: CompositeOperation) =
   var
     image = default(Image)
     imageFlags = default(set[ImageFlags])
@@ -475,6 +520,62 @@ Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
     fillRule,
     compositeOperation,
   )
+
+method drawGlyphQuads(ctx: OpenglBackendContext, paint: Paint, transform: Mat2d,
+    glyphQuads: openArray[GlyphQuad], compositeOperation: CompositeOperation) =
+  var
+    # rev = default(int32)
+    vertBuf: array[4, Vec4]
+    verts = newSeqOfCap[Vec4](glyphQuads.len * 4)
+
+    lastQuad: ptr GlyphQuad
+
+  template flush() =
+    var
+      image = default(Image)
+      imageFlags = default(set[ImageFlags])
+
+    if not lastQuad.imageId.isNil:
+      let tex = ctx.getTexture(lastQuad.imageId)
+      if not tex.isNil:
+        image = tex.image
+        imageFlags = tex.imageFlags
+
+    ctx.renderData.addCall(
+      vec2(float32(ctx.width), float32(ctx.height)),
+      paint,
+      image,
+      imageFlags,
+      lastQuad.isSdf,
+      lastQuad.color,
+      verts,
+      compositeOperation,
+    )
+
+  for idx in 0 ..< glyphQuads.len:
+    let quad = glyphQuads[idx].addr
+    if not lastQuad.isNil:
+      if lastQuad.imageId != quad.imageId or lastQuad.color != quad.color:
+        flush()
+        verts.setLenUninit(0)
+
+    lastQuad = quad
+
+    let
+      p1 = vec2(quad.x1, quad.y1) * transform
+      p2 = vec2(quad.x2, quad.y1) * transform
+      p3 = vec2(quad.x2, quad.y2) * transform
+      p4 = vec2(quad.x1, quad.y2) * transform
+
+    vertBuf[0] = vec4(p1, vec2(quad.s1, quad.t1))
+    vertBuf[1] = vec4(p2, vec2(quad.s2, quad.t1))
+    vertBuf[2] = vec4(p3, vec2(quad.s2, quad.t2))
+    vertBuf[3] = vec4(p4, vec2(quad.s1, quad.t2))
+
+    verts.add(vertBuf)
+
+  if verts.len > 0:
+    flush()
 
 method allocImage(ctx: OpenglBackendContext, imageInfo: ImageInfo,
     imageFlags: set[ImageFlags]): ImageId =
@@ -570,6 +671,7 @@ method flush(ctx: OpenglBackendContext) =
   ctx.updateInstanceBuf()
   ctx.texEdge.updateStorage(ctx.renderData.edges)
   ctx.texVert.updateStorage(ctx.renderData.verts)
+  ctx.texColor.updateStorage(ctx.renderData.colors)
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
 
@@ -585,6 +687,10 @@ method flush(ctx: OpenglBackendContext) =
     2, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[pointer](sizeof(int32))
   )
   glEnableVertexAttribArray(2)
+  glVertexAttribIPointer(
+    3, 1, cGL_INT, GLsizei(sizeof(InstanceParam)), cast[pointer](sizeof(int32)*2)
+  )
+  glEnableVertexAttribArray(3)
 
   let view = vec2(float32(ctx.width), float32(ctx.height))
   glUniform2fv(
@@ -594,6 +700,7 @@ method flush(ctx: OpenglBackendContext) =
   glUniform1i(ctx.shaderProgram.texLoc, 0)
   glUniform1i(ctx.shaderProgram.texVertLoc, 1)
   glUniform1i(ctx.shaderProgram.texEdgeLoc, 2)
+  glUniform1i(ctx.shaderProgram.texColorLoc, 3)
 
   glActiveTexture(GL_TEXTURE1)
   glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texVert.tex)
@@ -602,6 +709,10 @@ method flush(ctx: OpenglBackendContext) =
   glActiveTexture(GL_TEXTURE2)
   glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texEdge.tex)
   glBindSampler(2, ctx.smpDummy)
+
+  glActiveTexture(GL_TEXTURE3)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, ctx.texColor.tex)
+  glBindSampler(3, ctx.smpDummy)
 
   for idx in 0 ..< int32(ctx.renderData.calls.len):
     let
@@ -616,6 +727,7 @@ method flush(ctx: OpenglBackendContext) =
   glDisableVertexAttribArray(0)
   glDisableVertexAttribArray(1)
   glDisableVertexAttribArray(2)
+  glDisableVertexAttribArray(3)
 
   when NVG_USE_GLCORE:
     glBindVertexArray(0)
@@ -635,6 +747,10 @@ method flush(ctx: OpenglBackendContext) =
   glActiveTexture(GL_TEXTURE2)
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
   glBindSampler(2, 0)
+
+  glActiveTexture(GL_TEXTURE2)
+  glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
+  glBindSampler(3, 0)
 
   #
   ctx.renderData.clear()

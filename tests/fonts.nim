@@ -2,29 +2,25 @@ import nvg/context
 import nvg/core
 
 const
-  FONT = staticRead("../assets/vivoSans-Regular.ttf")
-  FONT_mono = staticRead("../assets/MapleMono.ttf")
+  FONT_sans = staticRead("../assets/vivoSans-Regular.ttf")
   FONT_emoji = staticRead("../assets/NotoColorEmoji-Regular.ttf")
 
 var
-  fontId = default(FontId)
-  fontId_mono = default(FontId)
+  fontId_sans = default(FontId)
   fontId_emoji = default(FontId)
 
-proc getDefaultFont*(ctx: Context): FontId =
-  # TODO:
-  # if fontId.isNil:
-  #   fontId = ctx.loadFontFromMemory(cast[seq[byte]](FONT))
-  fontId
+type
+  Fonts* = enum
+    Sans
+    Emoji
 
-proc getMonoFont*(ctx: Context): FontId =
-  # TODO:
-  # if fontId_mono.isNil:
-  #   fontId_mono = ctx.loadFontFromMemory(cast[seq[byte]](FONT_mono))
-  fontId_mono
+proc addDefaultFonts*(ctx: Context) =
+  fontId_sans = ctx.loadFontFromMemory("vivoSans", cast[seq[byte]](FONT_sans), FontFamilyDefault)
+  fontId_emoji = ctx.loadFontFromMemory("NotoColorEmoji", cast[seq[byte]](
+      FONT_emoji), FontFamilyEmoji)
 
-proc getEmojiFont*(ctx: Context): FontId =
-  # TODO:
-  # if fontId_emoji.isNil:
-  #   fontId_emoji = ctx.loadFontFromMemory(cast[seq[byte]](FONT_emoji))
-  fontId_emoji
+proc getFontId*(id: Fonts): FontId =
+  {.cast(noSideEffect).}:
+    case id
+    of Sans: fontId_sans
+    of Emoji: fontId_emoji

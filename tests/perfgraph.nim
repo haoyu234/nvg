@@ -106,9 +106,9 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
   ctx.fillStyle = color(255, 191, 0, 127)
   ctx.fill()
 
-  ctx.fontId = ctx.getMonoFont()
+  ctx.fontId = getFontId(Sans)
   ctx.fontSize = 36
-  ctx.fillStyle = color(239, 239, 239, 255)
+  ctx.fontColor = color(239, 239, 239, 255)
   ctx.textAlign = RightAlign
   ctx.textBaseline = TopBaseline
 
@@ -116,23 +116,16 @@ proc renderGraph*(ctx: Context, pos: Vec2, perfGraph: PerfGraph) =
 
   case perfGraph.renderStyle
   of PERF_GRAPH_RENDER_FPS:
-    # TODO:
-    # ctx.fillText(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
+    ctx.fillText(fmt"{1 / v:.2f} FPS", vec2(pos[0] + w - 3, pos[1] + 1))
     ctx.fontSize = 30
-    ctx.fillStyle = color(239, 239, 239, 158)
+    ctx.fontColor = color(239, 239, 239, 158)
     ctx.textBaseline = BottomBaseline
-    # TODO:
-    # ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
-    discard
+    ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + h - 1))
 
   of PERF_GRAPH_RENDER_PERCENT:
-    # TODO:
-    # ctx.fillText(fmt"{v:.1f} %", vec2(pos[0] + w - 3, pos[1] + 1))
-    discard
+    ctx.fillText(fmt"{v:.1f} %", vec2(pos[0] + w - 3, pos[1] + 1))
 
   of PERF_GRAPH_RENDER_MS:
-    # TODO:
-    # ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + 1))
-    discard
+    ctx.fillText(fmt"{v * 1000:.2f} ms", vec2(pos[0] + w - 3, pos[1] + 1))
 
   ctx.restore()

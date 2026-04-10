@@ -11,6 +11,11 @@ type
 
   BackendContext* = ref object of RootObj
 
+method drawGlyphQuads*(ctx: BackendContext, paint: Paint, transform: Mat2d,
+    glyphQuads: openArray[GlyphQuad],
+    compositeOperation: CompositeOperation) {.base.} =
+  discard
+
 method drawContours*(ctx: BackendContext, paint: Paint, contours: openArray[
     Contour], fillRule: FillRule, compositeOperation: CompositeOperation) {.base.} =
   discard

@@ -1,5 +1,4 @@
 import nvg
-import nvg/backend
 
 type
   AppEventType* = enum
@@ -152,14 +151,6 @@ when defined(feature.nvg.opengl):
   import std/strformat
   import std/times
 
-  discard sdl2.init(INIT_EVERYTHING)
-
-  discard glSetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-      SDL_GL_CONTEXT_PROFILE_CORE.cint)
-  discard glSetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4.cint)
-  discard glSetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1.cint)
-  discard glSetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG.cint)
-
   proc toAppKeyCode(keyCode: cint): AppKeyCode =
     case keyCode
     of K_SPACE: KEY_CODE_SPACE
@@ -270,6 +261,14 @@ when defined(feature.nvg.opengl):
     else: KEY_CODE_NONE
 
   proc launch*(w, h: int32, app: App) =
+    discard sdl2.init(INIT_VIDEO or INIT_EVENTS)
+    discard glSetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4.cint)
+    discard glSetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3.cint)
+    discard glSetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+        SDL_GL_CONTEXT_PROFILE_CORE.cint)
+    discard glSetAttribute(SDL_GL_CONTEXT_FLAGS, (SDL_GL_CONTEXT_DEBUG_FLAG or
+        SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG).cint)
+
     let
       name = fmt"{app.name} SDL2"
       window = createWindow(name.cstring, 100, 100, cint(w), cint(h),
@@ -284,7 +283,15 @@ when defined(feature.nvg.opengl):
       runGame = true
 
       backendContext = createOpenglBackendContext(w, h)
-      ctx = createInternal(backendContext)
+
+    let
+      fontCollection = createSimpleFontCollection()
+      textLayoutContext = createSimpleTextLayoutContext()
+      textRenderContext = createSimpleTextRenderContext(backendContext)
+      textBlobCache = createSimpleTextBlobCache(textLayoutContext)
+
+      ctx = createContext(backendContext, fontCollection, textBlobCache,
+          textLayoutContext, textRenderContext)
 
     ctx.setDevicePixelRatio(1)
 
@@ -305,7 +312,12 @@ when defined(feature.nvg.opengl):
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
 
         ctx.save()
-        app.frameImpl(ctx)
+        try:
+          app.frameImpl(ctx)
+        except Exception as e:
+          echo "msg: ", e.msg
+          writeStackTrace()
+
         ctx.restore()
 
         ctx.renderGraph(vec2(float32(w - 300), 10), fpsGraph)
@@ -383,7 +395,7 @@ when defined(feature.nvg.opengl):
 
     sdl2.glDeleteContext(glCtx)
     sdl2.destroyWindow(window)
-  sdl2.quit()
+    sdl2.quit()
 
 elif defined(feature.nvg.sokol):
   import pkg/sokol/app as sapp
@@ -409,7 +421,6 @@ elif defined(feature.nvg.sokol):
   var
     g_app = default(App)
     g_ctx = default(Context)
-    g_backendCtx = default(BackendContext)
 
   var
     g_frameStartTime = default(MonoTime)
@@ -421,8 +432,11 @@ elif defined(feature.nvg.sokol):
       gfx.Desc(
         environment: environment(),
         logger: gfx.Logger(fn: fn),
-        pipelinePoolSize: 128, # d3d11ShaderDebugging: true,
-      )
+        pipelinePoolSize: 128,
+        d3d11: D3d11Desc(
+          shaderDebugging: true,
+      ),
+    )
     )
 
     case queryBackend()
@@ -437,8 +451,15 @@ elif defined(feature.nvg.sokol):
 
     setWindowTitle(fmt"{g_app.name} {queryBackend()}".cstring)
 
-    g_backendCtx = createSokolBackendContext(width(), height())
-    g_ctx = createInternal(g_backendCtx)
+    let
+      backendContext = createSokolBackendContext(width(), height())
+      fontCollection = createSimpleFontCollection()
+      textLayoutContext = createSimpleTextLayoutContext()
+      textRenderContext = createSimpleTextRenderContext(backendContext)
+      textBlobCache = createSimpleTextBlobCache(textLayoutContext)
+
+    g_ctx = createContext(backendContext, fontCollection, textBlobCache,
+          textLayoutContext, textRenderContext)
     g_ctx.setDevicePixelRatio(dpiScale())
 
     if not g_app.initImpl.isNil:
@@ -614,7 +635,12 @@ elif defined(feature.nvg.sokol):
 
       if not g_app.frameImpl.isNil:
         g_ctx.save()
-        g_app.frameImpl(g_ctx)
+        try:
+          g_app.frameImpl(g_ctx)
+        except Exception as e:
+          echo "msg: ", e.msg
+          writeStackTrace()
+
         g_ctx.restore()
 
       g_ctx.renderGraph(vec2(float32(width() - 300), 10), g_fpsGraph)

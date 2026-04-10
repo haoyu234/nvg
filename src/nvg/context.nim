@@ -4,6 +4,7 @@ import ./core
 import ./math
 import ./path
 import ./pieces
+import ./text
 
 import std/math
 
@@ -23,12 +24,16 @@ type
     transform: Mat2d
 
     # font state
+    fontId: FontId
     fontSize: float32
+    fontColor: Color
     letterSpacing: float32
+    wordSpacing: float32
     lineHeight: float32
     textAlign: HorizontalAlignment
     textBaseline: BaselineAlignment
-    fontId: FontId
+    textWrap: TextWrap
+    textOverflow: TextOverflow
 
   Context* = ref ContextObj
   ContextObj = object # state
@@ -46,15 +51,23 @@ type
     transform: Mat2d
 
     # font state
+    fontId*: FontId
     fontSize*: float32
+    fontColor*: Color
     letterSpacing*: float32
+    wordSpacing*: float32
     lineHeight*: float32
     textAlign*: HorizontalAlignment
     textBaseline*: BaselineAlignment
-    fontId*: FontId
+    textWrap*: TextWrap
+    textOverflow*: TextOverflow
 
     #
     backendContext*: BackendContext
+    fontCollection*: FontCollection
+    textBlobCache*: TextBlobCache
+    textLayoutContext*: TextLayoutContext
+    textRenderContext*: TextRenderContext
 
     tessTol: float32
     tessTolSq: float32
@@ -83,12 +96,16 @@ proc resetState(ctx: Context) =
   ctx.transform = mat2d()
 
   # font settings
+  ctx.fontId = default(FontId)
   ctx.fontSize = 32
+  ctx.fontColor = color(0, 0, 0, 255)
   ctx.letterSpacing = 0
+  ctx.wordSpacing = 0
   ctx.lineHeight = 16
   ctx.textAlign = LeftAlign
   ctx.textBaseline = AlphabeticBaseline
-  ctx.fontId = default(FontId)
+  ctx.textWrap = NoWrap
+  ctx.textOverflow = Hidden
 
 proc setDevicePixelRatio*(
   ctx: Context, devicePixelRatio: float32) {.inline.} =
@@ -112,12 +129,27 @@ proc state(ctx: Context): ContextState =
   result.globalAlpha = ctx.globalAlpha
   result.transform = ctx.transform
 
+  result.fontId = ctx.fontId
   result.fontSize = ctx.fontSize
+  result.fontColor = ctx.fontColor
   result.letterSpacing = ctx.letterSpacing
+  result.wordSpacing = ctx.wordSpacing
   result.lineHeight = ctx.lineHeight
   result.textAlign = ctx.textAlign
   result.textBaseline = ctx.textBaseline
-  result.fontId = ctx.fontId
+  result.textWrap = ctx.textWrap
+  result.textOverflow = ctx.textOverflow
+
+proc textAttribs(ctx: Context): TextAttribs =
+  result.fontSize = ctx.fontSize
+  result.fontColor = ctx.fontColor
+  result.letterSpacing = ctx.letterSpacing
+  result.wordSpacing = ctx.wordSpacing
+  result.lineHeight = ctx.lineHeight
+  result.textAlign = ctx.textAlign
+  result.textBaseline = ctx.textBaseline
+  result.textWrap = ctx.textWrap
+  result.textOverflow = ctx.textOverflow
 
 proc save*(ctx: Context) {.inline.} =
   ctx.states.add(ctx.state)
@@ -140,18 +172,29 @@ proc restore*(ctx: Context) =
     ctx.globalAlpha = state.globalAlpha
     ctx.transform = state.transform
 
+    ctx.fontId = state.fontId
     ctx.fontSize = state.fontSize
+    ctx.fontColor = state.fontColor
     ctx.letterSpacing = state.letterSpacing
+    ctx.wordSpacing = state.wordSpacing
     ctx.lineHeight = state.lineHeight
     ctx.textAlign = state.textAlign
     ctx.textBaseline = state.textBaseline
-    ctx.fontId = state.fontId
+    ctx.textWrap = state.textWrap
+    ctx.textOverflow = state.textOverflow
 
     ctx.states.setLen(ctx.states.len - 1)
 
-proc createInternal*(backendContext: BackendContext): Context =
+proc createContext*(backendContext: BackendContext,
+    fontCollection: FontCollection, textBlobCache: TextBlobCache,
+    textLayoutContext: TextLayoutContext,
+    textRenderContext: TextRenderContext): Context =
   result = Context()
   result.backendContext = backendContext
+  result.fontCollection = fontCollection
+  result.textBlobCache = textBlobCache
+  result.textLayoutContext = textLayoutContext
+  result.textRenderContext = textRenderContext
   result.setDevicePixelRatio(1)
   result.resetState()
 
@@ -181,7 +224,7 @@ proc transform*(ctx: Context, v: Mat2d) {.inline.} =
 
 proc fillPath*(ctx: Context, path: Path) =
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
-  
+
   let contours = ctx.cache.expandFill(ctx.distTolSq)
 
   var paint = ctx.fillStyle
@@ -235,10 +278,14 @@ proc strokePath*(ctx: Context, path: Path) =
   )
 
 proc flush*(ctx: Context) {.inline.} =
+  ctx.textLayoutContext.flush()
+  ctx.textRenderContext.flush()
   ctx.backendContext.flush()
 
   ctx.states.setLen(0)
   ctx.resetState()
+
+  ctx.textBlobCache.compact()
 
 proc beginPath*(ctx: Context) {.inline.} =
   ctx.path.clear()
@@ -307,39 +354,33 @@ proc imagePattern*(ctx: Context, xywh: Vec4, radians: float32,
 proc getImageInfo*(ctx: Context, imageId: ImageId): ImageInfo {.inline.} =
   ctx.backendContext.getImageInfo(imageId)
 
-proc fillQuad*(ctx: Context, quads: openArray[Quad]) =
-  var paint = default(Paint)
-  paint.innerColor = ctx.fillStyle.innerColor
-  paint.outerColor = ctx.fillStyle.outerColor
-  paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
-      paint.innerColor.a))
-  paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
-      paint.outerColor.a))
+proc loadFontFromMemory*(ctx: Context, name: string, buffer: seq[byte],
+    fontFamily: FontFamily): FontId =
+  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
+      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+    return
 
-  var
-    rev = default(int32)
-    vertBuf: array[4, Vec4]
-    verts = newSeqOfCap[Vec4](len(quads) * 4)
+  ctx.fontCollection.loadFromMemory(name, buffer, fontFamily)
 
-  if ctx.transform.xx * ctx.transform.yy < 0:
-    rev = 2
+proc createTextBlob*(ctx: Context, text: openArray[char]): TextBlob =
+  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
+      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+    return
 
-  for quad in quads:
-    let
-      p1 = vec2(quad.x1, quad.y1) * ctx.transform
-      p2 = vec2(quad.x2, quad.y1) * ctx.transform
-      p3 = vec2(quad.x2, quad.y2) * ctx.transform
-      p4 = vec2(quad.x1, quad.y2) * ctx.transform
+  result = ctx.textLayoutContext.createTextBlob(ctx.fontCollection,
+      ctx.textAttribs, text)
 
-    vertBuf[0] = vec4(p3, vec2(quad.s2, quad.t2))
-    vertBuf[1 + rev] = vec4(p2, vec2(quad.s2, quad.t1))
-    vertBuf[2] = vec4(p1, vec2(quad.s1, quad.t1))
-    vertBuf[3 - rev] = vec4(p4, vec2(quad.s1, quad.t2))
+proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
+  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
+      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+    return
 
-    verts.add(vertBuf)
+  ctx.textRenderContext.fillText(ctx.textLayoutContext, ctx.textBlobCache,
+      ctx.fontCollection, ctx.textAttribs, text, pos, ctx.transform)
 
-  # ctx.backendContext.renderSdf(
-  #   paint,
-  #   verts,
-  #   ctx.compositeOperation,
-  # )
+proc fillTextBlob*(ctx: Context, textBlob: TextBlob, pos: Vec2) =
+  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
+      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+    return
+
+  ctx.textRenderContext.fillTextBlob(textBlob, pos, ctx.transform)

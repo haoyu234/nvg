@@ -12,7 +12,7 @@ type
     ShaderSolid = 1
     ShaderGradient
     ShaderImage
-    # ShaderSdf
+    ShaderGlyphQuad
 
   Image* = ref object
     imageId*: ImageId
@@ -23,7 +23,7 @@ type
     innerColor*: Color32f
     outerColor*: Color32f
     extent*: Vec2
-    texSize*: Vec2
+    texSize*: array[2, float32]
     transform1*: Vec2
     transform2*: Vec2
     transform3*: Vec2
@@ -32,16 +32,18 @@ type
     shaderType*: float32
     texType*: float32
     fillType*: float32
-    pad: array[4, uint8]
+    isSdf*: float32
 
   InstanceParam* = object
     fillCount*: int32
     fillOffset*: int32
+    colorIndex*: int32
+    pad: int32
 
   InstanceCall* = object
     imageId*: ImageId
-    triangleOffset*: int32
-    triangleCount*: int32
+    vertexOffset*: int32
+    vertexCount*: int32
     instanceOffset*: int32
     instanceCount*: int32
     uniformIndex*: int32
@@ -54,6 +56,7 @@ type
     edges*: seq[Vec4]
     calls*: seq[InstanceCall]
     uniforms*: seq[UniformParam]
+    colors*: seq[Color32f]
     instances*: seq[InstanceParam]
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
@@ -63,9 +66,9 @@ proc addQuad(verts: var seq[Vec4], bounds: array[4, float32]) {.inline.} =
     xMax = bounds[2]
     yMax = bounds[3]
 
-  verts.add(vec4(xMax, yMax, 0, 0))
-  verts.add(vec4(xMax, yMin, 0, 0))
   verts.add(vec4(xMin, yMin, 0, 0))
+  verts.add(vec4(xMax, yMin, 0, 0))
+  verts.add(vec4(xMax, yMax, 0, 0))
   verts.add(vec4(xMin, yMax, 0, 0))
 
 proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
@@ -76,9 +79,9 @@ proc addQuad(verts: var seq[Vec4], bounds: array[4, float32],
     xMax = bounds[2] + pad
     yMax = bounds[3] + pad
 
-  verts.add(vec4(xMax, yMax, 0, 0))
-  verts.add(vec4(xMax, yMin, 0, 0))
   verts.add(vec4(xMin, yMin, 0, 0))
+  verts.add(vec4(xMax, yMin, 0, 0))
+  verts.add(vec4(xMax, yMax, 0, 0))
   verts.add(vec4(xMin, yMax, 0, 0))
 
 proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
@@ -93,6 +96,7 @@ proc reserve[T](s: var seq[T], n: Natural) {.inline.} =
 proc clear*(ctx: var RenderData) =
   ctx.verts.setLen(0)
   ctx.edges.setLen(0)
+  ctx.colors.setLen(0)
   ctx.calls.setLen(0)
   ctx.uniforms.setLen(0)
   ctx.instances.setLen(0)
@@ -103,13 +107,22 @@ proc addUniform(ctx: var RenderData, uniform: UniformParam): int32 =
 
   int32(ctx.uniforms.len - 1)
 
+proc addColor(ctx: var RenderData, color: Color32f): int32 =
+  if ctx.colors.len <= 0:
+    ctx.colors.add(Color32f()) # transparent
+    ctx.colors.add(color)
+  elif ctx.colors[^1] != color:
+    ctx.colors.add(color)
+
+  int32(ctx.colors.len - 1)
+
 proc addCall(ctx: var RenderData, call: InstanceCall) =
   if ctx.calls.len > 0:
     let prev = ctx.calls[^1].addr
     if prev.blend == call.blend and prev.imageId == call.imageId and
       prev.uniformIndex == call.uniformIndex:
       prev.instanceCount = prev.instanceCount + call.instanceCount
-      prev.triangleCount = prev.triangleCount + call.triangleCount
+      prev.vertexCount = prev.vertexCount + call.vertexCount
       return
 
   ctx.calls.add(call)
@@ -157,7 +170,7 @@ proc updatePixels*(image: Image, x, y, w, h, strideBytes: int32,
         idx * sourceStrideBytes].addr, sourceRowBytes)
 
 proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
-    image: Image, imageFlags: set[ImageFlags],
+    image: Image, imageFlags: set[ImageFlags], isSdf: bool,
     fillRule: FillRule): UniformParam =
   result.shaderType = float32(shaderType)
   result.fillType = 0
@@ -165,11 +178,12 @@ proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
   result.innerColor = paint.innerColor.premultiplied
   result.outerColor = paint.outerColor.premultiplied
   result.extent = paint.extent
+  result.isSdf = float32(isSdf)
 
   if fillRule == EvenOdd:
     result.fillType = float32(1 shl 0)
 
-  if not paint.imageId.isNil or paint.innerColor != paint.outerColor:
+  if not image.isNil or paint.innerColor != paint.outerColor:
     var transform = paint.transform
 
     if ImageFlipY in imageFlags:
@@ -193,15 +207,16 @@ proc toUniform(call: var InstanceCall, paint: Paint, shaderType: ShaderType,
 
     case imageInfo.pixelFormat
     of PixelFormatA8, PixelFormatA32f:
-      result.texType = 2
+      result.texType = float32(2)
     of PixelFormatRGB8, PixelFormatRGBA8, PixelFormatRGB32f, PixelFormatRGBA32f:
       if imageInfo.alphaType == AlphaPremultiplied:
-        result.texType = 3
+        result.texType = float32(3)
       else:
-        result.texType = 1
+        result.texType = float32(1)
 
-    result.texSize = vec2(float32(imageInfo.width), float32(imageInfo.height))
     call.imageId = image.imageId
+    result.texSize[0] = float32(imageInfo.width)
+    result.texSize[1] = float32(imageInfo.height)
 
 proc calcBounds(contours: openArray[Contour]): Vec4 =
   result = vec4(1e6, 1e6, -1e6, -1e6)
@@ -261,12 +276,12 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
 
   var
     call = default(InstanceCall)
-    uniformParam = call.toUniform(paint, shaderType, image, imageFlags, fillRule)
+    uniformParam = call.toUniform(paint, shaderType, image, imageFlags, false, fillRule)
     instanceParam = default(InstanceParam)
 
   call.blend = compositeOperation
-  call.triangleOffset = int32(ctx.verts.len)
-  call.triangleCount = 0
+  call.vertexOffset = int32(ctx.verts.len)
+  call.vertexCount = 0
   call.instanceOffset = int32(ctx.instances.len)
   call.instanceCount = 0
 
@@ -371,6 +386,7 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
 
   else:
     instanceParam.fillOffset = int32(ctx.edges.len)
+    instanceParam.fillCount = 0
 
     for p in contours:
       ctx.edges.add(p.fill.toOpenArray)
@@ -381,8 +397,41 @@ proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint,
     ctx.instances.add(instanceParam)
 
   if ctx.instances.len > call.instanceOffset:
-    call.triangleCount = int32(ctx.verts.len) - call.triangleOffset
+    call.vertexCount = int32(ctx.verts.len) - call.vertexOffset
     call.instanceCount = int32(ctx.instances.len) - call.instanceOffset
     call.uniformIndex = ctx.addUniform(uniformParam)
 
     ctx.addCall(call)
+
+proc addCall*(ctx: var RenderData, viewBound: Vec2, paint: Paint, image: Image,
+    imageFlags: set[ImageFlags], isSdf: bool, color: Color, verts: openArray[
+    Vec4], compositeOperation: CompositeOperation) =
+  if verts.len <= 0:
+    return
+
+  var
+    call = default(InstanceCall)
+    uniformParam = call.toUniform(paint, ShaderGlyphQuad, image, imageFlags,
+        isSdf, NonZero)
+    instanceParam = default(InstanceParam)
+
+  call.blend = compositeOperation
+  call.vertexOffset = int32(ctx.verts.len)
+  call.vertexCount = 0
+  call.instanceOffset = int32(ctx.instances.len)
+  call.instanceCount = 0
+
+  ctx.verts.add(verts)
+
+  instanceParam.fillOffset = int32(ctx.edges.len)
+  instanceParam.fillCount = int32(ctx.edges.len) - instanceParam.fillOffset
+  instanceParam.colorIndex = ctx.addColor(color.premultiplied)
+
+  for _ in 0 ..< verts.len div 4:
+    ctx.instances.add(instanceParam)
+
+  call.vertexCount = int32(ctx.verts.len) - call.vertexOffset
+  call.instanceCount = int32(ctx.instances.len) - call.instanceOffset
+  call.uniformIndex = ctx.addUniform(uniformParam)
+
+  ctx.addCall(call)
