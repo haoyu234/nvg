@@ -106,6 +106,9 @@ proc frameImpl(ctx: Context) =
     mid = float32(SCREEN_W) / 2
     offset = mid - (n - 1) * 10 / 2
 
+  ctx.fillStyle = color(0, 0, 0, 128)
+  ctx.strokeStyle = color(0, 0, 0, 128)
+
   for i in 0 ..< n:
     let r = if idx == i: 5 else: 3
 

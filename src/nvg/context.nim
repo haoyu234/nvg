@@ -69,8 +69,8 @@ type
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
-  ctx.fillStyle = color(0, 0, 0, 1)
-  ctx.strokeStyle = color(0, 0, 0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
+  ctx.strokeStyle = color(0, 0, 0, 255)
 
   ctx.compositeOperation = SOURCE_OVER_OPERATION
   ctx.strokeWidth = 1
@@ -186,8 +186,10 @@ proc fillPath*(ctx: Context, path: Path) =
 
   var paint = ctx.fillStyle
   paint.transform.multiply(ctx.transform)
-  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
-  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
+  paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.innerColor.a))
+  paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.outerColor.a))
 
   ctx.backendContext.drawContours(
     paint,
@@ -210,8 +212,10 @@ proc strokePath*(ctx: Context, path: Path) =
 
   var paint = ctx.strokeStyle
   paint.transform.multiply(ctx.transform)
-  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
-  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
+  paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.innerColor.a))
+  paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.outerColor.a))
 
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
 
@@ -295,8 +299,10 @@ proc imagePattern*(ctx: Context, xywh: Vec4, radians: float32,
   result.extent[0] = xywh[2]
   result.extent[1] = xywh[3]
   result.imageId = imageId
-  result.innerColor = color(1, 1, 1, alpha)
-  result.outerColor = color(1, 1, 1, alpha)
+
+  let a8 = uint8(clamp(alpha, 0, 1) * 255)
+  result.innerColor = color(255, 255, 255, a8)
+  result.outerColor = color(255, 255, 255, a8)
 
 proc getImageInfo*(ctx: Context, imageId: ImageId): ImageInfo {.inline.} =
   ctx.backendContext.getImageInfo(imageId)
@@ -305,8 +311,10 @@ proc fillQuad*(ctx: Context, quads: openArray[Quad]) =
   var paint = default(Paint)
   paint.innerColor = ctx.fillStyle.innerColor
   paint.outerColor = ctx.fillStyle.outerColor
-  paint.innerColor.a = ctx.globalAlpha * paint.innerColor.a
-  paint.outerColor.a = ctx.globalAlpha * paint.outerColor.a
+  paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.innerColor.a))
+  paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
+      paint.outerColor.a))
 
   var
     rev = default(int32)

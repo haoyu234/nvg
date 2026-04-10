@@ -7,7 +7,7 @@ proc demo_tiger*(ctx: Context) =
   # # path0
   # ctx.save()
   # ctx.fillRule = NonZero
-  # ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  # ctx.fillStyle = color(255, 255, 255, 255)
   # ctx.beginPath()
   # ctx.moveTo(vec2(0,0))
   # ctx.lineTo(vec2(495,0))
@@ -21,7 +21,7 @@ proc demo_tiger*(ctx: Context) =
   # path1
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(66.1946,278.852))
   ctx.bezierTo(vec2(66.1946,278.852), vec2(66.2915,277.035), vec2(65.5012,277.053))
@@ -32,7 +32,7 @@ proc demo_tiger*(ctx: Context) =
   # path2
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -47,7 +47,7 @@ proc demo_tiger*(ctx: Context) =
   # path3
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(69.5799,281.751))
   ctx.bezierTo(vec2(69.5799,281.751), vec2(69.0534,280.009), vec2(68.316,280.296))
@@ -58,7 +58,7 @@ proc demo_tiger*(ctx: Context) =
   # path4
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -73,7 +73,7 @@ proc demo_tiger*(ctx: Context) =
   # path5
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(95.9433,241.157))
   ctx.bezierTo(vec2(95.9433,241.157), vec2(97.5123,240.237), vec2(97.0615,239.587))
@@ -84,7 +84,7 @@ proc demo_tiger*(ctx: Context) =
   # path6
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -99,7 +99,7 @@ proc demo_tiger*(ctx: Context) =
   # path7
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(93.2494,231.365))
   ctx.bezierTo(vec2(93.2494,231.365), vec2(95.0294,230.985), vec2(94.805,230.227))
@@ -110,7 +110,7 @@ proc demo_tiger*(ctx: Context) =
   # path8
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -125,7 +125,7 @@ proc demo_tiger*(ctx: Context) =
   # path9
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(89.211,236.663))
   ctx.bezierTo(vec2(89.211,236.663), vec2(90.9161,236.028), vec2(90.5843,235.31))
@@ -136,7 +136,7 @@ proc demo_tiger*(ctx: Context) =
   # path10
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -151,7 +151,7 @@ proc demo_tiger*(ctx: Context) =
   # path11
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(78.9447,254.121))
   ctx.bezierTo(vec2(78.9447,254.121), vec2(80.1991,252.804), vec2(79.5863,252.304))
@@ -162,7 +162,7 @@ proc demo_tiger*(ctx: Context) =
   # path12
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -177,7 +177,7 @@ proc demo_tiger*(ctx: Context) =
   # path13
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(71.709,250.102))
   ctx.bezierTo(vec2(71.709,250.102), vec2(73.1053,248.935), vec2(72.5529,248.368))
@@ -188,7 +188,7 @@ proc demo_tiger*(ctx: Context) =
   # path14
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -203,7 +203,7 @@ proc demo_tiger*(ctx: Context) =
   # path15
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(69.2155,246.197))
   ctx.bezierTo(vec2(69.2155,246.197), vec2(70.7576,245.23), vec2(70.2877,244.595))
@@ -214,7 +214,7 @@ proc demo_tiger*(ctx: Context) =
   # path16
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -229,7 +229,7 @@ proc demo_tiger*(ctx: Context) =
   # path17
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(79.5096,245.608))
   ctx.bezierTo(vec2(79.5096,245.608), vec2(80.5856,244.14), vec2(79.9133,243.723))
@@ -240,7 +240,7 @@ proc demo_tiger*(ctx: Context) =
   # path18
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -255,7 +255,7 @@ proc demo_tiger*(ctx: Context) =
   # path19
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(60.5402,273.371))
   ctx.bezierTo(vec2(60.5402,273.371), vec2(61.1157,271.645), vec2(60.3484,271.453))
@@ -266,7 +266,7 @@ proc demo_tiger*(ctx: Context) =
   # path20
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -281,7 +281,7 @@ proc demo_tiger*(ctx: Context) =
   # path21
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(61.2068,266.678))
   ctx.bezierTo(vec2(61.2068,266.678), vec2(62.1418,265.116), vec2(61.4331,264.764))
@@ -292,7 +292,7 @@ proc demo_tiger*(ctx: Context) =
   # path22
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -307,7 +307,7 @@ proc demo_tiger*(ctx: Context) =
   # path23
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(61.0965,262.487))
   ctx.bezierTo(vec2(61.0965,262.487), vec2(62.1725,261.019), vec2(61.5002,260.601))
@@ -318,7 +318,7 @@ proc demo_tiger*(ctx: Context) =
   # path24
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.164951
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -333,7 +333,7 @@ proc demo_tiger*(ctx: Context) =
   # path25
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(58.977,260.841))
   ctx.bezierTo(vec2(59.4594,255.041), vec2(60.4069,248.741), vec2(62.0747,245.75))
@@ -441,7 +441,7 @@ proc demo_tiger*(ctx: Context) =
   # path26
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -553,7 +553,7 @@ proc demo_tiger*(ctx: Context) =
   # path27
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(470.92,282.726))
   ctx.bezierTo(vec2(471.522,282.552), vec2(473.638,281.474), vec2(474.837,279.892))
@@ -604,7 +604,7 @@ proc demo_tiger*(ctx: Context) =
   # path28
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -659,7 +659,7 @@ proc demo_tiger*(ctx: Context) =
   # path29
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(72.6239,261.287))
   ctx.bezierTo(vec2(48.6484,299.072), vec2(62.4583,244.983), vec2(62.4583,244.983))
@@ -684,7 +684,7 @@ proc demo_tiger*(ctx: Context) =
   # path30
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9098039215686274, 0.4980392156862745, 0.22745098039215686, 1)
+  ctx.fillStyle = color(232, 127, 58, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(311.525,335.375))
   ctx.bezierTo(vec2(305.387,334.608), vec2(281.059,357.374), vec2(295.413,326.936))
@@ -709,7 +709,7 @@ proc demo_tiger*(ctx: Context) =
   # path31
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9176470588235294, 0.5490196078431373, 0.30196078431372547, 1)
+  ctx.fillStyle = color(234, 140, 77, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(312.78,333.702))
   ctx.bezierTo(vec2(306.642,332.934), vec2(282.922,355.979), vec2(296.668,325.262))
@@ -734,7 +734,7 @@ proc demo_tiger*(ctx: Context) =
   # path32
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9254901960784314, 0.6, 0.3803921568627451, 1)
+  ctx.fillStyle = color(236, 153, 97, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(314.035,332.027))
   ctx.bezierTo(vec2(307.898,331.26), vec2(284.182,354.307), vec2(297.924,323.588))
@@ -759,7 +759,7 @@ proc demo_tiger*(ctx: Context) =
   # path33
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9333333333333333, 0.6470588235294118, 0.4588235294117647, 1)
+  ctx.fillStyle = color(238, 165, 117, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(315.292,330.353))
   ctx.bezierTo(vec2(309.153,329.585), vec2(285.923,352.845), vec2(299.179,321.913))
@@ -784,7 +784,7 @@ proc demo_tiger*(ctx: Context) =
   # path34
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9450980392156862, 0.6980392156862745, 0.5333333333333333, 1)
+  ctx.fillStyle = color(241, 178, 136, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(316.547,328.679))
   ctx.bezierTo(vec2(310.409,327.912), vec2(285.509,350.402), vec2(300.435,320.24))
@@ -809,7 +809,7 @@ proc demo_tiger*(ctx: Context) =
   # path35
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9529411764705882, 0.7490196078431373, 0.611764705882353, 1)
+  ctx.fillStyle = color(243, 191, 156, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(317.802,327.006))
   ctx.bezierTo(vec2(311.664,326.239), vec2(286.401,348.545), vec2(301.69,318.566))
@@ -834,7 +834,7 @@ proc demo_tiger*(ctx: Context) =
   # path36
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9607843137254902, 0.8, 0.6901960784313725, 1)
+  ctx.fillStyle = color(245, 204, 176, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(319.058,325.331))
   ctx.bezierTo(vec2(312.92,324.564), vec2(286.603,346.31), vec2(302.946,316.892))
@@ -859,7 +859,7 @@ proc demo_tiger*(ctx: Context) =
   # path37
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9725490196078431, 0.8470588235294118, 0.7686274509803922, 1)
+  ctx.fillStyle = color(248, 216, 196, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(320.313,323.657))
   ctx.bezierTo(vec2(314.175,322.89), vec2(287.858,344.636), vec2(304.202,315.217))
@@ -884,7 +884,7 @@ proc demo_tiger*(ctx: Context) =
   # path38
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9803921568627451, 0.8980392156862745, 0.8431372549019608, 1)
+  ctx.fillStyle = color(250, 229, 215, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(321.568,321.983))
   ctx.bezierTo(vec2(315.431,321.216), vec2(289.485,343.165), vec2(305.457,313.544))
@@ -909,7 +909,7 @@ proc demo_tiger*(ctx: Context) =
   # path39
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9882352941176471, 0.9490196078431372, 0.9215686274509803, 1)
+  ctx.fillStyle = color(252, 242, 235, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(322.824,320.31))
   ctx.bezierTo(vec2(316.686,319.543), vec2(291.776,342.026), vec2(306.712,311.871))
@@ -934,7 +934,7 @@ proc demo_tiger*(ctx: Context) =
   # path40
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(72.4321,244.983))
   ctx.bezierTo(vec2(60.1566,266.082), vec2(69.3632,212.76), vec2(69.3632,212.76))
@@ -959,7 +959,7 @@ proc demo_tiger*(ctx: Context) =
   # path41
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(112.327,216.212))
   ctx.bezierTo(vec2(112.327,216.212), vec2(105.422,205.088), vec2(125.37,192.429))
@@ -972,7 +972,7 @@ proc demo_tiger*(ctx: Context) =
   # path42
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(246.59,261.863))
   ctx.bezierTo(vec2(246.59,261.863), vec2(263.562,236.141), vec2(262.989,231.557))
@@ -986,7 +986,7 @@ proc demo_tiger*(ctx: Context) =
   # path43
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(131.507,190.511))
   ctx.bezierTo(vec2(131.507,190.511), vec2(142.248,183.606), vec2(128.439,153.685))
@@ -1007,7 +1007,7 @@ proc demo_tiger*(ctx: Context) =
   # path44
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(162.58,174.399))
   ctx.bezierTo(vec2(162.58,174.399), vec2(165.265,178.619), vec2(162.58,177.852))
@@ -1018,7 +1018,7 @@ proc demo_tiger*(ctx: Context) =
   # path45
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(172.553,166.727))
   ctx.bezierTo(vec2(172.553,166.727), vec2(175.239,170.947), vec2(172.553,170.18))
@@ -1029,7 +1029,7 @@ proc demo_tiger*(ctx: Context) =
   # path46
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(185.212,181.304))
   ctx.bezierTo(vec2(185.212,181.304), vec2(187.898,185.524), vec2(185.212,184.757))
@@ -1040,7 +1040,7 @@ proc demo_tiger*(ctx: Context) =
   # path47
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(162.963,139.491))
   ctx.bezierTo(vec2(162.963,139.491), vec2(162.963,145.245), vec2(160.278,144.478))
@@ -1051,7 +1051,7 @@ proc demo_tiger*(ctx: Context) =
   # path48
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(164.114,149.848))
   ctx.bezierTo(vec2(164.114,149.848), vec2(165.265,154.452), vec2(162.58,153.685))
@@ -1062,7 +1062,7 @@ proc demo_tiger*(ctx: Context) =
   # path49
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(150.304,104.199))
   ctx.lineTo(vec2(140.714,96.911))
@@ -1093,7 +1093,7 @@ proc demo_tiger*(ctx: Context) =
   # path50
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(154.908,193.196))
   ctx.bezierTo(vec2(154.908,193.196), vec2(169.101,198.95), vec2(207.462,193.196))
@@ -1114,7 +1114,7 @@ proc demo_tiger*(ctx: Context) =
   # path51
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8980392156862745, 0.4, 0.5490196078431373, 1)
+  ctx.fillStyle = color(229, 102, 140, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(176.006,191.278))
   ctx.bezierTo(vec2(184.062,173.632), vec2(155.675,111.104), vec2(155.675,111.104))
@@ -1128,7 +1128,7 @@ proc demo_tiger*(ctx: Context) =
   # path52
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6980392156862745, 0.19607843137254902, 0.34901960784313724, 1)
+  ctx.fillStyle = color(178, 50, 89, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(174.058,161.648))
   ctx.bezierTo(vec2(177.248,173.914), vec2(178.767,185.231), vec2(176.006,191.278))
@@ -1141,7 +1141,7 @@ proc demo_tiger*(ctx: Context) =
   # path53
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.14901960784313725, 0.2980392156862745, 1)
+  ctx.fillStyle = color(165, 38, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(178.308,146.012))
   ctx.bezierTo(vec2(178.308,146.012), vec2(180.226,139.107), vec2(177.924,135.271))
@@ -1160,7 +1160,7 @@ proc demo_tiger*(ctx: Context) =
   # path54
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 0.4470588235294118, 0.4980392156862745, 1)
+  ctx.fillStyle = color(255, 114, 127, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(174.088,192.429))
   ctx.bezierTo(vec2(174.088,192.429), vec2(171.403,170.947), vec2(174.471,162.891))
@@ -1178,7 +1178,7 @@ proc demo_tiger*(ctx: Context) =
   # path55
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1200,7 +1200,7 @@ proc demo_tiger*(ctx: Context) =
   # path56
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(175.622,120.694))
   ctx.bezierTo(vec2(175.622,120.694), vec2(174.855,122.612), vec2(170.635,122.996))
@@ -1213,7 +1213,7 @@ proc demo_tiger*(ctx: Context) =
   # path57
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1230,7 +1230,7 @@ proc demo_tiger*(ctx: Context) =
   # path58
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.24705882352941178, 0.2980392156862745, 1)
+  ctx.fillStyle = color(204, 63, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(252.288,182.045))
   ctx.bezierTo(vec2(252.92,189.627), vec2(254.793,197.888), vec2(253.111,201.252))
@@ -1245,7 +1245,7 @@ proc demo_tiger*(ctx: Context) =
   # path59
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.09803921568627451, 0.14901960784313725, 1)
+  ctx.fillStyle = color(165, 25, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(211.585,192.325))
   ctx.lineTo(vec2(210.236,190.976))
@@ -1265,7 +1265,7 @@ proc demo_tiger*(ctx: Context) =
   # path60
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(164.881,110.337))
   ctx.bezierTo(vec2(164.881,110.337), vec2(160.662,122.612), vec2(169.101,116.091))
@@ -1276,7 +1276,7 @@ proc demo_tiger*(ctx: Context) =
   # path61
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1291,7 +1291,7 @@ proc demo_tiger*(ctx: Context) =
   # path62
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(169.715,109.186))
   ctx.bezierTo(vec2(169.715,109.186), vec2(166.339,119.006), vec2(173.09,113.789))
@@ -1302,7 +1302,7 @@ proc demo_tiger*(ctx: Context) =
   # path63
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1317,7 +1317,7 @@ proc demo_tiger*(ctx: Context) =
   # path64
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(174.318,109.186))
   ctx.bezierTo(vec2(174.318,109.186), vec2(170.942,119.006), vec2(177.694,113.789))
@@ -1328,7 +1328,7 @@ proc demo_tiger*(ctx: Context) =
   # path65
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1343,7 +1343,7 @@ proc demo_tiger*(ctx: Context) =
   # path66
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(180.648,108.994))
   ctx.bezierTo(vec2(180.648,108.994), vec2(177.272,118.815), vec2(184.023,113.598))
@@ -1354,7 +1354,7 @@ proc demo_tiger*(ctx: Context) =
   # path67
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1369,7 +1369,7 @@ proc demo_tiger*(ctx: Context) =
   # path68
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(186.862,109.071))
   ctx.bezierTo(vec2(186.862,109.071), vec2(183.486,118.891), vec2(190.239,113.674))
@@ -1380,7 +1380,7 @@ proc demo_tiger*(ctx: Context) =
   # path69
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1395,7 +1395,7 @@ proc demo_tiger*(ctx: Context) =
   # path70
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(193.268,108.419))
   ctx.bezierTo(vec2(193.268,108.419), vec2(188.665,120.311), vec2(197.488,114.173))
@@ -1406,7 +1406,7 @@ proc demo_tiger*(ctx: Context) =
   # path71
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1421,7 +1421,7 @@ proc demo_tiger*(ctx: Context) =
   # path72
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.14901960784313725, 0.2980392156862745, 1)
+  ctx.fillStyle = color(165, 38, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(179.218,126.872))
   ctx.bezierTo(vec2(177.146,127.056), vec2(174.992,126.989), vec2(173.014,126.842))
@@ -1448,7 +1448,7 @@ proc demo_tiger*(ctx: Context) =
   # path73
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.14901960784313725, 0.2980392156862745, 1)
+  ctx.fillStyle = color(165, 38, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(233.433,139.16))
   ctx.bezierTo(vec2(228.309,136.085), vec2(227.968,131.482), vec2(227.259,129))
@@ -1472,7 +1472,7 @@ proc demo_tiger*(ctx: Context) =
   # path74
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(215.134,131.819))
   ctx.bezierTo(vec2(215.134,131.819), vec2(211.298,142.176), vec2(208.612,129.901))
@@ -1485,7 +1485,7 @@ proc demo_tiger*(ctx: Context) =
   # path75
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1502,7 +1502,7 @@ proc demo_tiger*(ctx: Context) =
   # path76
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.14901960784313725, 0.2980392156862745, 1)
+  ctx.fillStyle = color(165, 38, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(232.384,127.352))
   ctx.bezierTo(vec2(231.609,127.288), vec2(230.859,127.05), vec2(230.226,126.812))
@@ -1517,7 +1517,7 @@ proc demo_tiger*(ctx: Context) =
   # path77
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6470588235294118, 0.14901960784313725, 0.2980392156862745, 1)
+  ctx.fillStyle = color(165, 38, 76, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(242.034,147.042))
   ctx.bezierTo(vec2(236.866,146.18), vec2(233.972,141.138), vec2(233.972,141.138))
@@ -1529,7 +1529,7 @@ proc demo_tiger*(ctx: Context) =
   # path78
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6980392156862745, 0.6980392156862745, 0.6980392156862745, 1)
+  ctx.fillStyle = color(178, 178, 178, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(158.744,105.35))
   ctx.bezierTo(vec2(158.744,105.35), vec2(176.006,102.281), vec2(180.226,103.816))
@@ -1541,7 +1541,7 @@ proc demo_tiger*(ctx: Context) =
   # path79
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(172.17,194.73))
   ctx.bezierTo(vec2(172.17,194.73), vec2(189.049,194.73), vec2(190.967,193.963))
@@ -1554,7 +1554,7 @@ proc demo_tiger*(ctx: Context) =
   # path80
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1571,7 +1571,7 @@ proc demo_tiger*(ctx: Context) =
   # path81
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(98.2296,197.32))
   ctx.bezierTo(vec2(98.2296,197.32), vec2(106.765,195.689), vec2(118.848,193.196))
@@ -1584,7 +1584,7 @@ proc demo_tiger*(ctx: Context) =
   # path82
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1601,7 +1601,7 @@ proc demo_tiger*(ctx: Context) =
   # path83
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(119.195,192.988))
   ctx.bezierTo(vec2(119.195,192.988), vec2(124.757,191.503), vec2(125.725,189.379))
@@ -1613,7 +1613,7 @@ proc demo_tiger*(ctx: Context) =
   # path84
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1629,7 +1629,7 @@ proc demo_tiger*(ctx: Context) =
   # path85
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(119.232,193.196))
   ctx.bezierTo(vec2(119.232,193.196), vec2(122.685,188.209), vec2(126.137,188.209))
@@ -1645,7 +1645,7 @@ proc demo_tiger*(ctx: Context) =
   # path86
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(162.004,193.004))
   ctx.bezierTo(vec2(162.004,193.004), vec2(155.819,189.648), vec2(155.435,187.346))
@@ -1657,7 +1657,7 @@ proc demo_tiger*(ctx: Context) =
   # path87
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1673,7 +1673,7 @@ proc demo_tiger*(ctx: Context) =
   # path88
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(126.055,187.764))
   ctx.bezierTo(vec2(126.055,187.764), vec2(132.775,177.035), vec2(132.983,187.786))
@@ -1684,7 +1684,7 @@ proc demo_tiger*(ctx: Context) =
   # path89
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1699,7 +1699,7 @@ proc demo_tiger*(ctx: Context) =
   # path90
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(132.939,187.525))
   ctx.bezierTo(vec2(132.939,187.525), vec2(140.536,176.797), vec2(139.926,187.615))
@@ -1710,7 +1710,7 @@ proc demo_tiger*(ctx: Context) =
   # path91
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1725,7 +1725,7 @@ proc demo_tiger*(ctx: Context) =
   # path92
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(139.857,187.518))
   ctx.bezierTo(vec2(139.857,187.518), vec2(147.49,177.325), vec2(146.849,186.595))
@@ -1736,7 +1736,7 @@ proc demo_tiger*(ctx: Context) =
   # path93
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1751,7 +1751,7 @@ proc demo_tiger*(ctx: Context) =
   # path94
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 0.8, 1)
+  ctx.fillStyle = color(255, 255, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(146.451,187.441))
   ctx.bezierTo(vec2(146.451,187.441), vec2(154.027,176.354), vec2(154.361,185.734))
@@ -1762,7 +1762,7 @@ proc demo_tiger*(ctx: Context) =
   # path95
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.479509
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -1777,7 +1777,7 @@ proc demo_tiger*(ctx: Context) =
   # path96
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8980392156862745, 0.8980392156862745, 0.6980392156862745, 1)
+  ctx.fillStyle = color(229, 229, 178, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(111.759,184.056))
   ctx.lineTo(vec2(104.415,185.524))
@@ -1790,7 +1790,7 @@ proc demo_tiger*(ctx: Context) =
   # path97
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8980392156862745, 0.8980392156862745, 0.6980392156862745, 1)
+  ctx.fillStyle = color(229, 229, 178, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(174.161,188.527))
   ctx.bezierTo(vec2(172.563,190.93), vec2(171.3,192.616), vec2(170.677,193.005))
@@ -1803,7 +1803,7 @@ proc demo_tiger*(ctx: Context) =
   # path98
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(225.568,321.014))
   ctx.bezierTo(vec2(252.153,317.216), vec2(276.627,351.395), vec2(278.315,360.68))
@@ -1819,7 +1819,7 @@ proc demo_tiger*(ctx: Context) =
   # path99
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9176470588235294, 0.5568627450980392, 0.3176470588235294, 1)
+  ctx.fillStyle = color(234, 142, 81, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(191.243,391.706))
   ctx.bezierTo(vec2(190,390.049), vec2(195.8,354.004), vec2(197.043,348.618))
@@ -1835,7 +1835,7 @@ proc demo_tiger*(ctx: Context) =
   # path100
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9372549019607843, 0.6666666666666666, 0.48627450980392156, 1)
+  ctx.fillStyle = color(239, 170, 124, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(191.941,391.084))
   ctx.bezierTo(vec2(190.721,389.458), vec2(196.414,354.081), vec2(197.634,348.795))
@@ -1851,7 +1851,7 @@ proc demo_tiger*(ctx: Context) =
   # path101
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9568627450980393, 0.7764705882352941, 0.6588235294117647, 1)
+  ctx.fillStyle = color(244, 198, 168, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(192.639,390.463))
   ctx.bezierTo(vec2(191.442,388.867), vec2(197.028,354.157), vec2(198.224,348.971))
@@ -1867,7 +1867,7 @@ proc demo_tiger*(ctx: Context) =
   # path102
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9764705882352941, 0.8862745098039215, 0.8274509803921568, 1)
+  ctx.fillStyle = color(249, 226, 211, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(193.337,389.841))
   ctx.bezierTo(vec2(192.163,388.276), vec2(197.641,354.234), vec2(198.815,349.148))
@@ -1883,7 +1883,7 @@ proc demo_tiger*(ctx: Context) =
   # path103
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(225.875,324.39))
   ctx.bezierTo(vec2(250.042,320.938), vec2(272.292,352.01), vec2(273.827,360.45))
@@ -1899,7 +1899,7 @@ proc demo_tiger*(ctx: Context) =
   # path104
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(270.374,356.997))
   ctx.bezierTo(vec2(270.374,356.997), vec2(243.712,349.709), vec2(232.588,351.243))
@@ -1911,7 +1911,7 @@ proc demo_tiger*(ctx: Context) =
   # path105
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(274.018,359.107))
   ctx.bezierTo(vec2(274.018,359.107), vec2(246.206,347.407), vec2(236.616,347.791))
@@ -1928,7 +1928,7 @@ proc demo_tiger*(ctx: Context) =
   # path106
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.8, 0.19607843137254902, 1)
+  ctx.fillStyle = color(153, 204, 50, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(228.56,324.665))
   ctx.bezierTo(vec2(221.97,324.665), vec2(213.94,328.371), vec2(213.94,334.364))
@@ -1940,7 +1940,7 @@ proc demo_tiger*(ctx: Context) =
   # path107
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.396078431372549, 0.6, 0.0, 1)
+  ctx.fillStyle = color(101, 153, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(225.086,340.665))
   ctx.bezierTo(vec2(220.438,339.973), vec2(215.558,338.531), vec2(215.627,338.738))
@@ -1952,7 +1952,7 @@ proc demo_tiger*(ctx: Context) =
   # path108
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(236.616,340.886))
   ctx.bezierTo(vec2(236.616,340.886), vec2(232.396,343.954), vec2(232.396,341.845))
@@ -1962,7 +1962,7 @@ proc demo_tiger*(ctx: Context) =
   # path109
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(227.026,333.093))
   ctx.bezierTo(vec2(224.629,333.093), vec2(222.686,335.036), vec2(222.686,337.433))
@@ -1974,7 +1974,7 @@ proc demo_tiger*(ctx: Context) =
   # path110
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(127.288,345.872))
   ctx.bezierTo(vec2(127.288,345.872), vec2(124.219,366.204), vec2(126.521,370.423))
@@ -1995,7 +1995,7 @@ proc demo_tiger*(ctx: Context) =
   # path111
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(126.329,347.637))
   ctx.bezierTo(vec2(126.329,347.637), vec2(123.567,365.935), vec2(125.638,369.733))
@@ -2016,7 +2016,7 @@ proc demo_tiger*(ctx: Context) =
   # path112
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9215686274509803, 0.5843137254901961, 0.3607843137254902, 1)
+  ctx.fillStyle = color(235, 149, 92, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(134.528,400.546))
   ctx.bezierTo(vec2(133.483,401.371), vec2(126.3,406.904), vec2(120.69,400.92))
@@ -2037,7 +2037,7 @@ proc demo_tiger*(ctx: Context) =
   # path113
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9490196078431372, 0.7215686274509804, 0.5725490196078431, 1)
+  ctx.fillStyle = color(242, 184, 146, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(134.097,399.597))
   ctx.bezierTo(vec2(133.157,400.479), vec2(126.079,405.792), vec2(120.613,399.961))
@@ -2058,7 +2058,7 @@ proc demo_tiger*(ctx: Context) =
   # path114
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.9725490196078431, 0.8627450980392157, 0.7843137254901961, 1)
+  ctx.fillStyle = color(248, 220, 200, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(133.665,398.647))
   ctx.bezierTo(vec2(132.831,399.587), vec2(125.859,404.679), vec2(120.536,399.002))
@@ -2079,7 +2079,7 @@ proc demo_tiger*(ctx: Context) =
   # path115
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(126.329,347.733))
   ctx.bezierTo(vec2(126.329,347.733), vec2(123.567,365.935), vec2(125.638,369.733))
@@ -2100,7 +2100,7 @@ proc demo_tiger*(ctx: Context) =
   # path116
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(123.356,353.736))
   ctx.bezierTo(vec2(123.356,353.736), vec2(102.641,363.518), vec2(101.778,364.286))
@@ -2111,7 +2111,7 @@ proc demo_tiger*(ctx: Context) =
   # path117
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(106.957,359.682))
   ctx.bezierTo(vec2(106.957,359.682), vec2(124.603,356.23), vec2(124.603,352.01))
@@ -2122,7 +2122,7 @@ proc demo_tiger*(ctx: Context) =
   # path118
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.8, 0.19607843137254902, 1)
+  ctx.fillStyle = color(153, 204, 50, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(115.012,356.038))
   ctx.bezierTo(vec2(115.012,356.038), vec2(123.622,354.624), vec2(124.603,352.01))
@@ -2133,7 +2133,7 @@ proc demo_tiger*(ctx: Context) =
   # path119
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(197.483,315.233))
   ctx.bezierTo(vec2(197.006,316.903), vec2(198.264,316.778), vec2(199.981,317.294))
@@ -2183,7 +2183,7 @@ proc demo_tiger*(ctx: Context) =
   # path120
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(384.305,474.764))
   ctx.bezierTo(vec2(384.305,474.764), vec2(359.755,467.092), vec2(357.069,449.063))
@@ -2202,7 +2202,7 @@ proc demo_tiger*(ctx: Context) =
   # path121
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(436.688,475.714))
   ctx.bezierTo(vec2(436.688,475.714), vec2(438.702,484.278), vec2(434.06,479.636))
@@ -2216,7 +2216,7 @@ proc demo_tiger*(ctx: Context) =
   # path122
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.19607843137254902, 0.19607843137254902, 0.19607843137254902, 1)
+  ctx.fillStyle = color(50, 50, 50, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(436.329,475.371))
   ctx.bezierTo(vec2(436.329,475.371), vec2(438.333,483.756), vec2(433.776,479.199))
@@ -2230,7 +2230,7 @@ proc demo_tiger*(ctx: Context) =
   # path123
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.4, 0.4, 0.4, 1)
+  ctx.fillStyle = color(102, 102, 102, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(435.97,475.027))
   ctx.bezierTo(vec2(435.97,475.027), vec2(437.965,483.234), vec2(433.492,478.762))
@@ -2244,7 +2244,7 @@ proc demo_tiger*(ctx: Context) =
   # path124
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.6, 0.6, 1)
+  ctx.fillStyle = color(153, 153, 153, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(435.612,474.684))
   ctx.bezierTo(vec2(435.612,474.684), vec2(437.597,482.713), vec2(433.208,478.324))
@@ -2258,7 +2258,7 @@ proc demo_tiger*(ctx: Context) =
   # path125
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(435.253,474.341))
   ctx.bezierTo(vec2(435.253,474.341), vec2(437.229,482.191), vec2(432.925,477.887))
@@ -2272,7 +2272,7 @@ proc demo_tiger*(ctx: Context) =
   # path126
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(434.893,473.997))
   ctx.bezierTo(vec2(434.893,473.997), vec2(436.859,481.669), vec2(432.64,477.45))
@@ -2286,7 +2286,7 @@ proc demo_tiger*(ctx: Context) =
   # path127
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.14901960784313725, 0.0, 1)
+  ctx.fillStyle = color(153, 38, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(232.012,279.125))
   ctx.bezierTo(vec2(232.012,279.125), vec2(212.449,297.538), vec2(204.776,298.305))
@@ -2317,7 +2317,7 @@ proc demo_tiger*(ctx: Context) =
   # path128
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(364.74,93.076))
   ctx.bezierTo(vec2(364.74,93.076), vec2(349.876,128.08), vec2(337.888,137.19))
@@ -2328,7 +2328,7 @@ proc demo_tiger*(ctx: Context) =
   # path129
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(409.814,85.883))
   ctx.bezierTo(vec2(409.814,85.883), vec2(384.4,138.629), vec2(366.658,161.645))
@@ -2341,7 +2341,7 @@ proc demo_tiger*(ctx: Context) =
   # path130
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(463.999,132.395))
   ctx.bezierTo(vec2(463.999,132.395), vec2(404.06,189.457), vec2(402.622,191.854))
@@ -2352,7 +2352,7 @@ proc demo_tiger*(ctx: Context) =
   # path131
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(283.224,90.678))
   ctx.bezierTo(vec2(283.224,90.678), vec2(301.925,140.547), vec2(320.146,118.969))
@@ -2364,7 +2364,7 @@ proc demo_tiger*(ctx: Context) =
   # path132
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(465.917,212.953))
   ctx.bezierTo(vec2(465.917,212.953), vec2(422.761,240.285), vec2(415.568,241.723))
@@ -2375,7 +2375,7 @@ proc demo_tiger*(ctx: Context) =
   # path133
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(321.394,110.721))
   ctx.bezierTo(vec2(321.394,110.721), vec2(340.958,112.639), vec2(347.479,119.16))
@@ -2444,7 +2444,7 @@ proc demo_tiger*(ctx: Context) =
   # path134
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(288.404,452.899))
   ctx.bezierTo(vec2(288.404,452.899), vec2(277.279,460.571), vec2(273.443,460.187))
@@ -2484,7 +2484,7 @@ proc demo_tiger*(ctx: Context) =
   # path135
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(356.877,461.722))
   ctx.bezierTo(vec2(356.877,461.722), vec2(347.095,468.819), vec2(345.177,468.819))
@@ -2503,7 +2503,7 @@ proc demo_tiger*(ctx: Context) =
   # path136
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(344.918,463.744))
   ctx.bezierTo(vec2(345.691,463.138), vec2(346.669,463.044), vec2(347.249,462.268))
@@ -2547,7 +2547,7 @@ proc demo_tiger*(ctx: Context) =
   # path137
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(271.424,477.391))
   ctx.bezierTo(vec2(269.009,479.045), vec2(266.738,480.106), vec2(264.397,481.819))
@@ -2576,7 +2576,7 @@ proc demo_tiger*(ctx: Context) =
   # path138
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(240.258,470.344))
   ctx.bezierTo(vec2(237.233,471.106), vec2(234.308,470.995), vec2(231.416,472.219))
@@ -2607,7 +2607,7 @@ proc demo_tiger*(ctx: Context) =
   # path139
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(226.966,427.944))
   ctx.bezierTo(vec2(225.439,429.113), vec2(224.879,431.061), vec2(223.798,432.78))
@@ -2623,7 +2623,7 @@ proc demo_tiger*(ctx: Context) =
   # path140
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.4470588235294118, 0.14901960784313725, 1)
+  ctx.fillStyle = color(204, 114, 38, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(200.557,478.366))
   ctx.bezierTo(vec2(200.686,478.366), vec2(207.429,478.142), vec2(207.413,478.033))
@@ -2635,7 +2635,7 @@ proc demo_tiger*(ctx: Context) =
   # path141
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(225.697,469.104))
   ctx.bezierTo(vec2(225.697,469.104), vec2(201.132,467.284), vec2(196.912,466.133))
@@ -2722,7 +2722,7 @@ proc demo_tiger*(ctx: Context) =
   # path142
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.2980392156862745, 0.0, 0.0, 1)
+  ctx.fillStyle = color(76, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(195.791,300.364))
   ctx.bezierTo(vec2(189.976,300.415), vec2(182.554,299.573), vec2(173.614,296.738))
@@ -2744,7 +2744,7 @@ proc demo_tiger*(ctx: Context) =
   # path143
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.2980392156862745, 0.0, 0.0, 1)
+  ctx.fillStyle = color(76, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(180.687,303.841))
   ctx.bezierTo(vec2(176.336,303.995), vec2(172.016,303.715), vec2(168.219,302.702))
@@ -2764,7 +2764,7 @@ proc demo_tiger*(ctx: Context) =
   # path144
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.2980392156862745, 0.0, 0.0, 1)
+  ctx.fillStyle = color(76, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(163.364,309.625))
   ctx.bezierTo(vec2(157.3,309.384), vec2(149.203,308.256), vec2(141.097,304.74))
@@ -2784,7 +2784,7 @@ proc demo_tiger*(ctx: Context) =
   # path145
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.2980392156862745, 0.0, 0.0, 1)
+  ctx.fillStyle = color(76, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(169.838,322.662))
   ctx.bezierTo(vec2(169.838,322.662), vec2(149.185,321.94), vec2(132.436,314.15))
@@ -2811,7 +2811,7 @@ proc demo_tiger*(ctx: Context) =
   # path146
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(203.525,307.505))
   ctx.bezierTo(vec2(205.004,306.102), vec2(230.862,278.358), vec2(230.862,278.358))
@@ -2986,7 +2986,7 @@ proc demo_tiger*(ctx: Context) =
   # path147
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.2980392156862745, 0.0, 0.0, 1)
+  ctx.fillStyle = color(76, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(180.609,318.636))
   ctx.bezierTo(vec2(180.609,318.636), vec2(191.734,313.266), vec2(194.227,310.581))
@@ -2999,7 +2999,7 @@ proc demo_tiger*(ctx: Context) =
   # path148
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.8, 0.19607843137254902, 1)
+  ctx.fillStyle = color(153, 204, 50, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(124.978,348.555))
   ctx.bezierTo(vec2(125.301,348.697), vec2(124.798,351.298), vec2(124.603,351.818))
@@ -3011,7 +3011,7 @@ proc demo_tiger*(ctx: Context) =
   # path149
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.396078431372549, 0.6, 0.0, 1)
+  ctx.fillStyle = color(101, 153, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(124.978,348.747))
   ctx.bezierTo(vec2(124.547,348.595), vec2(124.963,351.369), vec2(124.794,351.818))
@@ -3023,7 +3023,7 @@ proc demo_tiger*(ctx: Context) =
   # path150
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(120.766,348.61))
   ctx.bezierTo(vec2(120.167,348.61), vec2(119.682,349.703), vec2(119.682,351.051))
@@ -3035,7 +3035,7 @@ proc demo_tiger*(ctx: Context) =
   # path151
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(77.0353,254.573))
   ctx.bezierTo(vec2(77.0353,254.573), vec2(71.6648,244.983), vec2(95.4485,250.737))
@@ -3058,7 +3058,7 @@ proc demo_tiger*(ctx: Context) =
   # path152
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8980392156862745, 0.6, 0.6, 1)
+  ctx.fillStyle = color(229, 153, 153, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(75.8845,250.737))
   ctx.bezierTo(vec2(75.8845,250.737), vec2(73.9665,241.53), vec2(109.258,251.504))
@@ -3078,7 +3078,7 @@ proc demo_tiger*(ctx: Context) =
   # path153
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6980392156862745, 0.396078431372549, 0.396078431372549, 1)
+  ctx.fillStyle = color(178, 101, 101, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(78.9534,234.002))
   ctx.bezierTo(vec2(81.4468,230.214), vec2(84.5157,226.186), vec2(86.6255,223.885))
@@ -3099,7 +3099,7 @@ proc demo_tiger*(ctx: Context) =
   # path154
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.14901960784313725, 0.0, 1)
+  ctx.fillStyle = color(153, 38, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(76.4599,254.189))
   ctx.bezierTo(vec2(76.4599,254.189), vec2(78.1862,267.233), vec2(79.337,271.069))
@@ -3126,7 +3126,7 @@ proc demo_tiger*(ctx: Context) =
   # path155
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(68.2124,249.778))
   ctx.bezierTo(vec2(68.2124,249.778), vec2(66.2943,251.121), vec2(62.0747,245.367))
@@ -3139,7 +3139,7 @@ proc demo_tiger*(ctx: Context) =
   # path156
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.14901960784313725, 0.0, 1)
+  ctx.fillStyle = color(153, 38, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(88.9271,307.895))
   ctx.bezierTo(vec2(88.9271,307.895), vec2(72.0484,304.827), vec2(72.4321,276.823))
@@ -3158,7 +3158,7 @@ proc demo_tiger*(ctx: Context) =
   # path157
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(222.614,371.382))
   ctx.bezierTo(vec2(223.247,371.722), vec2(223.238,372.652), vec2(223.795,372.818))
@@ -3192,7 +3192,7 @@ proc demo_tiger*(ctx: Context) =
   # path158
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(214.135,375.665))
   ctx.bezierTo(vec2(214.254,375.739), vec2(214.106,376.145), vec2(214.21,376.352))
@@ -3217,7 +3217,7 @@ proc demo_tiger*(ctx: Context) =
   # path159
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(274.373,385.554))
   ctx.bezierTo(vec2(275.705,383.835), vec2(275.983,381.155), vec2(274.018,379.822))
@@ -3244,7 +3244,7 @@ proc demo_tiger*(ctx: Context) =
   # path160
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(238.736,367.921))
   ctx.bezierTo(vec2(237.31,366.146), vec2(234.038,363.682), vec2(236.835,361.833))
@@ -3323,7 +3323,7 @@ proc demo_tiger*(ctx: Context) =
   # path161
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(185.596,415.305))
   ctx.bezierTo(vec2(185.596,415.305), vec2(176.737,418.06), vec2(166.032,393.44))
@@ -3361,7 +3361,7 @@ proc demo_tiger*(ctx: Context) =
   # path162
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(166.416,399.577))
   ctx.bezierTo(vec2(166.416,399.577), vec2(154.14,399.577), vec2(151.071,394.591))
@@ -3373,7 +3373,7 @@ proc demo_tiger*(ctx: Context) =
   # path163
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(128.055,393.44))
   ctx.bezierTo(vec2(128.055,393.44), vec2(126.137,392.289), vec2(125.753,389.604))
@@ -3386,7 +3386,7 @@ proc demo_tiger*(ctx: Context) =
   # path164
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(119.616,334.748))
   ctx.bezierTo(vec2(119.616,334.748), vec2(111.56,338.584), vec2(108.491,342.036))
@@ -3403,7 +3403,7 @@ proc demo_tiger*(ctx: Context) =
   # path165
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(107.532,320.938))
   ctx.bezierTo(vec2(107.532,320.938), vec2(92.7632,316.718), vec2(89.3108,325.925))
@@ -3417,7 +3417,7 @@ proc demo_tiger*(ctx: Context) =
   # path166
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(326.573,245.942))
   ctx.bezierTo(vec2(326.163,243.895), vec2(324.56,243.127), vec2(322.736,242.489))
@@ -3447,7 +3447,7 @@ proc demo_tiger*(ctx: Context) =
   # path167
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(317.365,227.145))
   ctx.bezierTo(vec2(317.358,228.812), vec2(315.823,230.496), vec2(316.982,232.132))
@@ -3464,7 +3464,7 @@ proc demo_tiger*(ctx: Context) =
   # path168
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(157.976,235.776))
   ctx.bezierTo(vec2(157.976,235.776), vec2(141.809,226.056), vec2(155.291,240.763))
@@ -3485,7 +3485,7 @@ proc demo_tiger*(ctx: Context) =
   # path169
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(165.078,241.499))
   ctx.bezierTo(vec2(165.078,241.499), vec2(166.43,254.004), vec2(174.561,252.408))
@@ -3502,7 +3502,7 @@ proc demo_tiger*(ctx: Context) =
   # path170
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(161.429,216.98))
   ctx.bezierTo(vec2(161.429,216.98), vec2(146.852,219.281), vec2(162.963,220.816))
@@ -3519,7 +3519,7 @@ proc demo_tiger*(ctx: Context) =
   # path171
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(180.149,224.074))
   ctx.bezierTo(vec2(180.149,224.074), vec2(171.919,224.869), vec2(180.167,225.655))
@@ -3536,7 +3536,7 @@ proc demo_tiger*(ctx: Context) =
   # path172
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(172.553,221.967))
   ctx.bezierTo(vec2(172.553,221.967), vec2(177.54,222.35), vec2(176.389,220.816))
@@ -3547,7 +3547,7 @@ proc demo_tiger*(ctx: Context) =
   # path173
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(165.649,220.432))
   ctx.bezierTo(vec2(165.649,220.432), vec2(170.635,220.816), vec2(169.485,219.281))
@@ -3558,7 +3558,7 @@ proc demo_tiger*(ctx: Context) =
   # path174
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(155.675,218.898))
   ctx.bezierTo(vec2(155.675,218.898), vec2(160.662,219.281), vec2(159.511,217.747))
@@ -3569,7 +3569,7 @@ proc demo_tiger*(ctx: Context) =
   # path175
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(148.386,218.13))
   ctx.bezierTo(vec2(148.386,218.13), vec2(153.373,218.514), vec2(152.222,216.98))
@@ -3580,7 +3580,7 @@ proc demo_tiger*(ctx: Context) =
   # path176
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(185.212,256.108))
   ctx.bezierTo(vec2(185.212,256.108), vec2(189.432,256.108), vec2(188.281,254.573))
@@ -3591,7 +3591,7 @@ proc demo_tiger*(ctx: Context) =
   # path177
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(175.622,250.737))
   ctx.bezierTo(vec2(175.622,250.737), vec2(181.862,252.79), vec2(179.458,249.586))
@@ -3602,7 +3602,7 @@ proc demo_tiger*(ctx: Context) =
   # path178
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(164.881,246.134))
   ctx.bezierTo(vec2(164.881,246.134), vec2(169.868,246.517), vec2(168.717,244.983))
@@ -3613,7 +3613,7 @@ proc demo_tiger*(ctx: Context) =
   # path179
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(157.593,240.38))
   ctx.bezierTo(vec2(157.593,240.38), vec2(162.58,240.763), vec2(161.429,239.229))
@@ -3624,7 +3624,7 @@ proc demo_tiger*(ctx: Context) =
   # path180
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(151.071,235.776))
   ctx.bezierTo(vec2(151.071,235.776), vec2(156.058,236.16), vec2(154.908,234.626))
@@ -3635,7 +3635,7 @@ proc demo_tiger*(ctx: Context) =
   # path181
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(188.552,229.642))
   ctx.bezierTo(vec2(188.552,229.642), vec2(195.189,230.152), vec2(193.658,228.11))
@@ -3646,7 +3646,7 @@ proc demo_tiger*(ctx: Context) =
   # path182
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(198.526,234.245))
   ctx.bezierTo(vec2(198.526,234.245), vec2(205.163,234.755), vec2(203.631,232.713))
@@ -3657,7 +3657,7 @@ proc demo_tiger*(ctx: Context) =
   # path183
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(208.883,238.464))
   ctx.bezierTo(vec2(208.883,238.464), vec2(215.52,238.975), vec2(213.989,236.933))
@@ -3668,7 +3668,7 @@ proc demo_tiger*(ctx: Context) =
   # path184
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(218.857,243.068))
   ctx.bezierTo(vec2(218.857,243.068), vec2(225.494,243.578), vec2(223.962,241.536))
@@ -3679,7 +3679,7 @@ proc demo_tiger*(ctx: Context) =
   # path185
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(192.388,260.33))
   ctx.bezierTo(vec2(192.388,260.33), vec2(199.025,260.84), vec2(197.494,258.799))
@@ -3690,7 +3690,7 @@ proc demo_tiger*(ctx: Context) =
   # path186
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(201.978,263.399))
   ctx.bezierTo(vec2(201.978,263.399), vec2(208.615,263.909), vec2(207.084,261.867))
@@ -3701,7 +3701,7 @@ proc demo_tiger*(ctx: Context) =
   # path187
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(180.226,225.035))
   ctx.bezierTo(vec2(180.226,225.035), vec2(185.212,225.419), vec2(184.062,223.885))
@@ -3712,7 +3712,7 @@ proc demo_tiger*(ctx: Context) =
   # path188
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.14901960784313725, 0.0, 1)
+  ctx.fillStyle = color(153, 38, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(110.026,320.171))
   ctx.bezierTo(vec2(110.026,320.171), vec2(105.806,311.731), vec2(105.422,308.663))
@@ -3723,7 +3723,7 @@ proc demo_tiger*(ctx: Context) =
   # path189
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.6, 0.14901960784313725, 0.0, 1)
+  ctx.fillStyle = color(153, 38, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(92.3796,306.745))
   ctx.bezierTo(vec2(92.3796,306.745), vec2(89.3108,292.935), vec2(89.6944,290.249))
@@ -3734,7 +3734,7 @@ proc demo_tiger*(ctx: Context) =
   # path190
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(112.327,378.287))
   ctx.lineTo(vec2(112.135,375.218))
@@ -3746,7 +3746,7 @@ proc demo_tiger*(ctx: Context) =
   # path191
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(116.148,377.074))
   ctx.bezierTo(vec2(115.735,377.473), vec2(115.945,378.188), vec2(115.553,378.437))
@@ -3780,7 +3780,7 @@ proc demo_tiger*(ctx: Context) =
   # path192
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(112.711,375.41))
   ctx.bezierTo(vec2(112.711,375.41), vec2(113.094,368.889), vec2(115.396,367.354))
@@ -3797,7 +3797,7 @@ proc demo_tiger*(ctx: Context) =
   # path193
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(111.944,357.572))
   ctx.bezierTo(vec2(111.944,357.572), vec2(103.773,360.249), vec2(86.0501,356.997))
@@ -3808,7 +3808,7 @@ proc demo_tiger*(ctx: Context) =
   # path194
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3823,7 +3823,7 @@ proc demo_tiger*(ctx: Context) =
   # path195
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(113.956,357.641))
   ctx.bezierTo(vec2(113.956,357.641), vec2(106.048,361.014), vec2(88.1091,359.306))
@@ -3834,7 +3834,7 @@ proc demo_tiger*(ctx: Context) =
   # path196
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3849,7 +3849,7 @@ proc demo_tiger*(ctx: Context) =
   # path197
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(115.67,357.551))
   ctx.bezierTo(vec2(115.67,357.551), vec2(108.035,361.503), vec2(90.0195,361.134))
@@ -3860,7 +3860,7 @@ proc demo_tiger*(ctx: Context) =
   # path198
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3875,7 +3875,7 @@ proc demo_tiger*(ctx: Context) =
   # path199
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(116.888,357.338))
   ctx.bezierTo(vec2(116.888,357.338), vec2(110.344,361.468), vec2(94.1615,362.521))
@@ -3886,7 +3886,7 @@ proc demo_tiger*(ctx: Context) =
   # path200
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3901,7 +3901,7 @@ proc demo_tiger*(ctx: Context) =
   # path201
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(227.448,347.253))
   ctx.bezierTo(vec2(227.448,347.253), vec2(226.556,346.635), vec2(226.761,347.767))
@@ -3912,7 +3912,7 @@ proc demo_tiger*(ctx: Context) =
   # path202
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3927,7 +3927,7 @@ proc demo_tiger*(ctx: Context) =
   # path203
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(224.193,346.64))
   ctx.bezierTo(vec2(224.193,346.64), vec2(223.353,345.954), vec2(223.469,347.099))
@@ -3938,7 +3938,7 @@ proc demo_tiger*(ctx: Context) =
   # path204
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3953,7 +3953,7 @@ proc demo_tiger*(ctx: Context) =
   # path205
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(221.041,345.321))
   ctx.bezierTo(vec2(221.041,345.321), vec2(220.247,344.581), vec2(220.288,345.731))
@@ -3964,7 +3964,7 @@ proc demo_tiger*(ctx: Context) =
   # path206
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -3979,7 +3979,7 @@ proc demo_tiger*(ctx: Context) =
   # path207
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(218.283,343.534))
   ctx.bezierTo(vec2(218.283,343.534), vec2(217.569,342.869), vec2(217.605,343.904))
@@ -3990,7 +3990,7 @@ proc demo_tiger*(ctx: Context) =
   # path208
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4005,7 +4005,7 @@ proc demo_tiger*(ctx: Context) =
   # path209
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(187.898,201.635))
   ctx.bezierTo(vec2(187.898,201.635), vec2(173.321,203.937), vec2(189.432,205.471))
@@ -4022,7 +4022,7 @@ proc demo_tiger*(ctx: Context) =
   # path210
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(257.906,237.503))
   ctx.bezierTo(vec2(257.906,237.503), vec2(255.029,235.968), vec2(253.878,233.475))
@@ -4039,7 +4039,7 @@ proc demo_tiger*(ctx: Context) =
   # path211
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(201.594,207.284))
   ctx.bezierTo(vec2(201.594,207.284), vec2(206.609,207.501), vec2(205.503,206.015))
@@ -4050,7 +4050,7 @@ proc demo_tiger*(ctx: Context) =
   # path212
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(194.688,205.987))
   ctx.bezierTo(vec2(194.688,205.987), vec2(199.701,206.204), vec2(198.596,204.719))
@@ -4061,7 +4061,7 @@ proc demo_tiger*(ctx: Context) =
   # path213
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(184.686,204.791))
   ctx.bezierTo(vec2(184.686,204.791), vec2(189.701,205.008), vec2(188.595,203.522))
@@ -4072,7 +4072,7 @@ proc demo_tiger*(ctx: Context) =
   # path214
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(177.365,204.269))
   ctx.bezierTo(vec2(177.365,204.269), vec2(182.38,204.486), vec2(181.274,203))
@@ -4083,7 +4083,7 @@ proc demo_tiger*(ctx: Context) =
   # path215
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(217.45,214.379))
   ctx.bezierTo(vec2(217.45,214.379), vec2(224.125,214.667), vec2(222.652,212.69))
@@ -4094,7 +4094,7 @@ proc demo_tiger*(ctx: Context) =
   # path216
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(227.342,218.622))
   ctx.bezierTo(vec2(227.342,218.622), vec2(233.057,221.788), vec2(232.545,216.934))
@@ -4105,7 +4105,7 @@ proc demo_tiger*(ctx: Context) =
   # path217
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(236.1,221.321))
   ctx.bezierTo(vec2(236.1,221.321), vec2(242.965,224.87), vec2(241.302,219.632))
@@ -4116,7 +4116,7 @@ proc demo_tiger*(ctx: Context) =
   # path218
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(245.224,225.948))
   ctx.bezierTo(vec2(245.224,225.948), vec2(249.404,230.649), vec2(250.427,224.26))
@@ -4127,7 +4127,7 @@ proc demo_tiger*(ctx: Context) =
   # path219
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(209.22,210.079))
   ctx.bezierTo(vec2(209.22,210.079), vec2(214.234,210.296), vec2(213.129,208.81))
@@ -4138,7 +4138,7 @@ proc demo_tiger*(ctx: Context) =
   # path220
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(243.361,326.497))
   ctx.bezierTo(vec2(243.361,326.497), vec2(242.665,325.86), vec2(242.664,326.887))
@@ -4149,7 +4149,7 @@ proc demo_tiger*(ctx: Context) =
   # path221
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4164,7 +4164,7 @@ proc demo_tiger*(ctx: Context) =
   # path222
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(246.206,265.315))
   ctx.bezierTo(vec2(246.206,265.315), vec2(267.305,243.832), vec2(276.128,240.38))
@@ -4180,7 +4180,7 @@ proc demo_tiger*(ctx: Context) =
   # path223
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(190.199,228.104))
   ctx.bezierTo(vec2(190.199,228.104), vec2(190.008,229.83), vec2(191.734,229.063))
@@ -4191,7 +4191,7 @@ proc demo_tiger*(ctx: Context) =
   # path224
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4206,7 +4206,7 @@ proc demo_tiger*(ctx: Context) =
   # path225
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(200.173,232.324))
   ctx.bezierTo(vec2(200.173,232.324), vec2(199.981,234.05), vec2(201.708,233.283))
@@ -4219,7 +4219,7 @@ proc demo_tiger*(ctx: Context) =
   # path226
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4236,7 +4236,7 @@ proc demo_tiger*(ctx: Context) =
   # path227
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(211.298,236.16))
   ctx.bezierTo(vec2(211.298,236.16), vec2(211.106,237.886), vec2(212.832,237.119))
@@ -4249,7 +4249,7 @@ proc demo_tiger*(ctx: Context) =
   # path228
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4266,7 +4266,7 @@ proc demo_tiger*(ctx: Context) =
   # path229
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(220.888,240.763))
   ctx.bezierTo(vec2(220.888,240.763), vec2(220.696,242.489), vec2(222.422,241.722))
@@ -4279,7 +4279,7 @@ proc demo_tiger*(ctx: Context) =
   # path230
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4296,7 +4296,7 @@ proc demo_tiger*(ctx: Context) =
   # path231
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(165.265,218.898))
   ctx.bezierTo(vec2(165.265,218.898), vec2(165.073,220.624), vec2(166.799,219.857))
@@ -4307,7 +4307,7 @@ proc demo_tiger*(ctx: Context) =
   # path232
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4322,7 +4322,7 @@ proc demo_tiger*(ctx: Context) =
   # path233
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(156.826,217.363))
   ctx.bezierTo(vec2(156.826,217.363), vec2(156.634,219.089), vec2(158.36,218.322))
@@ -4333,7 +4333,7 @@ proc demo_tiger*(ctx: Context) =
   # path234
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4348,7 +4348,7 @@ proc demo_tiger*(ctx: Context) =
   # path235
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(149.153,216.98))
   ctx.bezierTo(vec2(149.153,216.98), vec2(148.962,218.706), vec2(150.688,217.939))
@@ -4359,7 +4359,7 @@ proc demo_tiger*(ctx: Context) =
   # path236
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4374,7 +4374,7 @@ proc demo_tiger*(ctx: Context) =
   # path237
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(194.54,259.499))
   ctx.bezierTo(vec2(194.54,259.499), vec2(194.114,257.581), vec2(195.6,258.749))
@@ -4387,7 +4387,7 @@ proc demo_tiger*(ctx: Context) =
   # path238
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4404,7 +4404,7 @@ proc demo_tiger*(ctx: Context) =
   # path239
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(205.281,261.225))
   ctx.bezierTo(vec2(205.281,261.225), vec2(203.974,262.369), vec2(205.765,262.968))
@@ -4415,7 +4415,7 @@ proc demo_tiger*(ctx: Context) =
   # path240
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4430,7 +4430,7 @@ proc demo_tiger*(ctx: Context) =
   # path241
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(185.294,255.373))
   ctx.bezierTo(vec2(185.294,255.373), vec2(184.806,253.839), vec2(186.447,254.775))
@@ -4443,7 +4443,7 @@ proc demo_tiger*(ctx: Context) =
   # path242
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4460,7 +4460,7 @@ proc demo_tiger*(ctx: Context) =
   # path243
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(166.187,244.799))
   ctx.bezierTo(vec2(166.187,244.799), vec2(165.155,243.565), vec2(167.028,243.809))
@@ -4471,7 +4471,7 @@ proc demo_tiger*(ctx: Context) =
   # path244
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4486,7 +4486,7 @@ proc demo_tiger*(ctx: Context) =
   # path245
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(176.965,250.674))
   ctx.bezierTo(vec2(176.965,250.674), vec2(176.187,249.265), vec2(177.98,249.864))
@@ -4497,7 +4497,7 @@ proc demo_tiger*(ctx: Context) =
   # path246
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4512,7 +4512,7 @@ proc demo_tiger*(ctx: Context) =
   # path247
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(159.436,239.89))
   ctx.bezierTo(vec2(159.436,239.89), vec2(158.599,238.89), vec2(160.116,239.088))
@@ -4523,7 +4523,7 @@ proc demo_tiger*(ctx: Context) =
   # path248
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4538,7 +4538,7 @@ proc demo_tiger*(ctx: Context) =
   # path249
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(152.148,234.223))
   ctx.bezierTo(vec2(152.148,234.223), vec2(151.185,233.221), vec2(152.71,233.334))
@@ -4549,7 +4549,7 @@ proc demo_tiger*(ctx: Context) =
   # path250
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4564,7 +4564,7 @@ proc demo_tiger*(ctx: Context) =
   # path251
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(218.831,264.837))
   ctx.bezierTo(vec2(218.831,264.837), vec2(217.679,266.137), vec2(219.532,266.506))
@@ -4575,7 +4575,7 @@ proc demo_tiger*(ctx: Context) =
   # path252
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4590,7 +4590,7 @@ proc demo_tiger*(ctx: Context) =
   # path253
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(186.747,203.17))
   ctx.bezierTo(vec2(186.747,203.17), vec2(186.555,204.896), vec2(188.281,204.129))
@@ -4601,7 +4601,7 @@ proc demo_tiger*(ctx: Context) =
   # path254
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4616,7 +4616,7 @@ proc demo_tiger*(ctx: Context) =
   # path255
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(196.721,204.704))
   ctx.bezierTo(vec2(196.721,204.704), vec2(196.529,206.43), vec2(198.255,205.663))
@@ -4627,7 +4627,7 @@ proc demo_tiger*(ctx: Context) =
   # path256
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4642,7 +4642,7 @@ proc demo_tiger*(ctx: Context) =
   # path257
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(203.242,206.239))
   ctx.bezierTo(vec2(203.242,206.239), vec2(203.05,207.965), vec2(204.776,207.198))
@@ -4653,7 +4653,7 @@ proc demo_tiger*(ctx: Context) =
   # path258
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4668,7 +4668,7 @@ proc demo_tiger*(ctx: Context) =
   # path259
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(210.554,208.184))
   ctx.bezierTo(vec2(210.554,208.184), vec2(210.135,209.87), vec2(211.948,209.339))
@@ -4679,7 +4679,7 @@ proc demo_tiger*(ctx: Context) =
   # path260
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4694,7 +4694,7 @@ proc demo_tiger*(ctx: Context) =
   # path261
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(220.528,212.404))
   ctx.bezierTo(vec2(220.528,212.404), vec2(220.109,214.09), vec2(221.922,213.559))
@@ -4705,7 +4705,7 @@ proc demo_tiger*(ctx: Context) =
   # path262
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4720,7 +4720,7 @@ proc demo_tiger*(ctx: Context) =
   # path263
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(181.76,223.501))
   ctx.bezierTo(vec2(181.76,223.501), vec2(181.568,225.227), vec2(183.294,224.46))
@@ -4731,7 +4731,7 @@ proc demo_tiger*(ctx: Context) =
   # path264
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4746,7 +4746,7 @@ proc demo_tiger*(ctx: Context) =
   # path265
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(172.17,219.665))
   ctx.bezierTo(vec2(172.17,219.665), vec2(171.978,221.391), vec2(173.704,220.624))
@@ -4757,7 +4757,7 @@ proc demo_tiger*(ctx: Context) =
   # path266
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4772,7 +4772,7 @@ proc demo_tiger*(ctx: Context) =
   # path267
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(230.96,216.825))
   ctx.bezierTo(vec2(230.96,216.825), vec2(230.419,218.476), vec2(232.266,218.079))
@@ -4783,7 +4783,7 @@ proc demo_tiger*(ctx: Context) =
   # path268
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4798,7 +4798,7 @@ proc demo_tiger*(ctx: Context) =
   # path269
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(239.016,219.127))
   ctx.bezierTo(vec2(239.016,219.127), vec2(238.474,220.777), vec2(240.321,220.38))
@@ -4809,7 +4809,7 @@ proc demo_tiger*(ctx: Context) =
   # path270
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4824,7 +4824,7 @@ proc demo_tiger*(ctx: Context) =
   # path271
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(1.0, 1.0, 1.0, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(248.223,223.922))
   ctx.bezierTo(vec2(248.223,223.922), vec2(247.681,225.572), vec2(249.528,225.175))
@@ -4837,7 +4837,7 @@ proc demo_tiger*(ctx: Context) =
   # path272
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.0959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin
@@ -4854,7 +4854,7 @@ proc demo_tiger*(ctx: Context) =
   # path273
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(141.481,217.363))
   ctx.bezierTo(vec2(141.481,217.363), vec2(146.468,217.747), vec2(145.317,216.212))
@@ -4865,7 +4865,7 @@ proc demo_tiger*(ctx: Context) =
   # path274
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(171.019,203.937))
   ctx.bezierTo(vec2(171.019,203.937), vec2(176.006,204.321), vec2(174.855,202.786))
@@ -4876,7 +4876,7 @@ proc demo_tiger*(ctx: Context) =
   # path275
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(162.58,204.321))
   ctx.bezierTo(vec2(162.58,204.321), vec2(167.567,204.704), vec2(166.416,203.17))
@@ -4887,7 +4887,7 @@ proc demo_tiger*(ctx: Context) =
   # path276
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(71.1192,215.655))
   ctx.bezierTo(vec2(71.1192,215.655), vec2(75.9574,214.386), vec2(74.3673,213.313))
@@ -4898,7 +4898,7 @@ proc demo_tiger*(ctx: Context) =
   # path277
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(73.0372,224.862))
   ctx.bezierTo(vec2(73.0372,224.862), vec2(77.8754,223.593), vec2(76.2854,222.52))
@@ -4909,7 +4909,7 @@ proc demo_tiger*(ctx: Context) =
   # path278
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(66.1323,229.081))
   ctx.bezierTo(vec2(66.1323,229.081), vec2(70.9705,227.813), vec2(69.3805,226.74))
@@ -4920,7 +4920,7 @@ proc demo_tiger*(ctx: Context) =
   # path279
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(142.632,157.137))
   ctx.bezierTo(vec2(142.632,157.137), vec2(141.098,157.137), vec2(137.262,155.219))
@@ -4931,7 +4931,7 @@ proc demo_tiger*(ctx: Context) =
   # path280
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(226.753,68.288))
   ctx.bezierTo(vec2(226.888,68.04), vec2(226.941,67.638), vec2(227.221,67.621))
@@ -4946,7 +4946,7 @@ proc demo_tiger*(ctx: Context) =
   # path281
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(216.129,63.748))
   ctx.bezierTo(vec2(216.847,62.393), vec2(216.725,60.61), vec2(218.082,60.07))
@@ -4961,7 +4961,7 @@ proc demo_tiger*(ctx: Context) =
   # path282
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(178.15,68.725))
   ctx.bezierTo(vec2(178.047,69.087), vec2(178.01,69.531), vec2(178.168,69.839))
@@ -4978,7 +4978,7 @@ proc demo_tiger*(ctx: Context) =
   # path283
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(153.563,75.239))
   ctx.bezierTo(vec2(156.089,77.635), vec2(158.765,80.475), vec2(158.341,84.035))
@@ -4991,7 +4991,7 @@ proc demo_tiger*(ctx: Context) =
   # path284
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(140.545,80.958))
   ctx.bezierTo(vec2(141.047,81.313), vec2(140.757,81.784), vec2(140.965,82.103))
@@ -5007,7 +5007,7 @@ proc demo_tiger*(ctx: Context) =
   # path285
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(156.593,62.215))
   ctx.bezierTo(vec2(157.018,63.049), vec2(158.53,64.202), vec2(158.421,65.054))
@@ -5019,7 +5019,7 @@ proc demo_tiger*(ctx: Context) =
   # path286
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(170.444,78.689))
   ctx.bezierTo(vec2(170.827,79.33), vec2(171.506,78.876), vec2(171.946,79.129))
@@ -5044,7 +5044,7 @@ proc demo_tiger*(ctx: Context) =
   # path287
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(227.793,26.519))
   ctx.bezierTo(vec2(227.793,26.519), vec2(234.89,46.083), vec2(230.67,56.824))
@@ -5056,7 +5056,7 @@ proc demo_tiger*(ctx: Context) =
   # path288
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(213.599,29.012))
   ctx.bezierTo(vec2(213.599,29.012), vec2(218.778,37.452), vec2(211.106,55.098))
@@ -5067,7 +5067,7 @@ proc demo_tiger*(ctx: Context) =
   # path289
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(204.009,30.93))
   ctx.bezierTo(vec2(204.009,30.93), vec2(203.817,50.111), vec2(204.201,52.988))
@@ -5078,7 +5078,7 @@ proc demo_tiger*(ctx: Context) =
   # path290
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(194.803,61.619))
   ctx.bezierTo(vec2(194.803,61.619), vec2(200.557,48.576), vec2(190.967,30.93))
@@ -5089,7 +5089,7 @@ proc demo_tiger*(ctx: Context) =
   # path291
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(176.389,31.314))
   ctx.bezierTo(vec2(176.389,31.314), vec2(175.43,46.275), vec2(177.157,48.384))
@@ -5103,7 +5103,7 @@ proc demo_tiger*(ctx: Context) =
   # path292
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(172.937,57.783))
   ctx.bezierTo(vec2(172.937,57.783), vec2(166.608,47.425), vec2(164.881,29.204))
@@ -5114,7 +5114,7 @@ proc demo_tiger*(ctx: Context) =
   # path293
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(152.03,38.794))
   ctx.bezierTo(vec2(152.03,38.794), vec2(156.826,43.973), vec2(158.168,48.768))
@@ -5126,7 +5126,7 @@ proc demo_tiger*(ctx: Context) =
   # path294
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(146.468,43.589))
   ctx.bezierTo(vec2(146.468,43.589), vec2(149.729,60.276), vec2(150.496,61.043))
@@ -5138,7 +5138,7 @@ proc demo_tiger*(ctx: Context) =
   # path295
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(140.906,59.509))
   ctx.bezierTo(vec2(140.906,59.509), vec2(152.03,80.991), vec2(131.124,56.248))
@@ -5148,7 +5148,7 @@ proc demo_tiger*(ctx: Context) =
   # path296
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(126.137,73.511))
   ctx.bezierTo(vec2(126.137,73.511), vec2(130.74,91.54), vec2(133.234,91.348))
@@ -5160,7 +5160,7 @@ proc demo_tiger*(ctx: Context) =
   # path297
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(442.9,84.444))
   ctx.bezierTo(vec2(442.9,84.444), vec2(431.392,94.035), vec2(428.995,97.391))
@@ -5171,7 +5171,7 @@ proc demo_tiger*(ctx: Context) =
   # path298
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(448.175,105.543))
   ctx.bezierTo(vec2(448.175,105.543), vec2(428.036,119.928), vec2(424.679,127.121))
@@ -5182,7 +5182,7 @@ proc demo_tiger*(ctx: Context) =
   # path299
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(464.478,253.231))
   ctx.bezierTo(vec2(464.478,253.231), vec2(452.97,260.904), vec2(451.531,258.986))
@@ -5193,7 +5193,7 @@ proc demo_tiger*(ctx: Context) =
   # path300
   ctx.save()
   ctx.fillRule = EvenOdd
-  ctx.fillStyle = color(0.8, 0.8, 0.8, 1)
+  ctx.fillStyle = color(204, 204, 204, 255)
   ctx.beginPath()
   ctx.moveTo(vec2(472.63,176.031))
   ctx.lineTo(vec2(455.847,187.539))
@@ -5204,7 +5204,7 @@ proc demo_tiger*(ctx: Context) =
   # path301
   ctx.save()
   ctx.fillRule = NonZero
-  ctx.strokeStyle = color(0.0, 0.0, 0.0, 1)
+  ctx.strokeStyle = color(0, 0, 0, 255)
   ctx.strokeWidth = 0.959017
   ctx.lineCap = ButtCap
   ctx.lineJoin = MiterJoin

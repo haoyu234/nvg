@@ -20,8 +20,8 @@ type
     data*: seq[byte]
 
   UniformParam* = object
-    innerColor*: Color
-    outerColor*: Color
+    innerColor*: Color32f
+    outerColor*: Color32f
     extent*: Vec2
     texSize*: Vec2
     transform1*: Vec2

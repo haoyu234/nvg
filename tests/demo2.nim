@@ -17,7 +17,7 @@ proc demo_arc*(ctx: Context) =
   ctx.arc(vec2(xc, yc), radius, angle1, angle2, false)
   ctx.stroke()
 
-  let color1 = color(1, 0.2, 0.2, 0.6)
+  let color1 = color(255, 51, 51, 153)
   ctx.fillStyle = color1
   ctx.strokeStyle = color1
   ctx.strokeWidth = 6
@@ -50,7 +50,7 @@ proc demo_curveTo*(ctx: Context) =
   ctx.stroke()
 
   ctx.beginPath()
-  ctx.strokeStyle = color(1, 0.2, 0.2, 0.6)
+  ctx.strokeStyle = color(255, 51, 51, 153)
   ctx.strokeWidth = 0.02
   ctx.moveTo(p1)
   ctx.lineTo(p2)
@@ -95,7 +95,7 @@ proc demo_lineCap*(ctx: Context) =
   ctx.stroke()
 
   ctx.beginPath()
-  ctx.strokeStyle = color(1, 0.2, 0.2, 1)
+  ctx.strokeStyle = color(255, 51, 51, 255)
   ctx.strokeWidth = 2.56
   ctx.moveTo(vec2(64, 50))
   ctx.lineTo(vec2(64, 200))

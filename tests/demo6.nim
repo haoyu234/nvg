@@ -8,9 +8,9 @@ proc demo_skew*(ctx: Context) =
 
   const
     colors = [
-      color(1, 0, 0, 1),
-      color(0, 1, 0, 1),
-      color(0, 0, 1, 1),
+      color(255, 0, 0, 255),
+      color(0, 255, 0, 255),
+      color(0, 0, 255, 255),
     ]
 
     vecs = [

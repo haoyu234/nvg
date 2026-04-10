@@ -284,7 +284,7 @@ when defined(feature.nvg.opengl):
       runGame = true
 
       backendContext = createOpenglBackendContext(w, h)
-      ctx = createContext(backendContext)
+      ctx = createInternal(backendContext)
 
     ctx.setDevicePixelRatio(1)
 
@@ -438,7 +438,7 @@ elif defined(feature.nvg.sokol):
     setWindowTitle(fmt"{g_app.name} {queryBackend()}".cstring)
 
     g_backendCtx = createSokolBackendContext(width(), height())
-    g_ctx = createContext(g_backendCtx)
+    g_ctx = createInternal(g_backendCtx)
     g_ctx.setDevicePixelRatio(dpiScale())
 
     if not g_app.initImpl.isNil:

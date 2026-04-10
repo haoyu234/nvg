@@ -15,7 +15,7 @@ proc demo_image*(ctx: Context) =
 
   ctx.rect(size)
 
-  ctx.fillStyle = color(23 / 255, 24 / 255, 31 / 255, 1)
+  ctx.fillStyle = color(23, 24, 31, 255)
   ctx.fill()
 
   ctx.fillStyle = ctx.imagePattern(size, 0, imageId, 1)

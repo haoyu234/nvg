@@ -1,3 +1,3 @@
 #! /bin/bash
 
-nimble --parser:declarative -d:feature.nvg.sokol test 
+nimble -d:feature.nvg.opengl test 

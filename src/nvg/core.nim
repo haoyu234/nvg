@@ -71,6 +71,12 @@ type
     EvenOdd
 
   Color* = object
+    r*: uint8
+    g*: uint8
+    b*: uint8
+    a*: uint8
+
+  Color32f* = object
     r*: float32
     g*: float32
     b*: float32
@@ -144,7 +150,7 @@ proc mat2d*(xx, yx, xy, yy, dx, dy: float32): Mat2d {.inline.} =
   result.dx = dx
   result.dy = dy
 
-proc color*(r, g, b, a: float32): Color {.inline.} =
+proc color*(r, g, b, a: uint8): Color {.inline.} =
   result.r = r
   result.g = g
   result.b = b
@@ -158,11 +164,12 @@ proc setColor(p: var Paint, color: Color) {.inline.} =
   p.innerColor = color
   p.outerColor = color
 
-proc premultiplied*(c: Color): Color {.inline.} =
-  result.r = c.r * c.a
-  result.g = c.g * c.a
-  result.b = c.b * c.a
-  result.a = c.a
+proc premultiplied*(c: Color): Color32f {.inline.} =
+  let a = float32(c.a) / 255
+  result.r = float32(c.r) / 255 * a
+  result.g = float32(c.g) / 255 * a
+  result.b = float32(c.b) / 255 * a
+  result.a = a
 
 converter parseSomePaint*(paint: SomePaint): Paint {.inline.} =
   when type(paint) is Color:

@@ -556,7 +556,7 @@ proc initIfNeeded(ctx: SokolBackendContext) =
   )
 
   let
-    data = [color(1, 1, 1, 1)]
+    data = [color(255, 255, 255, 255)]
     dataRange = Range(addr: data[0].addr, size: sizeof(Color))
 
   ctx.texDummy = makeImage(
@@ -565,7 +565,7 @@ proc initIfNeeded(ctx: SokolBackendContext) =
       width: 1,
       height: 1,
       usage: ImageUsage(immutable: true),
-      pixelFormat: pixelFormatRgba32f,
+      pixelFormat: pixelFormatRgba8,
       numMipmaps: 1,
       label: "nvg.texDummy",
       data: ImageData(mipLevels: [dataRange]),

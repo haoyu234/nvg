@@ -16,27 +16,26 @@ proc demo_fillStyle*(ctx: Context) =
 
   for i in 0 ..< 6:
     for j in 0 ..< 6:
-      let r = floor(255 - 42.5 * float32(i))
-      let g = floor(255 - 42.5 * float32(j))
+      let
+        r = uint8(floor(255 - 42.5 * float32(i)))
+        g = uint8(floor(255 - 42.5 * float32(j)))
 
       ctx.beginPath()
-      ctx.fillStyle = color(r / 255, g / 255, 0, 1)
+      ctx.fillStyle = color(r, g, 0, 255)
       ctx.rect(vec4(float32(j * 25), float32(i * 25), 25, 25))
       ctx.fill()
 
 proc hexRGBColor4(h: uint32): Color =
-  let
-    r = float32((0xF00 and h) shr 8) / 15
-    g = float32((0x0F0 and h) shr 4) / 15
-    b = float32((0x00F and h) shr 0) / 15
-  return color(r, g, b, 1)
+  result.r = uint8((0xF00 and h) shr 8) * 15
+  result.g = uint8((0x0F0 and h) shr 4) * 15
+  result.b = uint8((0x00F and h) shr 0) * 15
+  result.a = 255
 
 proc hexRGBColor8(h: uint32): Color =
-  let
-    r = float32((0xFF0000 and h) shr 16) / 255
-    g = float32((0x00FF00 and h) shr 8) / 255
-    b = float32((0x0000FF and h) shr 0) / 255
-  return color(r, g, b, 1)
+  result.r = uint8((0xFF0000 and h) shr 16)
+  result.g = uint8((0x00FF00 and h) shr 8)
+  result.b = uint8((0x0000FF and h) shr 0)
+  result.a = 255
 
 proc fillRect(ctx: Context, color: Color, pos: Vec4) =
   ctx.beginPath()

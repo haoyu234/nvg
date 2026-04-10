@@ -56,7 +56,7 @@ proc demo_pacman*(ctx: Context) =
   ctx.fill()
 
   ctx.beginPath()
-  ctx.fillStyle = color(1, 1, 1, 1)
+  ctx.fillStyle = color(255, 255, 255, 255)
   ctx.moveTo(vec2(91, 96))
   ctx.bezierTo(vec2(88, 96), vec2(87, 99), vec2(87, 101))
   ctx.bezierTo(vec2(87, 103), vec2(88, 106), vec2(91, 106))
@@ -69,7 +69,7 @@ proc demo_pacman*(ctx: Context) =
   ctx.bezierTo(vec2(107, 99), vec2(106, 96), vec2(103, 96))
   ctx.fill()
 
-  ctx.fillStyle = color(0, 0, 0, 1)
+  ctx.fillStyle = color(0, 0, 0, 255)
   ctx.beginPath()
   ctx.arc(vec2(101, 102), 2, 0, PI * 2, true)
   ctx.fill()

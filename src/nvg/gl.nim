@@ -286,7 +286,7 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
 
   const
     vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
-    pixels = [color(1, 1, 1, 1)]
+    pixels = [color(255, 255, 255, 255)]
 
   glBindBuffer(GL_ARRAY_BUFFER, ctx.vertAndIndexDummyBuf)
   glBufferData(
