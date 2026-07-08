@@ -152,16 +152,17 @@ proc allocCell(a: Atlas): ptr Cell {.inline.} =
 proc freeCell(a: Atlas, cell: ptr Cell) {.inline.} =
   a.removeLru(cell.idx)
 
+  if not cell.rectId.isNil:
+    let
+      imageId = a.images[cell.imageIdx].addr
+    imageId.rp.freeRect(cell.rectId)
+
   cell.rectId = default(RectId)
   cell.lru.next = a.cellFreeList
 
   a.lookup.del(cell.id)
   a.cellFreeList = cell.idx
 
-  if not cell.rectId.isNil:
-    let
-      imageId = a.images[cell.imageIdx].addr
-    imageId.rp.freeRect(cell.rectId)
 
 proc allocCell*(a: Atlas, id: uint32, w, h: int32,
     typ: PixelFormat): AtlasCell =

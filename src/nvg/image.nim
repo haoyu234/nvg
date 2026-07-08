@@ -63,6 +63,9 @@ proc loadImageFromMemory*(ctx: Context, data: openArray[byte], imageFlags: set[
     let p = stbi_load_from_memory(data[0].addr, cint(data.len), width, height,
         channels, 4)
 
+    if p.isNil:
+      return
+
     defer:
       stbi_image_free(p)
 

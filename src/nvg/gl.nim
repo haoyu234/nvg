@@ -146,7 +146,7 @@ proc updateStorage[T: Vec2 | Vec4 | Color | Color32f](storage: var OpenglStorage
 
   dataCount = layerSize * layerCount
 
-  if capacity(data) < dataCount:
+  if data.len < dataCount:
     data.setLen(dataCount)
 
   glActiveTexture(GL_TEXTURE0)
@@ -338,7 +338,7 @@ proc initIfNeeded(ctx: OpenglBackendContext) =
   glBindBuffer(GL_ARRAY_BUFFER, 0)
 
   glBindTexture(GL_TEXTURE_2D, ctx.texDummy)
-  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA32f), 1, 1, 0, GL_RGBA,
+  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA8), 1, 1, 0, GL_RGBA,
       GL_UNSIGNED_BYTE, pixels[0].addr)
   glBindTexture(GL_TEXTURE_2D, 0)
 
@@ -748,7 +748,7 @@ method flush(ctx: OpenglBackendContext) =
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
   glBindSampler(2, 0)
 
-  glActiveTexture(GL_TEXTURE2)
+  glActiveTexture(GL_TEXTURE3)
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
   glBindSampler(3, 0)
 
