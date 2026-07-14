@@ -1,6 +1,8 @@
+import std/math
+
 import nvg
 
-import std/math
+import ./app
 
 proc roundedRect(ctx: Context, x, y, w, h, radius: float32) =
   ctx.beginPath()
@@ -15,7 +17,7 @@ proc roundedRect(ctx: Context, x, y, w, h, radius: float32) =
   ctx.quadCurveTo(vec2(x, y), vec2(x, y + radius))
   ctx.stroke()
 
-proc demo_pacman*(ctx: Context) =
+proc demo_pacman*(app: App, ctx: Context) =
   # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes#making_combinations
 
   ctx.roundedRect(12, 12, 184, 168, 15)

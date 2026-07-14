@@ -1,9 +1,12 @@
 import nvg/context
 import nvg/core
+import nvg/font
+import nvg/font_collection
 import nvg/image
 import nvg/math
 import nvg/path
-import nvg/text
+import nvg/simple_text_layout
+import nvg/text_blob
 
 export
   context,
@@ -11,16 +14,17 @@ export
   image,
   math,
   path,
-  text
+  text_blob,
+  simple_text_layout,
+  font,
+  font_collection
 
 when defined(feature.nvg.opengl):
   import nvg/gl
+
   export gl
 
 when defined(feature.nvg.sokol):
   import nvg/sokol
-  export sokol
 
-when defined(feature.nvg.simple_text):
-  import nvg/simple_text
-  export simple_text
+  export sokol

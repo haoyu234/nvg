@@ -1,6 +1,8 @@
 import nvg
 
-proc demo_vehicle*(ctx: Context) =
+import ./app
+
+proc demo_vehicle*(app: App, ctx: Context) =
   # path0
   ctx.save()
   ctx.beginPath()

@@ -1,8 +1,10 @@
-import nvg
-
 import std/math
 
-proc demo_fillRule*(ctx: Context) =
+import nvg
+
+import ./app
+
+proc demo_fillRule*(app: App, ctx: Context) =
   # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#canvas_fill_rules
 
   ctx.beginPath()
@@ -11,7 +13,7 @@ proc demo_fillRule*(ctx: Context) =
   ctx.arc(vec2(50, 50), 15, 0, 2 * PI, true)
   ctx.fill()
 
-proc demo_fillStyle*(ctx: Context) =
+proc demo_fillStyle*(app: App, ctx: Context) =
   # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#a_fillstyle_example
 
   for i in 0 ..< 6:
@@ -43,7 +45,7 @@ proc fillRect(ctx: Context, color: Color, pos: Vec4) =
   ctx.rect(pos)
   ctx.fill()
 
-proc demo_globalAlpha*(ctx: Context) =
+proc demo_globalAlpha*(app: App, ctx: Context) =
   # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors#a_globalalpha_example
 
   ctx.fillRect(hexRGBColor4(0xFD0), vec4(0, 0, 75, 75))
@@ -59,7 +61,7 @@ proc demo_globalAlpha*(ctx: Context) =
     ctx.arc(vec2(75, 75), float32(10 + 10 * idx), 0, 2 * PI, true)
     ctx.fill()
 
-proc demo_rotate*(ctx: Context) =
+proc demo_rotate*(app: App, ctx: Context) =
   # https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations#a_rotate_example
 
   ctx.save()

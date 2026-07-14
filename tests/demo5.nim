@@ -1,10 +1,11 @@
 import nvg
 
+import ./app
 import ./images
 
-proc demo_image*(ctx: Context) =
+proc demo_image*(app: App, ctx: Context) =
   let
-    imageId = getImageId(Logo)
+    imageId = ctx.getImageId(Logo)
     imageInfo = ctx.getImageInfo(imageId)
     size = vec4(0, 0, float32(imageInfo.width), float32(imageInfo.height))
 

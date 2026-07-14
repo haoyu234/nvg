@@ -3,22 +3,17 @@ type
   Vec4* = array[4, float32]
 
   Mat2d* = object
-    xx*, yx*: float32
-    xy*, yy*: float32
-    dx*, dy*: float32
+    xx*, yx*: float32  # linear row 0: xx scales x, yx is y's contribution to the new x
+    xy*, yy*: float32  # linear row 1: xy is x's contribution to the new y, yy scales y
+    x0*, y0*: float32  # translation (x0, y0) applied after the linear part
 
   FontId* = object
     id*: uint32
 
-  FontFamily* = enum
-    FontFamilyDefault
-    FontFamilyEmoji
-    FontFamilySansSerif
-    FontFamilySerif
-    FontFamilyMonoSpace
-    FontFamilyMath
-
   ImageId* = object
+    id*: uint32
+
+  GlyphId* = object
     id*: uint32
 
   ImageFlags* = enum
@@ -36,6 +31,7 @@ type
     PixelFormatA32f
     PixelFormatRGB32f
     PixelFormatRGBA32f
+    PixelFormatRGBA32u
 
   AlphaType* = enum
     AlphaDefault
@@ -48,12 +44,9 @@ type
     pixelFormat*: PixelFormat
     alphaType*: AlphaType
 
-  GlyphQuad* = object
-    isSdf*: bool
-    color*: Color
-    imageId*: ImageId
-    x1*, y1*, x2*, y2*: float32
-    s1*, t1*, s2*, t2*: float32
+  FillRule* = enum
+    NonZero
+    EvenOdd
 
   LineCap* = enum
     ButtCap
@@ -76,6 +69,58 @@ type
     MiddleBaseline
     BottomBaseline
 
+  FontFamily* = enum
+    Default
+    Emoji
+    SansSerif
+    Serif
+    MonoSpace
+    Math
+
+  FontStyle* = enum
+    Normal
+    Italic
+    Oblique
+
+  FontStretch* = enum
+    Normal         # Normal (1.0), (Default, when zero initialized)
+    UltraCondensed # Ultra condensed (0.5)
+    ExtraCondensed # Extra condensed (0.625)
+    Condensed      # Condensed (0.75)
+    SemiCondensed  # Semi condensed (0.875)
+    SemiExpanded   # Semi expanded (1.125)
+    Expanded       # Expanded (1.25)
+    ExtraExpanded  # Extra expanded (1.5)
+    UltraExpanded  # Ultra expanded (2.0)
+
+  FontWeight* = enum
+    Normal     # Normal (400), (Default, when zero initialized)
+    Thin       # Thin (100)
+    ExtraLight # Extra light (200)
+    UltraLight # Ultra light (200)
+    Light      # Light (300)
+    Regular    # Regular (400)
+    Medium     # Medium (500)
+    Demibold   # Demibold (600)
+    Semibold   # Semibold (600)
+    Bold       # Bold (700)
+    ExtraBold  # Extra bold (800)
+    UltraBold  # Ultra bold (800)
+    Black      # Black (800)
+    Heavy      # Heavy (900)
+    ExtraBlack # Extra black (950)
+    UltraBlack # Ultra black (950)
+
+  FontMetrics* = object
+    ascender*: int32
+    descender*: int32
+    lineGap*: int32
+    unitsPerEm*: uint32
+
+  GlyphMetrics* = object
+    advance*: int32
+    bearing*: int32
+
   TextWrap* = enum
     NoWrap
     WordWrap
@@ -85,21 +130,11 @@ type
     Hidden
     Ellipsis
 
-  FillRule* = enum
-    NonZero
-    EvenOdd
-
   Color* = object
     r*: uint8
     g*: uint8
     b*: uint8
     a*: uint8
-
-  Color32f* = object
-    r*: float32
-    g*: float32
-    b*: float32
-    a*: float32
 
   Paint* = object
     imageId*: ImageId
@@ -109,6 +144,7 @@ type
     feather*: float32
     innerColor*: Color
     outerColor*: Color
+    backdropColor*: Color
 
   CompositeOperation* = enum
     SourceOverOperation = 1
@@ -153,6 +189,9 @@ type
 proc isNil*(fontId: FontId): bool {.inline.} =
   fontId.id == 0
 
+proc isNil*(glyphId: GlyphId): bool {.inline.} =
+  glyphId.id == 0
+
 proc isNil*(imageId: ImageId): bool {.inline.} =
   imageId.id == 0
 
@@ -170,16 +209,16 @@ proc mat2d*(): Mat2d {.inline.} =
   result.yx = 0
   result.xy = 0
   result.yy = 1
-  result.dx = 0
-  result.dy = 0
+  result.x0 = 0
+  result.y0 = 0
 
-proc mat2d*(xx, yx, xy, yy, dx, dy: float32): Mat2d {.inline.} =
+proc mat2d*(xx, yx, xy, yy, x0, y0: float32): Mat2d {.inline.} =
   result.xx = xx
   result.yx = yx
   result.xy = xy
   result.yy = yy
-  result.dx = dx
-  result.dy = dy
+  result.x0 = x0
+  result.y0 = y0
 
 proc color*(r, g, b, a: uint8): Color {.inline.} =
   result.r = r
@@ -195,13 +234,6 @@ proc setColor(p: var Paint, color: Color) {.inline.} =
   p.innerColor = color
   p.outerColor = color
 
-proc premultiplied*(c: Color): Color32f {.inline.} =
-  let a = float32(c.a) / 255
-  result.r = float32(c.r) / 255 * a
-  result.g = float32(c.g) / 255 * a
-  result.b = float32(c.b) / 255 * a
-  result.a = a
-
 converter parseSomePaint*(paint: SomePaint): Paint {.inline.} =
   when type(paint) is Color:
     result.setColor(paint)
@@ -216,3 +248,14 @@ proc bytesPerPixel*(typ: PixelFormat): int32 =
   of PixelFormatA32f: int32(sizeof(float32))
   of PixelFormatRGB32f: int32(sizeof(array[3, float32]))
   of PixelFormatRGBA32f: int32(sizeof(array[4, float32]))
+  of PixelFormatRGBA32u: int32(sizeof(array[4, uint32]))
+
+proc overlap*(a, b: Bounds): bool {.inline.} =
+  not (a.xMax < b.xMin or b.xMax < a.xMin or
+       a.yMax < b.yMin or b.yMax < a.yMin)
+
+proc union*(a, b: Bounds): Bounds {.inline.} =
+  result.xMin = min(a.xMin, b.xMin)
+  result.yMin = min(a.yMin, b.yMin)
+  result.xMax = max(a.xMax, b.xMax)
+  result.yMax = max(a.yMax, b.yMax)

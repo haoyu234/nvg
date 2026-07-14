@@ -1,8 +1,8 @@
+import std/os
+
 import ./backend
 import ./context
 import ./core
-
-import std/os
 
 const
   USE_LODEPNG = false
@@ -36,8 +36,8 @@ else:
 
   proc stbi_image_free(p: pointer) {.importc, header: STB_IMAGE.}
 
-proc loadImageFromMemory*(ctx: Context, data: openArray[byte], imageFlags: set[
-    ImageFlags]): ImageId =
+proc loadImageFromMemory*(ctx: Context, data: openArray[byte],
+    imageFlags: set[ImageFlags]): ImageId =
   when USE_LODEPNG:
     var
       width = cuint(0)
@@ -78,7 +78,7 @@ proc loadImageFromMemory*(ctx: Context, data: openArray[byte], imageFlags: set[
     imageFlags
   )
 
-  ctx.backendContext.updateImage(
+  ctx.backendContext.writeImagePixels(
     result,
     0, 0, int32(width), int32(height),
     int32(width) * 4,

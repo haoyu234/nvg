@@ -1,128 +1,131 @@
+import std/monotimes
+import std/times
+
 import nvg
 
 type
   AppEventType* = enum
-    EVENT_TYPE_NONE = 0
-    EVENT_TYPE_KEY_DOWN = 1
-    EVENT_TYPE_KEY_UP = 2
-    EVENT_TYPE_MOUSE_DOWN = 3
-    EVENT_TYPE_MOUSE_UP = 4
-    EVENT_TYPE_MOUSE_MOVE = 5
-    EVENT_TYPE_MOUSE_SCROLL = 6
+    EVENT_TYPE_NONE
+    EVENT_TYPE_KEY_DOWN
+    EVENT_TYPE_KEY_UP
+    EVENT_TYPE_MOUSE_DOWN
+    EVENT_TYPE_MOUSE_UP
+    EVENT_TYPE_MOUSE_MOVE
+    EVENT_TYPE_MOUSE_SCROLL
 
   AppMouseButton* = enum
-    MOUSE_BUTTON_NONE = 0
-    MOUSE_BUTTON_LEFT = 1
-    MOUSE_BUTTON_RIGHT = 2
-    MOUSE_BUTTON_MIDDLE = 3
+    MOUSE_BUTTON_NONE
+    MOUSE_BUTTON_LEFT
+    MOUSE_BUTTON_RIGHT
+    MOUSE_BUTTON_MIDDLE
 
   AppKeyCode* = enum
-    KEY_CODE_NONE = 0
-    KEY_CODE_SPACE = 1
-    KEY_CODE_APOSTROPHE = 2
-    KEY_CODE_COMMA = 3
-    KEY_CODE_MINUS = 4
-    KEY_CODE_PERIOD = 5
-    KEY_CODE_SLASH = 6
-    KEY_CODE_0 = 7
-    KEY_CODE_1 = 8
-    KEY_CODE_2 = 9
-    KEY_CODE_3 = 10
-    KEY_CODE_4 = 11
-    KEY_CODE_5 = 12
-    KEY_CODE_6 = 13
-    KEY_CODE_7 = 14
-    KEY_CODE_8 = 15
-    KEY_CODE_9 = 16
-    KEY_CODE_SEMICOLON = 17
-    KEY_CODE_EQUAL = 18
-    KEY_CODE_A = 19
-    KEY_CODE_B = 20
-    KEY_CODE_C = 21
-    KEY_CODE_D = 22
-    KEY_CODE_E = 23
-    KEY_CODE_F = 24
-    KEY_CODE_G = 25
-    KEY_CODE_H = 26
-    KEY_CODE_I = 27
-    KEY_CODE_J = 28
-    KEY_CODE_K = 29
-    KEY_CODE_L = 30
-    KEY_CODE_M = 31
-    KEY_CODE_N = 32
-    KEY_CODE_O = 33
-    KEY_CODE_P = 34
-    KEY_CODE_Q = 35
-    KEY_CODE_R = 36
-    KEY_CODE_S = 37
-    KEY_CODE_T = 38
-    KEY_CODE_U = 39
-    KEY_CODE_V = 40
-    KEY_CODE_W = 41
-    KEY_CODE_X = 42
-    KEY_CODE_Y = 43
-    KEY_CODE_Z = 44
-    KEY_CODE_LEFT_BRACKET = 45
-    KEY_CODE_BACKSLASH = 46
-    KEY_CODE_RIGHT_BRACKET = 47
-    KEY_CODE_GRAVE_ACCENT = 48
-    KEY_CODE_ESCAPE = 49
-    KEY_CODE_ENTER = 50
-    KEY_CODE_TAB = 51
-    KEY_CODE_BACKSPACE = 52
-    KEY_CODE_INSERT = 53
-    KEY_CODE_DELETE = 54
-    KEY_CODE_RIGHT = 55
-    KEY_CODE_LEFT = 56
-    KEY_CODE_DOWN = 57
-    KEY_CODE_UP = 58
-    KEY_CODE_PAGE_UP = 59
-    KEY_CODE_PAGE_DOWN = 60
-    KEY_CODE_HOME = 61
-    KEY_CODE_END = 62
-    KEY_CODE_CAPS_LOCK = 63
-    KEY_CODE_SCROLL_LOCK = 64
-    KEY_CODE_NUM_LOCK = 65
-    KEY_CODE_PRINT_SCREEN = 66
-    KEY_CODE_PAUSE = 67
-    KEY_CODE_F1 = 68
-    KEY_CODE_F2 = 69
-    KEY_CODE_F3 = 70
-    KEY_CODE_F4 = 71
-    KEY_CODE_F5 = 72
-    KEY_CODE_F6 = 73
-    KEY_CODE_F7 = 74
-    KEY_CODE_F8 = 75
-    KEY_CODE_F9 = 76
-    KEY_CODE_F10 = 77
-    KEY_CODE_F11 = 78
-    KEY_CODE_F12 = 79
-    KEY_CODE_KP_0 = 80
-    KEY_CODE_KP_1 = 81
-    KEY_CODE_KP_2 = 82
-    KEY_CODE_KP_3 = 83
-    KEY_CODE_KP_4 = 84
-    KEY_CODE_KP_5 = 85
-    KEY_CODE_KP_6 = 86
-    KEY_CODE_KP_7 = 87
-    KEY_CODE_KP_8 = 88
-    KEY_CODE_KP_9 = 89
-    KEY_CODE_KP_DECIMAL = 90
-    KEY_CODE_KP_DIVIDE = 91
-    KEY_CODE_KP_MULTIPLY = 92
-    KEY_CODE_KP_SUBTRACT = 93
-    KEY_CODE_KP_ADD = 94
-    KEY_CODE_KP_ENTER = 95
-    KEY_CODE_KP_EQUAL = 96
-    KEY_CODE_LEFT_SHIFT = 97
-    KEY_CODE_LEFT_CONTROL = 98
-    KEY_CODE_LEFT_ALT = 99
-    KEY_CODE_LEFT_SUPER = 100
-    KEY_CODE_RIGHT_SHIFT = 101
-    KEY_CODE_RIGHT_CONTROL = 102
-    KEY_CODE_RIGHT_ALT = 103
-    KEY_CODE_RIGHT_SUPER = 104
-    KEY_CODE_MENU = 105
+    KEY_CODE_NONE
+    KEY_CODE_SPACE
+    KEY_CODE_APOSTROPHE
+    KEY_CODE_COMMA
+    KEY_CODE_MINUS
+    KEY_CODE_PERIOD
+    KEY_CODE_SLASH
+    KEY_CODE_0
+    KEY_CODE_1
+    KEY_CODE_2
+    KEY_CODE_3
+    KEY_CODE_4
+    KEY_CODE_5
+    KEY_CODE_6
+    KEY_CODE_7
+    KEY_CODE_8
+    KEY_CODE_9
+    KEY_CODE_SEMICOLON
+    KEY_CODE_EQUAL
+    KEY_CODE_A
+    KEY_CODE_B
+    KEY_CODE_C
+    KEY_CODE_D
+    KEY_CODE_E
+    KEY_CODE_F
+    KEY_CODE_G
+    KEY_CODE_H
+    KEY_CODE_I
+    KEY_CODE_J
+    KEY_CODE_K
+    KEY_CODE_L
+    KEY_CODE_M
+    KEY_CODE_N
+    KEY_CODE_O
+    KEY_CODE_P
+    KEY_CODE_Q
+    KEY_CODE_R
+    KEY_CODE_S
+    KEY_CODE_T
+    KEY_CODE_U
+    KEY_CODE_V
+    KEY_CODE_W
+    KEY_CODE_X
+    KEY_CODE_Y
+    KEY_CODE_Z
+    KEY_CODE_LEFT_BRACKET
+    KEY_CODE_BACKSLASH
+    KEY_CODE_RIGHT_BRACKET
+    KEY_CODE_GRAVE_ACCENT
+    KEY_CODE_ESCAPE
+    KEY_CODE_ENTER
+    KEY_CODE_TAB
+    KEY_CODE_BACKSPACE
+    KEY_CODE_INSERT
+    KEY_CODE_DELETE
+    KEY_CODE_RIGHT
+    KEY_CODE_LEFT
+    KEY_CODE_DOWN
+    KEY_CODE_UP
+    KEY_CODE_PAGE_UP
+    KEY_CODE_PAGE_DOWN
+    KEY_CODE_HOME
+    KEY_CODE_END
+    KEY_CODE_CAPS_LOCK
+    KEY_CODE_SCROLL_LOCK
+    KEY_CODE_NUM_LOCK
+    KEY_CODE_PRINT_SCREEN
+    KEY_CODE_PAUSE
+    KEY_CODE_F1
+    KEY_CODE_F2
+    KEY_CODE_F3
+    KEY_CODE_F4
+    KEY_CODE_F5
+    KEY_CODE_F6
+    KEY_CODE_F7
+    KEY_CODE_F8
+    KEY_CODE_F9
+    KEY_CODE_F10
+    KEY_CODE_F11
+    KEY_CODE_F12
+    KEY_CODE_KP_0
+    KEY_CODE_KP_1
+    KEY_CODE_KP_2
+    KEY_CODE_KP_3
+    KEY_CODE_KP_4
+    KEY_CODE_KP_5
+    KEY_CODE_KP_6
+    KEY_CODE_KP_7
+    KEY_CODE_KP_8
+    KEY_CODE_KP_9
+    KEY_CODE_KP_DECIMAL
+    KEY_CODE_KP_DIVIDE
+    KEY_CODE_KP_MULTIPLY
+    KEY_CODE_KP_SUBTRACT
+    KEY_CODE_KP_ADD
+    KEY_CODE_KP_ENTER
+    KEY_CODE_KP_EQUAL
+    KEY_CODE_LEFT_SHIFT
+    KEY_CODE_LEFT_CONTROL
+    KEY_CODE_LEFT_ALT
+    KEY_CODE_LEFT_SUPER
+    KEY_CODE_RIGHT_SHIFT
+    KEY_CODE_RIGHT_CONTROL
+    KEY_CODE_RIGHT_ALT
+    KEY_CODE_RIGHT_SUPER
+    KEY_CODE_MENU
 
   AppEvent* = object
     typ*: AppEventType
@@ -135,21 +138,84 @@ type
     scrollX*: int32
     scrollY*: int32
 
-  App* = object
+  App* = ref object of RootObj
+    w*, h*: int32
     name*: string
-    initImpl*: proc (ctx: Context)
-    frameImpl*: proc (ctx: Context)
-    eventImpl*: proc (ctx: Context, event: AppEvent)
+    ctx*: Context
+    initImpl*: proc (app: App)
+    frameImpl*: proc (app: App, deltaTime: Duration)
+    eventImpl*: proc (app: App, event: AppEvent)
+    isErr: bool
+    lastFrameTime: MonoTime
+    deltaTime: Duration
+
+proc reportError*(app: App, where, msg: string) {.used.} =
+  app.isErr = true
+
+  writeLine(stderr, "[app] uncaught exception in " & where & ": " & msg)
+  writeLine(stderr, "stack trace: " & getStackTrace())
+
+proc reportException*(app: App, e: ref Exception, where: string) {.used.} =
+  app.isErr = true
+
+  writeLine(stderr, "[app] uncaught exception in " & where & ": " & e.msg)
+  writeLine(stderr, "stack trace: " & e.getStackTrace())
+
+when defined(feature.nvg.opengl) or defined(feature.nvg.sokol):
+  import nvg/backend
+
+  proc ensureContext(app: App, backendContext: BackendContext) =
+    ## Create the default context unless the caller supplied one.
+    if app.ctx.isNil:
+      let
+        fontCollection = createFontCollection()
+        textLayoutContext = createSimpleTextLayoutContext()
+      app.ctx = createContext(backendContext, fontCollection,
+          textLayoutContext)
+
+  proc updateDeltaTime(app: App) =
+    let now = getMonoTime()
+    if app.lastFrameTime == default(MonoTime):
+      app.deltaTime = initDuration(milliseconds = 16)
+    else:
+      app.deltaTime = now - app.lastFrameTime
+    app.lastFrameTime = now
+
+  proc dispatchEvent(app: App, event: AppEvent) =
+    if app.eventImpl.isNil:
+      return
+
+    try:
+      app.eventImpl(app, event)
+    except Exception as e:
+      app.reportException(e, "app event")
+
+  proc runFrame(app: App) =
+    app.updateDeltaTime()
+    app.ctx.save()
+    try:
+      if not app.frameImpl.isNil:
+        app.frameImpl(app, app.deltaTime)
+
+      app.ctx.flush()
+    except Exception as e:
+      app.reportException(e, "app frame")
+    finally:
+      app.ctx.restore()
+
+  proc initApp(app: App, backendContext: BackendContext, pixelRatio: float32) =
+    app.ensureContext(backendContext)
+    app.ctx.setDevicePixelRatio(pixelRatio)
+    if not app.initImpl.isNil:
+      app.initImpl(app)
 
 when defined(feature.nvg.opengl):
-  import pkg/sdl2
-  import pkg/opengl
-
-  import ./perfgraph
-
-  import std/monotimes
   import std/strformat
-  import std/times
+
+  import pkg/opengl
+  import pkg/sdl2
+
+  import nvg/tracy
 
   proc toAppKeyCode(keyCode: cint): AppKeyCode =
     case keyCode
@@ -260,154 +326,159 @@ when defined(feature.nvg.opengl):
     of K_MENU: KEY_CODE_MENU
     else: KEY_CODE_NONE
 
-  proc launch*(w, h: int32, app: App) =
-    discard sdl2.init(INIT_VIDEO or INIT_EVENTS)
-    discard glSetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4.cint)
-    discard glSetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3.cint)
-    discard glSetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-        SDL_GL_CONTEXT_PROFILE_CORE.cint)
-    discard glSetAttribute(SDL_GL_CONTEXT_FLAGS, (SDL_GL_CONTEXT_DEBUG_FLAG or
-        SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG).cint)
+  proc toAppEvent(sdlEvent: Event): AppEvent =
+    case sdlEvent.kind
+    of KeyDown, KeyUp:
+      let
+        keyEvent = cast[KeyboardEventPtr](sdlEvent.addr)
+        keyCode = toAppKeyCode(keyEvent.keysym.sym)
+      if keyCode == KEY_CODE_NONE:
+        return
+      if sdlEvent.kind == KeyDown:
+        result.typ = EVENT_TYPE_KEY_DOWN
+      else:
+        result.typ = EVENT_TYPE_KEY_UP
+      result.keyCode = keyCode
+    of MouseButtonDown, MouseButtonUp:
+      let mouseEvent = cast[MouseButtonEventPtr](sdlEvent.addr)
+      case mouseEvent.button
+      of BUTTON_LEFT:
+        result.mouseButton = MOUSE_BUTTON_LEFT
+      of BUTTON_RIGHT:
+        result.mouseButton = MOUSE_BUTTON_RIGHT
+      of BUTTON_MIDDLE:
+        result.mouseButton = MOUSE_BUTTON_MIDDLE
+      else:
+        return
+      if sdlEvent.kind == MouseButtonDown:
+        result.typ = EVENT_TYPE_MOUSE_DOWN
+      else:
+        result.typ = EVENT_TYPE_MOUSE_UP
+      result.mouseX = mouseEvent.x
+      result.mouseY = mouseEvent.y
+    of MouseMotion:
+      let motionEvent = cast[MouseMotionEventPtr](sdlEvent.addr)
+      result.typ = EVENT_TYPE_MOUSE_MOVE
+      result.mouseX = motionEvent.x
+      result.mouseY = motionEvent.y
+      result.mouseDx = motionEvent.xrel
+      result.mouseDy = motionEvent.yrel
+    of MouseWheel:
+      let wheelEvent = cast[MouseWheelEventPtr](sdlEvent.addr)
+      result.typ = EVENT_TYPE_MOUSE_SCROLL
+      result.scrollX = wheelEvent.x
+      result.scrollY = wheelEvent.y
+    else:
+      discard
+
+  proc setupPixelRatio(ctx: Context, window: WindowPtr, w, h: int32) =
+    ctx.backendContext.resize(w, h)
+
+    var
+      drawW, drawH: cint
+
+    glGetDrawableSize(window, drawW, drawH)
+    glViewport(0, 0, drawW, drawH)
 
     let
-      name = fmt"{app.name} SDL2"
-      window = createWindow(name.cstring, 100, 100, cint(w), cint(h),
-          SDL_WINDOW_SHOWN or SDL_WINDOW_OPENGL)
+      pixelRatio = float32(drawW) / float32(w)
+    ctx.setDevicePixelRatio(pixelRatio)
+
+  proc raiseSDLError(name: string) =
+    raise newException(OSError, name & ": " & $sdl2.getError())
+
+  proc launch*(app: App) =
+    var
+      window: WindowPtr = nil
+      glCtx: GlContextPtr = nil
+      runGame = true
+    try:
+      if not sdl2.setHint("SDL_WINDOWS_DPI_SCALING", "1"):
+        writeLine(stderr, "[app] SDL_WINDOWS_DPI_SCALING hint not honored")
+      if sdl2.init(INIT_VIDEO or INIT_EVENTS) != SdlSuccess:
+        raise newException(OSError, "SDL_Init: " & $sdl2.getError())
+
+      discard glSetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4.cint)
+      discard glSetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3.cint)
+      discard glSetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+          SDL_GL_CONTEXT_PROFILE_CORE.cint)
+      discard glSetAttribute(SDL_GL_CONTEXT_FLAGS, (SDL_GL_CONTEXT_DEBUG_FLAG or
+          SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG).cint)
+
+      let
+        name = fmt"{app.name} SDL2"
+      window = createWindow(name.cstring, 100, 100,
+          cint(app.w), cint(app.h),
+          SDL_WINDOW_SHOWN or SDL_WINDOW_OPENGL or SDL_WINDOW_ALLOW_HIGHDPI)
+      if window.isNil:
+        raiseSDLError("SDL_CreateWindow")
 
       glCtx = window.glCreateContext()
+      if glCtx.isNil:
+        raiseSDLError("SDL_GL_CreateContext")
 
-    loadExtensions()
+      discard window.glMakeCurrent(glCtx)
+      loadExtensions()
 
-    var
-      e = sdl2.defaultEvent
-      runGame = true
+      var
+        drawW, drawH: cint
+      glGetDrawableSize(window, drawW, drawH)
 
-      backendContext = createOpenglBackendContext(w, h)
+      let
+        backendContext = createOpenglBackendContext(app.w, app.h)
+      initApp(app, backendContext, float32(drawW) / float32(app.w))
+      glViewport(0, 0, drawW, drawH)
 
-    let
-      fontCollection = createSimpleFontCollection()
-      textLayoutContext = createSimpleTextLayoutContext()
-      textRenderContext = createSimpleTextRenderContext(backendContext)
-      textBlobCache = createSimpleTextBlobCache(textLayoutContext)
+      var
+        sdlEvent = sdl2.defaultEvent
 
-      ctx = createContext(backendContext, fontCollection, textBlobCache,
-          textLayoutContext, textRenderContext)
-
-    ctx.setDevicePixelRatio(1)
-
-    app.initImpl(ctx)
-
-    var
-      frameCount = 0
-      frameStartTime = default(MonoTime)
-      fpsGraph = initGraph("fps", PERF_GRAPH_RENDER_FPS)
-      totalTime = default(Duration)
-
-    while runGame:
-      block: # begin
-        frameStartTime = getMonoTime()
-
-      block: # render
+      while runGame and not app.isErr:
         glClearColor(0.93f, 0.93f, 0.93f, 1.0f)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
 
-        ctx.save()
-        try:
-          app.frameImpl(ctx)
-        except Exception as e:
-          echo "msg: ", e.msg
-          writeStackTrace()
+        app.runFrame()
+        if not app.isErr:
+          window.glSwapWindow()
+        frameMark()
 
-        ctx.restore()
+        while pollEvent(sdlEvent):
+          case sdlEvent.kind
+          of QuitEvent:
+            runGame = false
+            break
 
-        ctx.renderGraph(vec2(float32(w - 300), 10), fpsGraph)
+          of WindowEvent:
+            let windowEvent = cast[WindowEventPtr](sdlEvent.addr)
+            if windowEvent.event == WindowEvent_Resized or
+                windowEvent.event == WindowEvent_SizeChanged:
+              let
+                w = int32(windowEvent.data1)
+                h = int32(windowEvent.data2)
+              if w > 0 and h > 0:
+                app.ctx.setupPixelRatio(window, w, h)
 
-        ctx.flush()
-
-      block: # end
-        inc frameCount, 1
-        let diff = getMonoTime() - frameStartTime
-        totalTime = totalTime + diff
-
-        fpsGraph.updateGraph(diff)
-
-      window.glSwapWindow()
-
-      while pollEvent(e):
-        var
-          event = default(AppEvent)
-
-        case e.kind
-        of QuitEvent:
-          runGame = false
-          continue
-
-        of KeyDown, KeyUp:
-          let e2 = cast[KeyboardEventPtr](e.addr)
-          if e.kind == KeyDown:
-            event.typ = EVENT_TYPE_KEY_DOWN
           else:
-            event.typ = EVENT_TYPE_KEY_UP
-
-          event.keyCode = toAppKeyCode(e2.keysym.sym)
-          if event.keyCode == KEY_CODE_NONE:
-            continue
-
-        of MouseButtonDown, MouseButtonUp:
-          let e2 = cast[MouseButtonEventPtr](e.addr)
-          if e.kind == MouseButtonDown:
-            event.typ = EVENT_TYPE_MOUSE_DOWN
-          else:
-            event.typ = EVENT_TYPE_MOUSE_UP
-
-          case e2.button
-          of BUTTON_LEFT:
-            event.mouseButton = MOUSE_BUTTON_LEFT
-          of BUTTON_RIGHT:
-            event.mouseButton = MOUSE_BUTTON_RIGHT
-          of BUTTON_MIDDLE:
-            event.mouseButton = MOUSE_BUTTON_MIDDLE
-          else:
-            continue
-
-          event.mouseX = e2.x
-          event.mouseY = e2.y
-
-        of MouseMotion:
-          let e2 = cast[MouseMotionEventPtr](e.addr)
-          event.typ = EVENT_TYPE_MOUSE_MOVE
-          event.mouseX = e2.x
-          event.mouseY = e2.y
-          event.mouseDx = e2.xrel
-          event.mouseDy = e2.yrel
-
-        of MouseWheel:
-          let e2 = cast[MouseWheelEventPtr](e.addr)
-          event.typ = EVENT_TYPE_MOUSE_SCROLL
-          event.scrollX = e2.x
-          event.scrollY = e2.y
-
-        else:
-          continue
-
-        if not app.eventImpl.isNil:
-          app.eventImpl(ctx, event)
-
-    sdl2.glDeleteContext(glCtx)
-    sdl2.destroyWindow(window)
-    sdl2.quit()
+            let appEvent = toAppEvent(sdlEvent)
+            if appEvent.typ != EVENT_TYPE_NONE:
+              app.dispatchEvent(appEvent)
+    except Exception as e:
+      app.reportException(e, "opengl launch")
+    finally:
+      if not glCtx.isNil:
+        sdl2.glDeleteContext(glCtx)
+      if not window.isNil:
+        sdl2.destroyWindow(window)
+      sdl2.quit()
 
 elif defined(feature.nvg.sokol):
+  import std/strformat
+
   import pkg/sokol/app as sapp
   import pkg/sokol/gfx
   import pkg/sokol/glue
   import pkg/sokol/log
 
-  import ./perfgraph
-
-  import std/monotimes
-  import std/strformat
-  import std/times
+  import nvg/tracy
 
   const action = PassAction(
     colors: [
@@ -419,51 +490,7 @@ elif defined(feature.nvg.sokol):
   )
 
   var
-    g_app = default(App)
-    g_ctx = default(Context)
-
-  var
-    g_frameStartTime = default(MonoTime)
-    g_fpsGraph = initGraph("fps", PERF_GRAPH_RENDER_FPS)
-    g_totalTime = default(Duration)
-
-  proc init() {.cdecl.} =
-    gfx.setup(
-      gfx.Desc(
-        environment: environment(),
-        logger: gfx.Logger(fn: fn),
-        pipelinePoolSize: 128,
-        d3d11: D3d11Desc(
-          shaderDebugging: true,
-      ),
-    )
-    )
-
-    case queryBackend()
-    of backendGlcore:
-      echo "using GLCORE backend"
-    of backendD3d11:
-      echo "using D3D11 backend"
-    of backendMetalMacos:
-      echo "using Metal backend"
-    else:
-      echo "using untested backend"
-
-    setWindowTitle(fmt"{g_app.name} {queryBackend()}".cstring)
-
-    let
-      backendContext = createSokolBackendContext(width(), height())
-      fontCollection = createSimpleFontCollection()
-      textLayoutContext = createSimpleTextLayoutContext()
-      textRenderContext = createSimpleTextRenderContext(backendContext)
-      textBlobCache = createSimpleTextBlobCache(textLayoutContext)
-
-    g_ctx = createContext(backendContext, fontCollection, textBlobCache,
-          textLayoutContext, textRenderContext)
-    g_ctx.setDevicePixelRatio(dpiScale())
-
-    if not g_app.initImpl.isNil:
-      g_app.initImpl(g_ctx)
+    appState = default(App)
 
   proc toAppKeyCode(keyCode: Keycode): AppKeyCode =
     case keyCode
@@ -575,93 +602,124 @@ elif defined(feature.nvg.sokol):
     of keyCodeMenu: KEY_CODE_MENU
     else: KEY_CODE_NONE
 
-  proc event(e: ptr Event) {.cdecl.} =
-    var event = default(AppEvent)
-
-    case e.`type`
+  proc toAppEvent(ev: ptr Event): AppEvent =
+    case ev.`type`
     of eventTypeKeyDown, eventTypeKeyUp:
-      if e.`type` == eventTypeKeyDown:
-        event.typ = EVENT_TYPE_KEY_DOWN
-      else:
-        event.typ = EVENT_TYPE_KEY_UP
-
-      event.keyCode = toAppKeyCode(e.keyCode)
-      if event.keyCode == KEY_CODE_NONE:
+      let
+        keyCode = toAppKeyCode(ev.keyCode)
+      if keyCode == KEY_CODE_NONE:
         return
-
+      if ev.`type` == eventTypeKeyDown:
+        result.typ = EVENT_TYPE_KEY_DOWN
+      else:
+        result.typ = EVENT_TYPE_KEY_UP
+      result.keyCode = keyCode
     of eventTypeMouseDown, eventTypeMouseUp:
-      if e.`type` == eventTypeMouseDown:
-        event.typ = EVENT_TYPE_MOUSE_DOWN
-      else:
-        event.typ = EVENT_TYPE_MOUSE_UP
-
-      case e.mouseButton
+      case ev.mouseButton
       of mouseButtonLeft:
-        event.mouseButton = MOUSE_BUTTON_LEFT
+        result.mouseButton = MOUSE_BUTTON_LEFT
       of mouseButtonRight:
-        event.mouseButton = MOUSE_BUTTON_RIGHT
+        result.mouseButton = MOUSE_BUTTON_RIGHT
       of mouseButtonMiddle:
-        event.mouseButton = MOUSE_BUTTON_MIDDLE
+        result.mouseButton = MOUSE_BUTTON_MIDDLE
       else:
         return
-
-      event.mouseX = int32(e.mouseX)
-      event.mouseY = int32(e.mouseY)
-
+      if ev.`type` == eventTypeMouseDown:
+        result.typ = EVENT_TYPE_MOUSE_DOWN
+      else:
+        result.typ = EVENT_TYPE_MOUSE_UP
+      result.mouseX = int32(ev.mouseX)
+      result.mouseY = int32(ev.mouseY)
     of eventTypeMouseMove:
-      event.typ = EVENT_TYPE_MOUSE_MOVE
-      event.mouseX = int32(e.mouseX)
-      event.mouseY = int32(e.mouseY)
-      event.mouseDx = int32(e.mouseDx)
-      event.mouseDy = int32(e.mouseDy)
-
+      result.typ = EVENT_TYPE_MOUSE_MOVE
+      result.mouseX = int32(ev.mouseX)
+      result.mouseY = int32(ev.mouseY)
+      result.mouseDx = int32(ev.mouseDx)
+      result.mouseDy = int32(ev.mouseDy)
     of eventTypeMouseScroll:
-      event.typ = EVENT_TYPE_MOUSE_SCROLL
-      event.scrollX = int32(e.scrollX)
-      event.scrollY = int32(e.scrollY)
-
+      result.typ = EVENT_TYPE_MOUSE_SCROLL
+      result.scrollX = int32(ev.scrollX)
+      result.scrollY = int32(ev.scrollY)
     else:
+      discard
+
+  proc init() {.cdecl.} =
+    try:
+      gfx.setup(gfx.Desc(
+        environment: environment(),
+        logger: gfx.Logger(fn: fn),
+        pipelinePoolSize: 128,
+        d3d11: D3d11Desc(shaderDebugging: true),
+      ))
+
+      case queryBackend()
+      of backendGlcore:
+        echo "using GLCORE backend"
+      of backendD3d11:
+        echo "using D3D11 backend"
+      of backendMetalMacos:
+        echo "using Metal backend"
+      else:
+        echo "using untested backend"
+
+      setWindowTitle(fmt"{appState.name} {queryBackend()}".cstring)
+
+      let
+        backendContext = createSokolBackendContext(int32(width()), int32(height()))
+      appState.initApp(backendContext, dpiScale())
+    except Exception as e:
+      appState.reportException(e, "sokol init")
+      sapp.quit()
+
+  proc event(ev: ptr Event) {.cdecl.} =
+    if appState.isErr:
       return
 
-    if not g_app.eventImpl.isNil:
-      g_app.eventImpl(g_ctx, event)
+    let appEvent = toAppEvent(ev)
+    if appEvent.typ != EVENT_TYPE_NONE:
+      appState.dispatchEvent(appEvent)
+
+    if appState.isErr:
+      sapp.quit()
+
+  proc setupPixelRatio(ctx: Context, w, h: int32) =
+    let
+      scale = dpiScale()
+      w = int32(float32(w) / scale)
+      h = int32(float32(h) / scale)
+
+    ctx.backendContext.resize(w, h)
+    ctx.setDevicePixelRatio(dpiScale())
 
   proc frame() {.cdecl.} =
-    block: # begin
-      g_frameStartTime = getMonoTime()
+    if appState.isErr:
+      sapp.quit()
+      return
 
-    block: # render
+    appState.ctx.setupPixelRatio(width(), height())
+
+    try:
       beginPass(Pass(action: action, swapchain: swapchain()))
 
-      if not g_app.frameImpl.isNil:
-        g_ctx.save()
-        try:
-          g_app.frameImpl(g_ctx)
-        except Exception as e:
-          echo "msg: ", e.msg
-          writeStackTrace()
-
-        g_ctx.restore()
-
-      g_ctx.renderGraph(vec2(float32(width() - 300), 10), g_fpsGraph)
-
-      g_ctx.flush()
+      appState.runFrame()
 
       endPass()
       commit()
-
-    block: # end
-      let diff = getMonoTime() - g_frameStartTime
-      g_totalTime = g_totalTime + diff
-
-      g_fpsGraph.updateGraph(diff)
+      frameMark()
+    except Exception as e:
+      appState.reportException(e, "sokol frame")
+      sapp.quit()
 
   proc cleanup() {.cdecl.} =
-    g_ctx = nil
+    appState.ctx = nil
+    appState = nil
     shutdown()
 
-  proc launch*(w, h: int32, app: App) =
-    g_app = app
+  proc launch*(app: App) =
+    if app.isNil:
+      return
+
+    appState = app
 
     sapp.run(
       sapp.Desc(
@@ -671,13 +729,14 @@ elif defined(feature.nvg.sokol):
         cleanupCb: cleanup,
         swapInterval: 0,
         sampleCount: 4,
-        width: w,
-        height: h,
+        highDpi: true,
+        width: app.w,
+        height: app.h,
         icon: IconDesc(sokol_default: true),
         logger: sapp.Logger(fn: log.fn),
       )
     )
 
 else:
-  proc launch*(w, h: int32, app: App) =
+  proc launch*(app: App) =
     quit(0)

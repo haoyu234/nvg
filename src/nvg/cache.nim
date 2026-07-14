@@ -1,42 +1,43 @@
+import std/hashes
+import std/math
+
 import ./backend
 import ./core
 import ./math
 import ./path
 import ./pieces
-
-import std/hashes
-import std/math
+import ./tracy
 
 type Cache* = object
   lastId: uint
   lastVersion: uint32
   lastHash: Hash
   points: seq[Vec2]
-  flattenedContourCount: int32
-  flattenedContourPointCount: int32
+  flattenedPathCount: int32
+  flattenedPathPointCount: int32
   strokeOffset: int32
   strokeEndOffset: int32
-  contours: seq[Contour]
-  curPath: ptr Contour
+  paths: seq[DrawPath]
+  curPath: ptr DrawPath
   storage: seq[Vec4]
 
 proc clear*(c: var Cache) {.inline, raises: [].} =
   c.lastId = 0
   c.lastVersion = 0
-  c.lastHash = default(Hash)
+  c.lastHash = Hash(0)
   c.curPath = nil
   c.points.setLen(0)
-  c.flattenedContourCount = 0
-  c.flattenedContourPointCount = 0
+  c.flattenedPathCount = 0
+  c.flattenedPathPointCount = 0
   c.strokeOffset = 0
   c.strokeEndOffset = 0
-  c.contours.setLen(0)
+  c.paths.setLen(0)
 
-proc addContour(c: var Cache) {.inline, raises: [].} =
-  let idx = c.contours.len
-  c.contours.setLen(idx + 1)
+proc addPath(c: var Cache) {.inline, raises: [].} =
+  let idx = c.paths.len
+  c.paths.setLen(idx + 1)
 
-  let p = c.contours[idx].addr
+  let p = c.paths[idx].addr
   p.offset = int32(c.points.len)
 
   c.curPath = p
@@ -50,11 +51,19 @@ proc quadCurve(
 ) =
   let
     d = p3 - p1
-    d2 = cross(d, p2 - p1)
-    distSq = (d2 * d2) / d.lengthSq
+    distSq = d.length2
 
-  if distSq < tessTolSq or level >= 9:
-    if not equals(p1, p3, distTolSq):
+  if distSq < distTolSq:
+    if not nearEqual(p1, p3, distTolSq):
+      c.addPoint(p3)
+    return
+
+  let
+    det = cross(d, p2 - p1)
+    perpDistSq = (det * det) / distSq
+
+  if perpDistSq < tessTolSq or level >= 9:
+    if not nearEqual(p1, p3, distTolSq):
       c.addPoint(p3)
   else:
     let
@@ -69,11 +78,12 @@ proc bezier(
     c: var Cache, p1, p2, p3, p4: Vec2, level: int32,
     tessTolSq, distTolSq: float32
 ) =
-  let d = p4 - p1
-  let distSq = d.lengthSq
+  let
+    d = p4 - p1
+    distSq = d.length2
 
   if distSq < distTolSq:
-    if not equals(p1, p4, distTolSq):
+    if not nearEqual(p1, p4, distTolSq):
       c.addPoint(p4)
     return
 
@@ -85,28 +95,30 @@ proc bezier(
     p234 = (p23 + p34) * 0.5
     p1234 = (p123 + p234) * 0.5
 
-  let midDeviation = cross(d, p1234 - p1)
-  let quarterDeviation = cross(d, p123 - p1)
-  let threeQuarterDeviation = cross(d, p234 - p1)
+  let
+    midDeviation = cross(d, p1234 - p1)
+    quarterDeviation = cross(d, p123 - p1)
+    threeQuarterDeviation = cross(d, p234 - p1)
 
-  let maxCross = max(max(abs(midDeviation), abs(quarterDeviation)), abs(threeQuarterDeviation))
-  let maxCrossSq = maxCross * maxCross
-  let toleranceSq = tessTolSq * distSq
+  let
+    maxCross = max(max(abs(midDeviation), abs(quarterDeviation)), abs(threeQuarterDeviation))
+    maxCrossSq = maxCross * maxCross
+    toleranceSq = tessTolSq * distSq
 
   if maxCrossSq < toleranceSq or level >= 9:
-    if not equals(p1, p4, distTolSq):
+    if not nearEqual(p1, p4, distTolSq):
       c.addPoint(p4)
     return
 
   c.bezier(p1, p12, p123, p1234, level + 1, tessTolSq, distTolSq)
   c.bezier(p1234, p234, p34, p4, level + 1, tessTolSq, distTolSq)
 
-proc udpateBounds(contours: openArray[Contour]) =
-  if contours.len <= 0:
+proc updateBounds(paths: openArray[DrawPath]) =
+  if paths.len <= 0:
     return
 
-  for idx in 0 ..< contours.len:
-    let p = contours[idx].addr
+  for idx in 0 ..< paths.len:
+    let p = paths[idx].addr
     if p.fill.len <= 0:
       continue
 
@@ -127,8 +139,12 @@ proc udpateBounds(contours: openArray[Contour]) =
 proc flattenPaths*(
     c: var Cache, path: Path, matrix: Mat2d, tessTolSq, distTolSq: float32
 ) =
+  let
+    zone = zoneBegin("cache.flattenPaths")
+  defer: zone.zoneEnd()
+
   var
-    id = default(uint)
+    id = uint(0)
     hash = hash(matrix)
 
   if c.lastVersion == path.version and c.lastHash == hash:
@@ -145,50 +161,50 @@ proc flattenPaths*(
   for cmd in path.commands:
     case cmd.command
     of Command.MOVE:
-      c.addContour()
+      c.addPath()
 
-      let p = cmd.p1 * matrix
+      let p = matrix * cmd.p1
       c.addPoint(p)
 
     of Command.LINE:
       if c.curPath.isNil:
-        c.addContour()
+        c.addPath()
         c.addPoint(vec2(0, 0))
 
       if not c.curPath.isNil:
-        let p = cmd.p1 * matrix
+        let p = matrix * cmd.p1
 
         if c.curPath.pointCount > 0:
           let idx = c.curPath.offset + c.curPath.pointCount - 1
-          if equals(c.points[idx], p, distTolSq):
+          if nearEqual(c.points[idx], p, distTolSq):
             continue
 
         c.addPoint(p)
 
     of Command.CURVE:
       if c.curPath.isNil:
-        c.addContour()
+        c.addPath()
         c.addPoint(vec2(0, 0))
 
       if c.curPath.pointCount > 0:
         let
           idx = c.curPath.offset + c.curPath.pointCount - 1
-          cp = cmd.p1 * matrix
-          p = cmd.p2 * matrix
+          cp = matrix * cmd.p1
+          p = matrix * cmd.p2
 
         c.quadCurve(c.points[idx], cp, p, 0, tessTolSq, distTolSq)
 
     of Command.BEZIER:
       if c.curPath.isNil:
-        c.addContour()
+        c.addPath()
         c.addPoint(vec2(0, 0))
 
       if c.curPath.pointCount > 0:
         let
           idx = c.curPath.offset + c.curPath.pointCount - 1
-          cp1 = cmd.p1 * matrix
-          cp2 = cmd.p2 * matrix
-          p = cmd.p3 * matrix
+          cp1 = matrix * cmd.p1
+          cp2 = matrix * cmd.p2
+          p = matrix * cmd.p3
 
         c.bezier(c.points[idx], cp1, cp2, p, 0, tessTolSq, distTolSq)
 
@@ -196,10 +212,10 @@ proc flattenPaths*(
       if not c.curPath.isNil:
         c.curPath.closed = true
 
-  let contourCount = int32(c.contours.len)
+  let pathCount = int32(c.paths.len)
 
-  for idx in 0 ..< contourCount:
-    let p = c.contours[idx].addr
+  for idx in 0 ..< pathCount:
+    let p = c.paths[idx].addr
 
     if p.pointCount <= 1:
       continue
@@ -208,16 +224,16 @@ proc flattenPaths*(
       i = p.offset
       j = p.offset + p.pointCount - 1
 
-    if equals(c.points[j], c.points[i], distTolSq):
+    if nearEqual(c.points[j], c.points[i], distTolSq):
       dec j
       dec p.pointCount
 
       p.closed = true
 
   c.strokeOffset = 0
-  c.strokeEndOffset = contourCount
-  c.flattenedContourCount = contourCount
-  c.flattenedContourPointCount = int32(c.points.len)
+  c.strokeEndOffset = pathCount
+  c.flattenedPathCount = pathCount
+  c.flattenedPathPointCount = int32(c.points.len)
 
 proc curveDivs(r, arc, tol: float32): int32 {.inline.} =
   let da = arccos(r / (r + tol)) * 2
@@ -231,8 +247,8 @@ proc arcJoin(
     ax = float32(0)
     ay = float32(0)
 
-    a0 = angle(p0 - c)
-    a1 = angle(p1 - c)
+    a0 = atan(p0 - c)
+    a1 = atan(p1 - c)
 
   if a1 > a0:
     a1 = a1 - PI * 2
@@ -242,19 +258,19 @@ proc arcJoin(
     let
       u = float32(i) / float32(n - 1)
       a = a0 + u * (a1 - a0)
-      rx = c[0] + cos(a) * w
-      ry = c[1] + sin(a) * w
+      px = c[0] + cos(a) * w
+      py = c[1] + sin(a) * w
 
     if i > 0:
       if dir < 0:
         dec pos, 1
-        memory[pos] = vec4(ax, ay, rx, ry)
+        memory[pos] = vec4(ax, ay, px, py)
       else:
-        memory[pos] = vec4(ax, ay, rx, ry)
+        memory[pos] = vec4(ax, ay, px, py)
         inc pos, 1
 
-    ax = rx
-    ay = ry
+    ax = px
+    ay = py
 
   pos
 
@@ -278,13 +294,13 @@ proc dashStroke*(
     dash0 = succ(dash0) mod dashArray.len
 
   c.curPath = nil
-  if c.contours.len > c.flattenedContourCount:
-    c.contours.setLenUninit(c.flattenedContourCount)
-    c.points.setLenUninit(c.flattenedContourPointCount)
+  if c.paths.len > c.flattenedPathCount:
+    c.paths.setLenUninit(c.flattenedPathCount)
+    c.points.setLenUninit(c.flattenedPathPointCount)
 
-  for idx in 0 ..< c.flattenedContourCount:
+  for idx in 0 ..< c.flattenedPathCount:
     let
-      p = c.contours[idx].addr
+      p = c.paths[idx].addr
       pointCount = p.pointCount
       pointOffset = p.offset
 
@@ -306,7 +322,7 @@ proc dashStroke*(
         else:
           pointOffset + pointCount - 1
 
-    c.addContour()
+    c.addPath()
     c.addPoint(p0)
 
     while i <= j:
@@ -317,11 +333,11 @@ proc dashStroke*(
 
       if totalDist + dist >= dashLen:
         let
-          d = (dashLen - totalDist) / dist
-          p1 = p0 + dp * d
+          t = (dashLen - totalDist) / dist
+          p1 = p0 + dp * t
 
         if not dashState:
-          c.addContour()
+          c.addPath()
         c.addPoint(p1)
 
         dashState = not dashState
@@ -336,8 +352,8 @@ proc dashStroke*(
           c.addPoint(p0)
         inc i, 1
 
-  c.strokeOffset = c.flattenedContourCount
-  c.strokeEndOffset = int32(c.contours.len)
+  c.strokeOffset = c.flattenedPathCount
+  c.strokeEndOffset = int32(c.paths.len)
 
 proc expandStroke*(
     c: var Cache,
@@ -345,15 +361,19 @@ proc expandStroke*(
     lineJoin: LineJoin,
     strokeWidth, miterLimit: float32,
     tessTol, distTolSq: float32,
-): Piece[Contour] =
+): Piece[DrawPath] =
+  let
+    zone = zoneBegin("cache.expandStroke")
+  defer: zone.zoneEnd()
+
   let
     w = float32(0.5 * strokeWidth)
     nCap = curveDivs(w, PI, tessTol)
     mLimSq = w * w * miterLimit * miterLimit
 
   let vertCount = block:
-    var count = default(int32)
-    for p in c.contours:
+    var count = int32(0)
+    for p in c.paths:
       if lineJoin == RoundJoin or lineCap == RoundCap:
         inc count, (p.pointCount * (nCap + 2) + 1) * 2
       else:
@@ -363,19 +383,19 @@ proc expandStroke*(
   c.storage.setLenUninit(vertCount)
 
   var
-    l = default(int32)
+    l = int32(0)
     r = vertCount
-    n = default(int32)
+    n = int32(0)
     offset = l
 
   let memory = piece(c.storage)
 
-  template incp(v1, v2) =
+  template emitLeft(v1, v2) =
     inc n, 1
     memory[l] = vec4(v1[0], v1[1], v2[0], v2[1])
     inc l
 
-  template decp(v1, v2) =
+  template emitRight(v1, v2) =
     inc n, 1
     dec r
     memory[r] = vec4(v1[0], v1[1], v2[0], v2[1])
@@ -385,7 +405,7 @@ proc expandStroke*(
     strokeEndOffset = c.strokeEndOffset
 
   for idx in strokeOffset ..< strokeEndOffset:
-    let p = c.contours[idx].addr
+    let p = c.paths[idx].addr
 
     if p.pointCount <= 0:
       continue
@@ -398,7 +418,7 @@ proc expandStroke*(
       p1 = default(ptr Vec2)
       p2 = default(ptr Vec2)
 
-      tmp = default(Vec2)
+      tempPoint = default(Vec2)
 
     let closed = p.closed and p.pointCount > 2
 
@@ -410,10 +430,10 @@ proc expandStroke*(
         continue
 
       p0 = c.points[i].addr
-      p1 = tmp.addr
+      p1 = tempPoint.addr
 
-      tmp[0] = p0[][0] + w / float32(256)
-      tmp[1] = p0[][1]
+      tempPoint[0] = p0[][0] + w / float32(256)
+      tempPoint[1] = p0[][1]
 
       inc i, 2
     else:
@@ -441,16 +461,16 @@ proc expandStroke*(
       rp = p0[] - wn01
 
       if lineCap == ButtCap:
-        incp(rp, lp)
+        emitLeft(rp, lp)
       elif lineCap == SquareCap:
         let
-          cd = vec2(wn01[1], -wn01[0])
-          v1 = vec2(rp[0] - cd[0], rp[1] - cd[1])
-          v2 = vec2(lp[0] - cd[0], lp[1] - cd[1])
+          capExt = vec2(wn01[1], -wn01[0])
+          v1 = vec2(rp[0] - capExt[0], rp[1] - capExt[1])
+          v2 = vec2(lp[0] - capExt[0], lp[1] - capExt[1])
 
-        incp(rp, v1)
-        incp(v1, v2)
-        incp(v2, lp)
+        emitLeft(rp, v1)
+        emitLeft(v1, v2)
+        emitLeft(v2, lp)
       elif lineCap == RoundCap:
         l = arcJoin(memory, l, rp, lp, p0[], w, nCap, 1)
 
@@ -462,11 +482,11 @@ proc expandStroke*(
         n12 = normalized(vec2(-d12[1], d12[0]))
         wn12 = n12 * w
         miterDenom = max(1e-6f, 1 + dot(n01, n12))
-        e = (n01 + n12) / miterDenom
-        we = e * w
-        mLenSq = e.lengthSq * w * w
-        l01Sq = d01.lengthSq
-        l12Sq = d12.lengthSq
+        miterDir = (n01 + n12) / miterDenom
+        wMiter = miterDir * w
+        mLenSq = miterDir.length2 * w * w
+        l01Sq = d01.length2
+        l12Sq = d12.length2
 
         join = if lineJoin == MiterJoin and mLenSq <= mLimSq and
           miterDenom > 1e-6f: MiterJoin else: BevelJoin
@@ -484,7 +504,7 @@ proc expandStroke*(
         r12 = default(Vec2)
 
       if lJoin == MiterJoin:
-        let p = p1[] + we
+        let p = p1[] + wMiter
         l01 = p
         l12 = p
       else:
@@ -492,19 +512,19 @@ proc expandStroke*(
         l12 = p1[] + wn12
 
       if i > p.offset:
-        incp(lp, l01)
+        emitLeft(lp, l01)
       else:
         l00 = l01
 
       if lJoin == RoundJoin:
         l = arcJoin(memory, l, l01, l12, p1[], w, nCap, 1)
       elif lJoin == BevelJoin:
-        incp(l01, l12)
+        emitLeft(l01, l12)
 
       lp = l12
 
       if rJoin == MiterJoin:
-        let p = p1[] - we
+        let p = p1[] - wMiter
         r01 = p
         r12 = p
       else:
@@ -512,14 +532,14 @@ proc expandStroke*(
         r12 = p1[] - wn12
 
       if i > p.offset:
-        decp(r01, rp)
+        emitRight(r01, rp)
       else:
         r00 = r01
 
       if rJoin == RoundJoin:
         r = arcJoin(memory, r, r12, r01, p1[], w, nCap, -1)
       elif rJoin == BevelJoin:
-        decp(r12, r01)
+        emitRight(r12, r01)
 
       rp = r12
 
@@ -538,27 +558,27 @@ proc expandStroke*(
         l01 = p1[] + wn01
         r01 = p1[] - wn01
 
-      incp(lp, l01)
+      emitLeft(lp, l01)
       lp = l01
-      decp(r01, rp)
+      emitRight(r01, rp)
       rp = r01
 
       if lineCap == ButtCap:
-        incp(lp, rp)
+        emitLeft(lp, rp)
       elif lineCap == SquareCap:
         let
-          cd = vec2(wn01[1], -wn01[0])
-          v1 = vec2(lp[0] + cd[0], lp[1] + cd[1])
-          v2 = vec2(rp[0] + cd[0], rp[1] + cd[1])
+          capExt = vec2(wn01[1], -wn01[0])
+          v1 = vec2(lp[0] + capExt[0], lp[1] + capExt[1])
+          v2 = vec2(rp[0] + capExt[0], rp[1] + capExt[1])
 
-        incp(lp, v1)
-        incp(v1, v2)
-        incp(v2, rp)
+        emitLeft(lp, v1)
+        emitLeft(v1, v2)
+        emitLeft(v2, rp)
       elif lineCap == RoundCap:
         l = arcJoin(memory, l, lp, rp, p1[], w, nCap, 1)
     else:
-      incp(lp, l00)
-      decp(r00, rp)
+      emitLeft(lp, l00)
+      emitRight(r00, rp)
 
     let
       n = vertCount - r
@@ -572,14 +592,18 @@ proc expandStroke*(
     offset = l2
     r = vertCount
 
-  result = piece(c.contours.toOpenArray(strokeOffset, strokeEndOffset - 1))
-  udpateBounds(result.toOpenArray)
+  result = piece(c.paths.toOpenArray(strokeOffset, strokeEndOffset - 1))
+  updateBounds(result.toOpenArray)
 
-proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
+proc expandFill*(c: var Cache, distTolSq: float32): Piece[DrawPath] =
+  let
+    zone = zoneBegin("cache.expandFill")
+  defer: zone.zoneEnd()
+
   let vertCount = block:
     var count = 0
 
-    for p in c.contours:
+    for p in c.paths:
       inc count, p.pointCount
 
     count
@@ -591,11 +615,11 @@ proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
 
   let
     fillOffset = 0
-    fillEndOffset = c.flattenedContourCount
+    fillEndOffset = c.flattenedPathCount
 
   for idx in fillOffset ..< fillEndOffset:
     let
-      p = c.contours[idx].addr
+      p = c.paths[idx].addr
       oldPos = pos
 
     var
@@ -617,5 +641,5 @@ proc expandFill*(c: var Cache, distTolSq: float32): Piece[Contour] =
 
     p.fill = memory[oldPos ..< pos]
 
-  result = piece(c.contours.toOpenArray(fillOffset, fillEndOffset - 1))
-  udpateBounds(result.toOpenArray)
+  result = piece(c.paths.toOpenArray(fillOffset, fillEndOffset - 1))
+  updateBounds(result.toOpenArray)

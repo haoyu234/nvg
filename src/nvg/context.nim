@@ -1,12 +1,17 @@
+import std/math
+import std/unicode
+
 import ./backend
 import ./cache
 import ./core
+import ./font
+import ./font_collection
+import ./glyph_cache
 import ./math
 import ./path
 import ./pieces
-import ./text
-
-import std/math
+import ./text_blob
+import ./tracy
 
 type
   ContextState = object
@@ -24,9 +29,8 @@ type
     transform: Mat2d
 
     # font state
-    fontId: FontId
+    fontCollection: FontCollection
     fontSize: float32
-    fontColor: Color
     letterSpacing: float32
     wordSpacing: float32
     lineHeight: float32
@@ -34,6 +38,11 @@ type
     textBaseline: BaselineAlignment
     textWrap: TextWrap
     textOverflow: TextOverflow
+    fontWeight: FontWeight
+    fontStyle: FontStyle
+    fontStretch: FontStretch
+    fontFamily: FontFamily
+    maxWidth: float32
 
   Context* = ref ContextObj
   ContextObj = object # state
@@ -53,7 +62,6 @@ type
     # font state
     fontId*: FontId
     fontSize*: float32
-    fontColor*: Color
     letterSpacing*: float32
     wordSpacing*: float32
     lineHeight*: float32
@@ -61,13 +69,17 @@ type
     textBaseline*: BaselineAlignment
     textWrap*: TextWrap
     textOverflow*: TextOverflow
+    fontWeight*: FontWeight
+    fontStyle*: FontStyle
+    fontStretch*: FontStretch
+    fontFamily*: FontFamily
+    maxWidth*: float32
 
     #
     backendContext*: BackendContext
     fontCollection*: FontCollection
-    textBlobCache*: TextBlobCache
     textLayoutContext*: TextLayoutContext
-    textRenderContext*: TextRenderContext
+    glyphCache*: GlyphCache
 
     tessTol: float32
     tessTolSq: float32
@@ -77,8 +89,11 @@ type
 
     cache: Cache
     states: seq[ContextState]
+    lastIdx: uint32
 
     path: Path
+
+    glyphs: seq[DrawGlyph]
 
 proc resetState(ctx: Context) =
   ctx.fillRule = NonZero
@@ -98,14 +113,18 @@ proc resetState(ctx: Context) =
   # font settings
   ctx.fontId = default(FontId)
   ctx.fontSize = 32
-  ctx.fontColor = color(0, 0, 0, 255)
   ctx.letterSpacing = 0
   ctx.wordSpacing = 0
-  ctx.lineHeight = 16
+  ctx.lineHeight = 0
   ctx.textAlign = LeftAlign
   ctx.textBaseline = AlphabeticBaseline
   ctx.textWrap = NoWrap
   ctx.textOverflow = Hidden
+  ctx.fontWeight = Normal
+  ctx.fontStyle = Normal
+  ctx.fontStretch = Normal
+  ctx.fontFamily = Default
+  ctx.maxWidth = 0
 
 proc setDevicePixelRatio*(
   ctx: Context, devicePixelRatio: float32) {.inline.} =
@@ -114,6 +133,9 @@ proc setDevicePixelRatio*(
   ctx.tessTolSq = ctx.tessTol * ctx.tessTol
   ctx.distTolSq = ctx.distTol * ctx.distTol
   ctx.devicePixelRatio = devicePixelRatio
+
+proc devicePixelRatio*(ctx: Context): float32 {.inline.} =
+  ctx.devicePixelRatio
 
 proc state(ctx: Context): ContextState =
   result.fillRule = ctx.fillRule
@@ -129,9 +151,8 @@ proc state(ctx: Context): ContextState =
   result.globalAlpha = ctx.globalAlpha
   result.transform = ctx.transform
 
-  result.fontId = ctx.fontId
+  result.fontCollection = ctx.fontCollection
   result.fontSize = ctx.fontSize
-  result.fontColor = ctx.fontColor
   result.letterSpacing = ctx.letterSpacing
   result.wordSpacing = ctx.wordSpacing
   result.lineHeight = ctx.lineHeight
@@ -139,20 +160,16 @@ proc state(ctx: Context): ContextState =
   result.textBaseline = ctx.textBaseline
   result.textWrap = ctx.textWrap
   result.textOverflow = ctx.textOverflow
-
-proc textAttribs(ctx: Context): TextAttribs =
-  result.fontSize = ctx.fontSize
-  result.fontColor = ctx.fontColor
-  result.letterSpacing = ctx.letterSpacing
-  result.wordSpacing = ctx.wordSpacing
-  result.lineHeight = ctx.lineHeight
-  result.textAlign = ctx.textAlign
-  result.textBaseline = ctx.textBaseline
-  result.textWrap = ctx.textWrap
-  result.textOverflow = ctx.textOverflow
+  result.fontWeight = ctx.fontWeight
+  result.fontStyle = ctx.fontStyle
+  result.fontStretch = ctx.fontStretch
+  result.fontFamily = ctx.fontFamily
+  result.maxWidth = ctx.maxWidth
 
 proc save*(ctx: Context) {.inline.} =
   ctx.states.add(ctx.state)
+
+  assert ctx.states.len < 255
 
 proc restore*(ctx: Context) =
   assert ctx.states.len > 0
@@ -172,9 +189,8 @@ proc restore*(ctx: Context) =
     ctx.globalAlpha = state.globalAlpha
     ctx.transform = state.transform
 
-    ctx.fontId = state.fontId
+    ctx.fontCollection = state.fontCollection
     ctx.fontSize = state.fontSize
-    ctx.fontColor = state.fontColor
     ctx.letterSpacing = state.letterSpacing
     ctx.wordSpacing = state.wordSpacing
     ctx.lineHeight = state.lineHeight
@@ -182,19 +198,22 @@ proc restore*(ctx: Context) =
     ctx.textBaseline = state.textBaseline
     ctx.textWrap = state.textWrap
     ctx.textOverflow = state.textOverflow
+    ctx.fontWeight = state.fontWeight
+    ctx.fontStyle = state.fontStyle
+    ctx.fontStretch = state.fontStretch
+    ctx.fontFamily = state.fontFamily
+    ctx.maxWidth = state.maxWidth
 
     ctx.states.setLen(ctx.states.len - 1)
 
 proc createContext*(backendContext: BackendContext,
-    fontCollection: FontCollection, textBlobCache: TextBlobCache,
-    textLayoutContext: TextLayoutContext,
-    textRenderContext: TextRenderContext): Context =
+    fontCollection: FontCollection,
+    textLayoutContext: TextLayoutContext): Context =
   result = Context()
   result.backendContext = backendContext
   result.fontCollection = fontCollection
-  result.textBlobCache = textBlobCache
   result.textLayoutContext = textLayoutContext
-  result.textRenderContext = textRenderContext
+  result.glyphCache = createGlyphCache(result.backendContext)
   result.setDevicePixelRatio(1)
   result.resetState()
 
@@ -220,23 +239,27 @@ proc setTransform*(ctx: Context, v: Mat2d) {.inline.} =
   ctx.transform = v
 
 proc transform*(ctx: Context, v: Mat2d) {.inline.} =
-  ctx.transform.premultiply(v)
+  ctx.transform.multiply(v)
 
 proc fillPath*(ctx: Context, path: Path) =
+  let
+    zone = zoneBegin("context.fillPath")
+  defer: zone.zoneEnd()
+
   ctx.cache.flattenPaths(path, ctx.transform, ctx.tessTolSq, ctx.distTolSq)
 
-  let contours = ctx.cache.expandFill(ctx.distTolSq)
+  let paths = ctx.cache.expandFill(ctx.distTolSq)
 
   var paint = ctx.fillStyle
-  paint.transform.multiply(ctx.transform)
+  paint.transform.premultiply(ctx.transform)
   paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
       paint.innerColor.a))
   paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
       paint.outerColor.a))
 
-  ctx.backendContext.drawContours(
+  ctx.backendContext.drawPaths(
     paint,
-    contours.toOpenArray,
+    paths.toOpenArray,
     ctx.fillRule,
     ctx.compositeOperation,
   )
@@ -250,11 +273,15 @@ proc getAverageScale(t: Mat2d): float32 {.inline.} =
 
 proc strokePath*(ctx: Context, path: Path) =
   let
+    zone = zoneBegin("context.strokePath")
+  defer: zone.zoneEnd()
+
+  let
     s = getAverageScale(ctx.transform)
     strokeWidth = max(ctx.strokeWidth * s, 0.01)
 
   var paint = ctx.strokeStyle
-  paint.transform.multiply(ctx.transform)
+  paint.transform.premultiply(ctx.transform)
   paint.innerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
       paint.innerColor.a))
   paint.outerColor.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(
@@ -265,27 +292,25 @@ proc strokePath*(ctx: Context, path: Path) =
   if len(ctx.dashArray) > 0 and ctx.dashArray[0] > 0:
     ctx.cache.dashStroke(s, strokeWidth, ctx.dashOffset, ctx.dashArray)
 
-  let contours = ctx.cache.expandStroke(
+  let paths = ctx.cache.expandStroke(
     ctx.lineCap, ctx.lineJoin, strokeWidth, ctx.miterLimit,
     ctx.tessTolSq, ctx.distTolSq
   )
 
-  ctx.backendContext.drawContours(
+  ctx.backendContext.drawPaths(
     paint,
-    contours.toOpenArray,
+    paths.toOpenArray,
     NonZero,
     ctx.compositeOperation,
   )
 
 proc flush*(ctx: Context) {.inline.} =
-  ctx.textLayoutContext.flush()
-  ctx.textRenderContext.flush()
+  let
+    zone = zoneBegin("context.flush")
+  defer: zone.zoneEnd()
+
+  ctx.glyphCache.uploadDirty()
   ctx.backendContext.flush()
-
-  ctx.states.setLen(0)
-  ctx.resetState()
-
-  ctx.textBlobCache.compact()
 
 proc beginPath*(ctx: Context) {.inline.} =
   ctx.path.clear()
@@ -293,8 +318,8 @@ proc beginPath*(ctx: Context) {.inline.} =
 proc rect*(ctx: Context, xywh: Vec4) {.inline.} =
   ctx.path.rect(xywh)
 
-proc arc*(ctx: Context, cp: Vec2, r, a0, a1: float32, ccw: bool) =
-  ctx.path.arc(cp, r, a0, a1, ccw)
+proc arc*(ctx: Context, c: Vec2, r, a0, a1: float32, ccw: bool) =
+  ctx.path.arc(c, r, a0, a1, ccw)
 
 proc ellipse*(ctx: Context, c: Vec2, rx, ry: float32) {.inline.} =
   ctx.path.ellipse(c, rx, ry)
@@ -341,8 +366,8 @@ proc stroke*(ctx: Context) {.inline.} =
 proc imagePattern*(ctx: Context, xywh: Vec4, radians: float32,
     imageId: ImageId, alpha: float32): Paint {.inline.} =
   result.transform = rotated(radians)
-  result.transform.dx = xywh[0]
-  result.transform.dy = xywh[1]
+  result.transform.x0 = xywh[0]
+  result.transform.y0 = xywh[1]
   result.extent[0] = xywh[2]
   result.extent[1] = xywh[3]
   result.imageId = imageId
@@ -355,32 +380,227 @@ proc getImageInfo*(ctx: Context, imageId: ImageId): ImageInfo {.inline.} =
   ctx.backendContext.getImageInfo(imageId)
 
 proc loadFontFromMemory*(ctx: Context, name: string, buffer: seq[byte],
-    fontFamily: FontFamily): FontId =
-  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
-      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+    fontFamily: FontFamily) =
+  if ctx.fontCollection.isNil or ctx.textLayoutContext.isNil:
     return
 
-  ctx.fontCollection.loadFromMemory(name, buffer, fontFamily)
+  inc ctx.lastIdx, 1
+
+  let
+    fontId = FontId(id: ctx.lastIdx)
+    font = createFontFromMemory(fontId, fontFamily, buffer)
+  ctx.fontCollection.add(font)
+
+proc textAttribs*(ctx: Context): TextAttribs =
+  TextAttribs(attribs: [
+    TextAttrib(kind: akColor, color: ctx.fillStyle.innerColor),
+    TextAttrib(kind: akFontSize, fontSize: ctx.fontSize),
+    TextAttrib(kind: akLetterSpacing, letterSpacing: ctx.letterSpacing),
+    TextAttrib(kind: akWordSpacing, wordSpacing: ctx.wordSpacing),
+    TextAttrib(kind: akLineHeight, lineHeight: ctx.lineHeight),
+    TextAttrib(kind: akTextAlign, textAlign: ctx.textAlign),
+    TextAttrib(kind: akTextBaseline, textBaseline: ctx.textBaseline),
+    TextAttrib(kind: akTextWrap, textWrap: ctx.textWrap),
+    TextAttrib(kind: akTextOverflow, textOverflow: ctx.textOverflow),
+    TextAttrib(kind: akFontWeight, fontWeight: ctx.fontWeight),
+    TextAttrib(kind: akFontStyle, fontStyle: ctx.fontStyle),
+    TextAttrib(kind: akFontStretch, fontStretch: ctx.fontStretch),
+    TextAttrib(kind: akFontFamily, fontFamily: ctx.fontFamily),
+  ])
 
 proc createTextBlob*(ctx: Context, text: openArray[char]): TextBlob =
-  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
-      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+  if ctx.fontCollection.isNil or ctx.textLayoutContext.isNil:
     return
 
-  result = ctx.textLayoutContext.createTextBlob(ctx.fontCollection,
-      ctx.textAttribs, text)
+  result = ctx.textLayoutContext.createTextBlob(
+    ctx.fontCollection, toRunes(text), [
+      TextAttribSpan(
+        runeRange: int32(0) .. high(int32),
+        attribs: ctx.textAttribs.attribs,
+    )
+  ],
+    float32(0), float32(0))
 
-proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
-  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
-      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+type
+  BatchDrawGlyph = object
+    curveTexId: ImageId
+    bandTexId: ImageId
+    useSolid: bool
+    basePaint: Paint
+    solidPaint: Paint
+
+proc flushGlyphs(batch: var BatchDrawGlyph, ctx: Context) =
+  let
+    zone = zoneBegin("context.flushGlyphs")
+  defer: zone.zoneEnd()
+
+  if ctx.glyphs.len > 0:
+    ctx.backendContext.drawGlyphs(
+        (if batch.useSolid: batch.solidPaint else: batch.basePaint),
+        ctx.transform, batch.curveTexId, batch.bandTexId, ctx.glyphs,
+        ctx.compositeOperation)
+    ctx.glyphs.setLen(0)
+
+proc addGlyph(batch: var BatchDrawGlyph, ctx: Context,
+    info: SlugGlyphInfo, posX, posY: float32, textColor: Color,
+    useSolid: bool, layerTransform: Mat2d, scale: float32) =
+  let
+    zone = zoneBegin("context.addGlyph")
+  defer: zone.zoneEnd()
+
+  if info.rawBBox.xMin == 0 and info.rawBBox.xMax == 0 and
+      info.rawBBox.yMin == 0 and info.rawBBox.yMax == 0:
     return
 
-  ctx.textRenderContext.fillText(ctx.textLayoutContext, ctx.textBlobCache,
-      ctx.fontCollection, ctx.textAttribs, text, pos, ctx.transform)
+  let
+    scale = scale
+    baselineX = posX
+    baselineY = posY
+
+  var
+    glyphTransform = mat2d()
+  if layerTransform != glyphTransform:
+    # Layer transform expressed around the baseline:
+    #   T(baseline) · S(scale,-scale) · layerTransform · S(1/scale,-1/scale) · T(-baseline)
+    glyphTransform = translated(vec2(baselineX, baselineY))
+      .multiplied(scaled(vec2(scale, -scale)))
+      .multiplied(layerTransform)
+      .multiplied(scaled(vec2(float32(1) / scale, -float32(1) / scale)))
+      .multiplied(translated(vec2(-baselineX, -baselineY)))
+
+  if info.curveTexId != batch.curveTexId or
+      info.bandTexId != batch.bandTexId or
+      useSolid != batch.useSolid:
+    batch.flushGlyphs(ctx)
+    batch.curveTexId = info.curveTexId
+    batch.bandTexId = info.bandTexId
+    batch.useSolid = useSolid
+
+  let
+    x = baselineX + info.rawBBox.xMin * scale
+    y = baselineY - info.rawBBox.yMin * scale
+    w = (info.rawBBox.xMax - info.rawBBox.xMin) * scale
+    h = (info.rawBBox.yMin - info.rawBBox.yMax) * scale
+
+  var
+    drawGlyph = default(DrawGlyph)
+  drawGlyph.drawRect[0] = x
+  drawGlyph.drawRect[1] = y
+  drawGlyph.drawRect[2] = w
+  drawGlyph.drawRect[3] = h
+  drawGlyph.glyphLocX = info.glyphLoc[0]
+  drawGlyph.glyphLocY = info.glyphLoc[1]
+  drawGlyph.maxBandX = info.maxBandX
+  drawGlyph.maxBandY = info.maxBandY
+  drawGlyph.color = textColor
+  drawGlyph.transform = glyphTransform
+
+  ctx.glyphs.add(drawGlyph)
+
+proc addColrGlyph(batch: var BatchDrawGlyph, ctx: Context, font: Font,
+    run: GlyphRun, pos: Vec2, color: Color, paintIsPlain: bool,
+    scale: float32, shear: bool) =
+  let
+    zone = zoneBegin("context.addColrGlyph")
+  defer: zone.zoneEnd()
+
+  for g in font.getColrGlyphs(run.glyphId):
+    if g.glyphId.isNil:
+      continue
+
+    var
+      layerColor = color
+
+    if g.paletteEntryIndex != 0xFFFF:
+      layerColor = font.getPaletteColor(0, g.paletteEntryIndex)
+      layerColor.a = uint8((uint32(layerColor.a) * uint32(color.a) +
+          uint32(127)) div uint32(255))
+
+    let layerAlpha = clamp(g.alpha, float32(0), float32(1))
+    if layerAlpha < 1:
+      layerColor.a = uint8(float32(layerColor.a) * layerAlpha +
+          float32(0.5))
+
+    let
+      glyphInfo = ctx.glyphCache.getGlyphInfo(font, g.glyphId, shear)
+
+    batch.addGlyph(ctx, glyphInfo, pos[0] + run.x, pos[1] + run.y,
+        layerColor, not paintIsPlain, g.paintTransform, scale)
 
 proc fillTextBlob*(ctx: Context, textBlob: TextBlob, pos: Vec2) =
-  if ctx.fontCollection.isNil or ctx.textBlobCache.isNil or
-      ctx.textLayoutContext.isNil or ctx.textRenderContext.isNil:
+  let
+    zone = zoneBegin("context.fillTextBlob")
+  defer: zone.zoneEnd()
+
+  if textBlob.lines.len <= 0:
     return
 
-  ctx.textRenderContext.fillTextBlob(textBlob, pos, ctx.transform)
+  let
+    basePaint = ctx.fillStyle
+    paintIsPlain = basePaint.imageId.isNil and
+        basePaint.innerColor == basePaint.outerColor
+
+  var
+    batch = BatchDrawGlyph(
+      basePaint: basePaint,
+      solidPaint: basePaint,
+    )
+  batch.solidPaint.imageId = default(ImageId)
+  batch.solidPaint.outerColor = batch.solidPaint.innerColor
+
+  for line in textBlob.lines:
+    for i in line.runStart ..< line.runStart + line.runLen:
+      let
+        run = textBlob.runs[i]
+        font = textBlob.fontCollection.getFont(run.fontId)
+      if font.isNil:
+        continue
+
+      let
+        zone = zoneBegin("context.fillTextBlob.run")
+      defer: zone.zoneEnd()
+
+      if run.glyphId.isNil:
+        continue
+
+      let
+        fontSize = getAttrib(textBlob.spans, run.runePos, akFontSize)
+        scale = font.getPixelHeightScale(fontSize)
+
+      var
+        shear = false
+        color = getAttrib(textBlob.spans, run.runePos, akColor)
+      color.a = uint8(clamp(ctx.globalAlpha, 0, 1) * float32(color.a))
+
+      if font.getStyle() == Normal:
+        let
+          runStyle = getAttrib(textBlob.spans, run.runePos, akFontStyle)
+        if runStyle == Italic or runStyle == Oblique:
+          shear = true
+
+      if not font.hasColor(run.glyphId):
+        let
+          glyphInfo = ctx.glyphCache.getGlyphInfo(font, run.glyphId, shear)
+
+        batch.addGlyph(ctx, glyphInfo, pos[0] + run.x, pos[1] + run.y,
+            color, false, mat2d(), scale)
+      else:
+        batch.addColrGlyph(ctx, font, run, pos, color, paintIsPlain,
+            scale, shear)
+
+  batch.flushGlyphs(ctx)
+
+proc fillText*(ctx: Context, text: openArray[char], pos: Vec2) =
+  let
+    zone = zoneBegin("context.fillText")
+  defer: zone.zoneEnd()
+
+  if ctx.fontCollection.isNil or ctx.textLayoutContext.isNil:
+    return
+
+  let
+    textBlob = ctx.createTextBlob(text)
+  if textBlob.lines.len <= 0:
+    return
+
+  ctx.fillTextBlob(textBlob, pos)

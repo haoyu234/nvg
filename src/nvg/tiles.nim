@@ -74,7 +74,7 @@ proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
 
   var
     h = s[n].addr
-    pos = default(int32)
+    pos = int32(0)
     b = h
 
   if b.tail > 0:
@@ -113,8 +113,8 @@ proc add*(tiles: var Tiles, tileId: TileId, val: sink Vec4) {.inline.} =
 
   inc b.len, 1
 
-  if pos + N >= int32(tiles.storage.len):
-    tiles.storage.setLenUninit(uint32(float32(pos) * 1.5))
+  if tiles.tail >= int32(tiles.storage.len):
+    tiles.storage.setLenUninit(tiles.tail * 2)
 
   tiles.storage[pos] = val
 

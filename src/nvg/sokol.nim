@@ -1,15 +1,16 @@
+import std/tables
+
 import pkg/sokol/gfx except Color, Image, ImageInfo, PixelFormat
 
 import ./backend
 import ./core
-import ./glsl
+import ./draw_list
 import ./math
-import ./render_data
+import ./sokol_gen
+import ./tracy
 
-import std/math
-import std/tables
-
-const TILE_IMAGE_WIDTH = 256
+const
+  NVG_DEFAULT_STORAGE_CAPACITY = 32 * 1024
 
 type
   SokolBlend = object
@@ -27,34 +28,39 @@ type
     smp: Sampler
     dirty: bool
 
+  StorageUsage = enum
+    StorageUsageVertexBuffer
+    StorageUsageStorageBuffer
+
   SokolStorage = object
-    tex: gfx.Image
+    buffer: gfx.Buffer
     view: View
-    layerCount: int32
+    cap: int32
+    name: cstring
+    usage: StorageUsage
 
   SokolBackendContext = ref SokolBackendContextObj
   SokolBackendContextObj = object of BackendContext
-    width: int32
-    height: int32
+    size: Vec2
 
-    shader: Shader
     smpDummy: Sampler
     texDummy: gfx.Image
     texDummyView: View
 
-    texEdge: SokolStorage
-    texVert: SokolStorage
-    texColor: SokolStorage
+    pathShader: Shader
+    pathPipeline: Pipeline
+    pathBlend: uint32
 
-    vertAndIndexDummyBuf: Buffer
-    instanceBuf: Buffer
-    instanceBufSize: int32
+    glyphShader: Shader
+    glyphPipeline: Pipeline
+    glyphBlend: uint32
 
-    blend: uint32
-    pipeline: Pipeline
+    drawList: DrawList
 
-    renderData: RenderData
-
+    edges: SokolStorage
+    paths: SokolStorage
+    glyphs: SokolStorage
+    transforms: SokolStorage
     textures: Table[ImageId, SokolTexture]
 
     initial: bool
@@ -69,96 +75,141 @@ proc `=destroy`(tex: var SokolTextureObj) =
   `=destroy`(tex.image)
   `=destroy`(tex.imageFlags)
 
-proc `=destroy`(storage: SokolStorage) =
-  destroyView(storage.view)
-  destroyImage(storage.tex)
+proc `=destroy`(s: SokolStorage) =
+  destroyView(s.view)
+  destroyBuffer(s.buffer)
 
 proc `=destroy`(ctx: var SokolBackendContextObj) =
-  destroyShader(ctx.shader)
+  destroyShader(ctx.pathShader)
   destroySampler(ctx.smpDummy)
   destroyImage(ctx.texDummy)
   destroyView(ctx.texDummyView)
-  destroyBuffer(ctx.vertAndIndexDummyBuf)
-  destroyBuffer(ctx.instanceBuf)
-  destroyPipeline(ctx.pipeline)
+  destroyPipeline(ctx.pathPipeline)
+  destroyShader(ctx.glyphShader)
+  destroyPipeline(ctx.glyphPipeline)
 
-  `=destroy`(ctx.renderData)
+  `=destroy`(ctx.drawList)
 
-  `=destroy`(ctx.texEdge)
-  `=destroy`(ctx.texVert)
-  `=destroy`(ctx.texColor)
+  `=destroy`(ctx.edges)
+  `=destroy`(ctx.paths)
+  `=destroy`(ctx.glyphs)
+  `=destroy`(ctx.transforms)
   `=destroy`(ctx.textures)
 
-proc initStorage(storage: var SokolStorage) {.inline.} =
-  storage.tex = allocImage()
-  storage.view = allocView()
-  storage.layerCount = -1
+proc initStorage(s: var SokolStorage, name: cstring,
+    usage: StorageUsage) {.inline.} =
+  s.buffer = allocBuffer()
+  s.name = name
+  s.usage = usage
 
-proc updateStorage[T: Vec2 | Vec4 | Color | Color32f](storage: var SokolStorage,
-    name: cstring, data: var seq[T]) =
-  const layerSize = TILE_IMAGE_WIDTH * TILE_IMAGE_WIDTH
+proc initIfNeeded(ctx: SokolBackendContext) =
+  if ctx.initial:
+    return
 
-  var
-    layerCount = default(int32)
-    dataCount = default(int32)
+  ctx.initial = true
 
-  if data.len <= 0:
-    layerCount = 1
-  elif data.len mod layerSize > 0:
-    layerCount = int32(data.len) div layerSize + 1
-  else:
-    layerCount = int32(data.len) div layerSize
+  let
+    backend = queryBackend()
+    pathShader = makeShader(getPathShaderDesc(backend))
+    glyphShader = makeShader(getGlyphShaderDesc(backend))
 
-  dataCount = layerSize * layerCount
+  ctx.pathShader = pathShader
+  ctx.pathPipeline = allocPipeline()
+  ctx.glyphShader = glyphShader
+  ctx.glyphPipeline = allocPipeline()
+  ctx.glyphBlend = 0
 
-  if data.len < dataCount:
-    data.setLen(dataCount)
+  ctx.edges.initStorage("nvg.edges", StorageUsageStorageBuffer)
+  ctx.paths.initStorage("nvg.paths", StorageUsageVertexBuffer)
+  ctx.glyphs.initStorage("nvg.glyphs", StorageUsageVertexBuffer)
+  ctx.transforms.initStorage("nvg.transforms", StorageUsageStorageBuffer)
 
-  if storage.layerCount != layerCount:
-    if storage.layerCount > 0:
-      storage.tex.uninitImage()
-      storage.view.uninitView()
-
-    storage.layerCount = int32(layerCount)
-
-    const pixelFormat =
-      when T is float32:
-        pixelFormatR32f
-      elif T is Vec2:
-        pixelFormatRg32f
-      elif T is Color:
-        pixelFormatRgba8
-      elif T is Vec4 or T is Color32f:
-        pixelFormatRgba32f
-      else:
-        assert false
-
-    storage.tex.initImage(
-      ImageDesc(
-        type: imageTypeArray,
-        width: TILE_IMAGE_WIDTH,
-        height: TILE_IMAGE_WIDTH,
-        usage: ImageUsage(dynamicUpdate: true),
-        pixelFormat: pixelFormat,
-        numMipmaps: 0,
-        numSlices: int32(layerCount),
-        label: name,
-      )
+  ctx.smpDummy = makeSampler(
+    SamplerDesc(
+      minFilter: filterDefault,
+      magFilter: filterDefault,
+      mipmapFilter: filterDefault,
+      wrapU: wrapClampToEdge,
+      wrapV: wrapClampToEdge,
+      label: "nvg.smpDummy",
     )
-
-    storage.view.initView(
-      ViewDesc(
-        texture: TextureViewDesc(
-          image: storage.tex
-      )
-    )
-    )
-
-  let dataRange = Range(
-    addr: data[0].addr,
-    size: dataCount * sizeof(T)
   )
-  storage.tex.updateImage(ImageData(mipLevels: [dataRange]))
+
+  let
+    data = [color(255, 255, 255, 255)]
+    dataRange = Range(addr: data[0].addr, size: sizeof(Color))
+
+  ctx.texDummy = makeImage(
+    ImageDesc(
+      type: imageType2d,
+      width: 1,
+      height: 1,
+      usage: ImageUsage(immutable: true),
+      pixelFormat: pixelFormatRgba8,
+      numMipmaps: 1,
+      label: "nvg.texDummy",
+      data: ImageData(mipLevels: [dataRange]),
+    )
+  )
+
+  ctx.texDummyView = makeView(
+    ViewDesc(
+      texture: TextureViewDesc(
+        image: ctx.texDummy
+    )
+  )
+  )
+
+  let
+    features = queryFeatures()
+  ctx.supportDrawBaseVertex = features.drawBaseVertex
+  ctx.supportDrawBaseInstance = features.drawBaseInstance
+
+proc reserveStorage(s: var SokolStorage, needBytes: int32) =
+  var
+    cap = s.cap * 2
+  if cap < int32(needBytes):
+    cap = int32(needBytes)
+
+  if s.cap > 0:
+    s.buffer.uninitBuffer()
+    if s.usage == StorageUsageStorageBuffer:
+      s.view.uninitView()
+
+  s.cap = cap
+  s.buffer.initBuffer(
+    BufferDesc(
+      size: cap,
+      usage: BufferUsage(
+        vertexBuffer: s.usage == StorageUsageVertexBuffer,
+        storageBuffer: s.usage == StorageUsageStorageBuffer,
+        dynamicUpdate: true,
+    ),
+    label: s.name,
+  )
+  )
+  if s.usage == StorageUsageStorageBuffer:
+    s.view = makeView(
+      ViewDesc(
+        storageBuffer: BufferViewDesc(
+          buffer: s.buffer,
+          offset: 0,
+      )
+    )
+    )
+
+proc updateStorage[T: Vec2 | Vec4 | Color | object](s: var SokolStorage,
+    data: var seq[T]) =
+  if data.len <= 0:
+    return
+
+  let byteSize = int32(data.len * sizeof(T))
+  if byteSize > s.cap:
+    s.reserveStorage(max(byteSize, NVG_DEFAULT_STORAGE_CAPACITY))
+
+  s.buffer.updateBuffer(
+    Range(addr: data[0].addr, size: byteSize)
+  )
 
 proc addTexture(ctx: SokolBackendContext, imageId: ImageId,
     tex: SokolTexture) {.inline.} =
@@ -172,228 +223,6 @@ proc getTexture(ctx: SokolBackendContext,
 proc deleteTexture(ctx: SokolBackendContext,
     imageId: ImageId) {.inline.} =
   ctx.textures.del(imageId)
-
-proc getShader(): Shader =
-  var s = ShaderDesc(label: "nvg.shader")
-
-  case queryBackend()
-  of backendGlcore:
-    s.vertexFunc.source = cast[cstring](vsContourSourceGlsl410[0].addr)
-    s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsContourSourceGlsl410[0].addr)
-    s.fragmentFunc.entry = "main"
-    s.attrs[0].base_type = shaderAttrBaseTypeSint
-    s.attrs[0].glslName = "v_idx"
-    s.attrs[1].base_type = shaderAttrBaseTypeSint
-    s.attrs[1].glslName = "v_fillCount"
-    s.attrs[2].base_type = shaderAttrBaseTypeSint
-    s.attrs[2].glslName = "v_fillOffset"
-    s.attrs[3].base_type = shaderAttrBaseTypeSint
-    s.attrs[3].glslName = "v_colorIndex"
-    s.attrs[4].base_type = shaderAttrBaseTypeSint
-    s.attrs[4].glslName = "v_pad"
-    s.uniformBlocks[0].stage = shaderStageVertex
-    s.uniformBlocks[0].layout = uniformLayoutStd140
-    s.uniformBlocks[0].size = 16
-    s.uniformBlocks[0].glslUniforms[0].type = uniformTypeFloat2
-    s.uniformBlocks[0].glslUniforms[0].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[0].glslName = "_70.viewSize"
-    s.uniformBlocks[0].glslUniforms[1].type = uniformTypeInt
-    s.uniformBlocks[0].glslUniforms[1].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[1].glslName = "_70.vertexOffset"
-    s.uniformBlocks[3].stage = shaderStageFragment
-    s.uniformBlocks[3].layout = uniformLayoutStd140
-    s.uniformBlocks[3].size = 96
-    s.uniformBlocks[3].glslUniforms[0].type = uniformTypeFloat4
-    s.uniformBlocks[3].glslUniforms[0].arrayCount = 6
-    s.uniformBlocks[3].glslUniforms[0].glslName = "f_params"
-    s.views[1].texture.stage = shaderStageVertex
-    s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageTypeArray
-    s.views[1].texture.sampleType = imageSampleTypeFloat
-    s.views[4].texture.stage = shaderStageFragment
-    s.views[4].texture.multisampled = false
-    s.views[4].texture.imageType = imageType2d
-    s.views[4].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.stage = shaderStageFragment
-    s.views[6].texture.multisampled = false
-    s.views[6].texture.imageType = imageTypeArray
-    s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.views[8].texture.stage = shaderStageVertex
-    s.views[8].texture.multisampled = false
-    s.views[8].texture.imageType = imageTypeArray
-    s.views[8].texture.sampleType = imageSampleTypeFloat
-    s.samplers[2].stage = shaderStageVertex
-    s.samplers[2].samplerType = samplerTypeFiltering
-    s.samplers[5].stage = shaderStageFragment
-    s.samplers[5].samplerType = samplerTypeFiltering
-    s.samplers[7].stage = shaderStageFragment
-    s.samplers[7].samplerType = samplerTypeFiltering
-    s.samplers[9].stage = shaderStageVertex
-    s.samplers[9].samplerType = samplerTypeFiltering
-    s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 1
-    s.textureSamplerPairs[0].samplerSlot = 2
-    s.textureSamplerPairs[0].glslName = "vertTex_vertSmp"
-    s.textureSamplerPairs[1].stage = shaderStageVertex
-    s.textureSamplerPairs[1].viewSlot = 8
-    s.textureSamplerPairs[1].samplerSlot = 9
-    s.textureSamplerPairs[1].glslName = "colorTex_colorSmp"
-    s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 6
-    s.textureSamplerPairs[2].samplerSlot = 7
-    s.textureSamplerPairs[2].glslName = "edgeTex_edgeSmp"
-    s.textureSamplerPairs[3].stage = shaderStageFragment
-    s.textureSamplerPairs[3].viewSlot = 4
-    s.textureSamplerPairs[3].samplerSlot = 5
-    s.textureSamplerPairs[3].glslName = "imageTex_imageSmp"
-  of backendGles3:
-    s.vertexFunc.source = cast[cstring](vsContourSourceGlsl300es[0].addr)
-    s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsContourSourceGlsl300es[0].addr)
-    s.fragmentFunc.entry = "main"
-    s.attrs[0].base_type = shaderAttrBaseTypeSint
-    s.attrs[0].glslName = "v_idx"
-    s.attrs[1].base_type = shaderAttrBaseTypeSint
-    s.attrs[1].glslName = "v_fillCount"
-    s.attrs[2].base_type = shaderAttrBaseTypeSint
-    s.attrs[2].glslName = "v_fillOffset"
-    s.attrs[3].base_type = shaderAttrBaseTypeSint
-    s.attrs[3].glslName = "v_colorIndex"
-    s.attrs[4].base_type = shaderAttrBaseTypeSint
-    s.attrs[4].glslName = "v_pad"
-    s.uniformBlocks[0].stage = shaderStageVertex
-    s.uniformBlocks[0].layout = uniformLayoutStd140
-    s.uniformBlocks[0].size = 16
-    s.uniformBlocks[0].glslUniforms[0].type = uniformTypeFloat2
-    s.uniformBlocks[0].glslUniforms[0].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[0].glslName = "_70.viewSize"
-    s.uniformBlocks[0].glslUniforms[1].type = uniformTypeInt
-    s.uniformBlocks[0].glslUniforms[1].arrayCount = 0
-    s.uniformBlocks[0].glslUniforms[1].glslName = "_70.vertexOffset"
-    s.uniformBlocks[3].stage = shaderStageFragment
-    s.uniformBlocks[3].layout = uniformLayoutStd140
-    s.uniformBlocks[3].size = 96
-    s.uniformBlocks[3].glslUniforms[0].type = uniformTypeFloat4
-    s.uniformBlocks[3].glslUniforms[0].arrayCount = 6
-    s.uniformBlocks[3].glslUniforms[0].glslName = "f_params"
-    s.views[1].texture.stage = shaderStageVertex
-    s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageTypeArray
-    s.views[1].texture.sampleType = imageSampleTypeFloat
-    s.views[4].texture.stage = shaderStageFragment
-    s.views[4].texture.multisampled = false
-    s.views[4].texture.imageType = imageType2d
-    s.views[4].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.stage = shaderStageFragment
-    s.views[6].texture.multisampled = false
-    s.views[6].texture.imageType = imageTypeArray
-    s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.views[8].texture.stage = shaderStageVertex
-    s.views[8].texture.multisampled = false
-    s.views[8].texture.imageType = imageTypeArray
-    s.views[8].texture.sampleType = imageSampleTypeFloat
-    s.samplers[2].stage = shaderStageVertex
-    s.samplers[2].samplerType = samplerTypeFiltering
-    s.samplers[5].stage = shaderStageFragment
-    s.samplers[5].samplerType = samplerTypeFiltering
-    s.samplers[7].stage = shaderStageFragment
-    s.samplers[7].samplerType = samplerTypeFiltering
-    s.samplers[9].stage = shaderStageVertex
-    s.samplers[9].samplerType = samplerTypeFiltering
-    s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 1
-    s.textureSamplerPairs[0].samplerSlot = 2
-    s.textureSamplerPairs[0].glslName = "vertTex_vertSmp"
-    s.textureSamplerPairs[1].stage = shaderStageVertex
-    s.textureSamplerPairs[1].viewSlot = 8
-    s.textureSamplerPairs[1].samplerSlot = 9
-    s.textureSamplerPairs[1].glslName = "colorTex_colorSmp"
-    s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 6
-    s.textureSamplerPairs[2].samplerSlot = 7
-    s.textureSamplerPairs[2].glslName = "edgeTex_edgeSmp"
-    s.textureSamplerPairs[3].stage = shaderStageFragment
-    s.textureSamplerPairs[3].viewSlot = 4
-    s.textureSamplerPairs[3].samplerSlot = 5
-    s.textureSamplerPairs[3].glslName = "imageTex_imageSmp"
-  of backendD3d11:
-    s.vertexFunc.source = cast[cstring](vsContourSourceHlsl5[0].addr)
-    s.vertexFunc.d3d11Target = "vs_5_0"
-    s.vertexFunc.entry = "main"
-    s.fragmentFunc.source = cast[cstring](fsContourSourceHlsl5[0].addr)
-    s.fragmentFunc.d3d11Target = "ps_5_0"
-    s.fragmentFunc.entry = "main"
-    s.attrs[0].base_type = shaderAttrBaseTypeSint
-    s.attrs[0].hlslSemName = "TEXCOORD"
-    s.attrs[0].hlslSemIndex = 0
-    s.attrs[1].base_type = shaderAttrBaseTypeSint
-    s.attrs[1].hlslSemName = "TEXCOORD"
-    s.attrs[1].hlslSemIndex = 1
-    s.attrs[2].base_type = shaderAttrBaseTypeSint
-    s.attrs[2].hlslSemName = "TEXCOORD"
-    s.attrs[2].hlslSemIndex = 2
-    s.attrs[3].base_type = shaderAttrBaseTypeSint
-    s.attrs[3].hlslSemName = "TEXCOORD"
-    s.attrs[3].hlslSemIndex = 3
-    s.attrs[4].base_type = shaderAttrBaseTypeSint
-    s.attrs[4].hlslSemName = "TEXCOORD"
-    s.attrs[4].hlslSemIndex = 4
-    s.uniformBlocks[0].stage = shaderStageVertex
-    s.uniformBlocks[0].layout = uniformLayoutStd140
-    s.uniformBlocks[0].size = 16
-    s.uniformBlocks[0].hlslRegisterBN = 0
-    s.uniformBlocks[3].stage = shaderStageFragment
-    s.uniformBlocks[3].layout = uniformLayoutStd140
-    s.uniformBlocks[3].size = 96
-    s.uniformBlocks[3].hlslRegisterBN = 3
-    s.views[1].texture.stage = shaderStageVertex
-    s.views[1].texture.multisampled = false
-    s.views[1].texture.imageType = imageTypeArray
-    s.views[1].texture.sampleType = imageSampleTypeFloat
-    s.views[1].texture.hlslRegisterTN = 0
-    s.views[4].texture.stage = shaderStageFragment
-    s.views[4].texture.multisampled = false
-    s.views[4].texture.imageType = imageType2d
-    s.views[4].texture.sampleType = imageSampleTypeFloat
-    s.views[4].texture.hlslRegisterTN = 0
-    s.views[6].texture.stage = shaderStageFragment
-    s.views[6].texture.multisampled = false
-    s.views[6].texture.imageType = imageTypeArray
-    s.views[6].texture.sampleType = imageSampleTypeFloat
-    s.views[6].texture.hlslRegisterTN = 1
-    s.views[8].texture.stage = shaderStageVertex
-    s.views[8].texture.multisampled = false
-    s.views[8].texture.imageType = imageTypeArray
-    s.views[8].texture.sampleType = imageSampleTypeFloat
-    s.views[8].texture.hlslRegisterTN = 1
-    s.samplers[2].stage = shaderStageVertex
-    s.samplers[2].samplerType = samplerTypeFiltering
-    s.samplers[2].hlslRegisterSN = 2
-    s.samplers[5].stage = shaderStageFragment
-    s.samplers[5].samplerType = samplerTypeFiltering
-    s.samplers[5].hlslRegisterSN = 5
-    s.samplers[7].stage = shaderStageFragment
-    s.samplers[7].samplerType = samplerTypeFiltering
-    s.samplers[7].hlslRegisterSN = 7
-    s.samplers[9].stage = shaderStageVertex
-    s.samplers[9].samplerType = samplerTypeFiltering
-    s.samplers[9].hlslRegisterSN = 9
-    s.textureSamplerPairs[0].stage = shaderStageVertex
-    s.textureSamplerPairs[0].viewSlot = 1
-    s.textureSamplerPairs[0].samplerSlot = 2
-    s.textureSamplerPairs[1].stage = shaderStageVertex
-    s.textureSamplerPairs[1].viewSlot = 8
-    s.textureSamplerPairs[1].samplerSlot = 9
-    s.textureSamplerPairs[2].stage = shaderStageFragment
-    s.textureSamplerPairs[2].viewSlot = 6
-    s.textureSamplerPairs[2].samplerSlot = 7
-    s.textureSamplerPairs[3].stage = shaderStageFragment
-    s.textureSamplerPairs[3].viewSlot = 4
-    s.textureSamplerPairs[3].samplerSlot = 5
-  else: discard
-
-  makeShader(s)
 
 proc toSokolBlend(op: CompositeOperation): SokolBlend {.inline.} =
   type BlendOp = object
@@ -422,19 +251,19 @@ proc toSokolBlend(op: CompositeOperation): SokolBlend {.inline.} =
     dstAlpha: blendOp.dst,
   )
 
-proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
+proc updatePathPipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
   const
     BLEND_MASK = uint32(1 shl 16 - 1)
     ACTIVE_MASK = uint32(1 shl 16)
 
   let
-    oldBlend = ctx.blend
+    oldBlend = ctx.pathBlend
     newBlend = uint32(blend)
 
   if (oldBlend and BLEND_MASK) != newBlend:
     if (oldBlend and ACTIVE_MASK) > 0:
-      ctx.pipeline.uninitPipeline()
-    ctx.blend = newBlend or ACTIVE_MASK
+      ctx.pathPipeline.uninitPipeline()
+    ctx.pathBlend = newBlend or ACTIVE_MASK
 
     let blend = toSokolBlend(blend)
 
@@ -449,31 +278,93 @@ proc updatePipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
     )
 
     initPipeline(
-      ctx.pipeline,
+      ctx.pathPipeline,
       PipelineDesc(
-        shader: ctx.shader,
+        shader: ctx.pathShader,
         layout: VertexLayoutState(
           buffers: [
-            VertexBufferLayoutState(),
+            VertexBufferLayoutState(
+              stride: int32(sizeof(PathInstanceParam)),
+              stepFunc: vertexStepPerInstance,
+              stepRate: 1,
+      ),
+    ],
+          attrs: [
+            VertexAttrState(format: vertexFormatUint, bufferIndex: 0),
+            VertexAttrState(format: vertexFormatUint, bufferIndex: 0),
+            VertexAttrState(format: vertexFormatFloat4, bufferIndex: 0),
+            VertexAttrState(format: vertexFormatUbyte4n, bufferIndex: 0),
+            VertexAttrState(format: vertexFormatUbyte4n, bufferIndex: 0),
+            VertexAttrState(format: vertexFormatUbyte4n, bufferIndex: 0),
+      ]
+    ),
+        indexType: indexTypeNone,
+        stencil: StencilState(enabled: false),
+        colors: [
+          ColorTargetState(
+            writeMask: colorMaskRgba,
+            blend: blendState,
+      ),
+    ],
+        primitiveType: primitiveTypeTriangleStrip,
+        label: "nvg.pathPipeline",
+      ),
+    )
+
+proc updateGlyphPipeline(ctx: SokolBackendContext, blend: CompositeOperation) =
+  const
+    BLEND_MASK = uint32(1 shl 16 - 1)
+    ACTIVE_MASK = uint32(1 shl 16)
+
+  let
+    oldBlend = ctx.glyphBlend
+    newBlend = uint32(blend)
+
+  if (oldBlend and BLEND_MASK) != newBlend:
+    if (oldBlend and ACTIVE_MASK) > 0:
+      ctx.glyphPipeline.uninitPipeline()
+    ctx.glyphBlend = newBlend or ACTIVE_MASK
+
+    let blend = toSokolBlend(blend)
+
+    let blendState = BlendState(
+      enabled: true,
+      srcFactorRgb: blend.srcRGB,
+      dstFactorRgb: blend.dstRGB,
+      opRgb: blendOpAdd,
+      srcFactorAlpha: blend.srcAlpha,
+      dstFactorAlpha: blend.dstAlpha,
+      opAlpha: blendOpAdd,
+    )
+
+    initPipeline(
+      ctx.glyphPipeline,
+      PipelineDesc(
+        shader: ctx.glyphShader,
+        layout: VertexLayoutState(
+          buffers: [
             VertexBufferLayoutState(stepFunc: vertexStepPerInstance,
                 stepRate: 1),
       ],
       attrs: [
+        VertexAttrState(format: vertexFormatFloat4, bufferIndex: 0),
+        VertexAttrState(format: vertexFormatUbyte4n, bufferIndex: 0),
+        VertexAttrState(format: vertexFormatUbyte4n, bufferIndex: 0),
+        VertexAttrState(format: vertexFormatInt4, bufferIndex: 0),
         VertexAttrState(format: vertexFormatInt, bufferIndex: 0),
-        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
-        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
-        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
-        VertexAttrState(format: vertexFormatInt, bufferIndex: 1),
-      ]
-      ),
-      stencil: StencilState(enabled: false),
-      colors: [ColorTargetState(writeMask: colorMaskRgba, blend: blendState)],
-      primitiveType: primitiveTypeTriangles,
-      indexType: indexTypeUint32,
-      cullMode: cullModeBack,
-      faceWinding: faceWindingCw,
-      label: "nvg.pipeline",
+      ],
     ),
+        indexType: indexTypeNone,
+        stencil: StencilState(enabled: false),
+        colors: [
+          ColorTargetState(
+            writeMask: colorMaskRgba,
+            blend: blendState
+      ),
+    ],
+        primitiveType: primitiveTypeTriangleStrip,
+        label: "nvg.glyphPipeline",
+      ),
     )
 
 proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat {.inline.} =
@@ -484,6 +375,7 @@ proc toSokolPixelFormat(typ: PixelFormat): gfx.PixelFormat {.inline.} =
   of PixelFormatA32f: gfx.pixelFormatR32f
   of PixelFormatRGB32f: gfx.pixelFormatRgba32f
   of PixelFormatRGBA32f: gfx.pixelFormatRgba32f
+  of PixelFormatRGBA32u: gfx.pixelFormatRgba32ui
 
 proc createTexture(ctx: SokolBackendContext, image: Image, imageFlags: set[
     ImageFlags]): SokolTexture =
@@ -553,232 +445,176 @@ proc updateTexture(tex: SokolTexture) {.inline.} =
   let
     image = tex.image
     imageInfo = image.imageInfo
+    size = imageInfo.width * imageInfo.height *
+        imageInfo.pixelFormat.bytesPerPixel
 
   if image.data.len > 0:
     tex.texImage.updateImage(ImageData(mipLevels: [
       Range(
         addr: image.data[0].addr,
-        size: imageInfo.width * imageInfo.height *
-            imageInfo.pixelFormat.bytesPerPixel)
+        size: size
+      )
     ]))
 
-proc updateInstanceBuf(ctx: SokolBackendContext) =
-  if ctx.instanceBufSize < ctx.renderData.instances.len:
-    if ctx.instanceBufSize > 0:
-      ctx.instanceBuf.uninitBuffer()
+proc drawPathCall(ctx: SokolBackendContext, drawCall: PathDrawCall,
+    blend: CompositeOperation) =
+  let
+    zone = zoneBegin("sokol.drawPathCall")
+  defer: zone.zoneEnd()
 
-    const defaultSize = int32(128)
-    ctx.instanceBufSize = max(defaultSize, int32(ctx.renderData.instances.len))
+  ctx.updatePathPipeline(blend)
 
-    ctx.instanceBuf.initBuffer(
-      BufferDesc(
-        size: ctx.instanceBufSize * sizeof(InstanceParam),
-        usage: BufferUsage(vertexBuffer: true, streamUpdate: true),
-        label: "nvg.instanceBuf",
-      )
-    )
+  applyPipeline(ctx.pathPipeline)
 
-  if ctx.renderData.instances.len > 0:
-    ctx.instanceBuf.updateBuffer(
-      Range(
-        addr: ctx.renderData.instances[0].addr,
-        size: ctx.renderData.instances.len * sizeof(InstanceParam),
-      )
-    )
+  type
+    VertexParam = object
+      viewSize: array[2, float32] # offset 0, std140 vec2
+      pad: array[2, float32]      # pad the block to 16 bytes
 
-proc initIfNeeded(ctx: SokolBackendContext) =
-  if ctx.initial:
-    return
+  var param = default(VertexParam)
+  param.viewSize = ctx.size
 
-  ctx.initial = true
-  ctx.shader = getShader()
-  ctx.vertAndIndexDummyBuf = allocBuffer()
-  ctx.instanceBuf = allocBuffer()
-  ctx.pipeline = allocPipeline()
-
-  ctx.texEdge.initStorage()
-  ctx.texVert.initStorage()
-  ctx.texColor.initStorage()
-
-  ctx.smpDummy = makeSampler(
-    SamplerDesc(
-      minFilter: filterDefault,
-      mipmapFilter: filterDefault,
-      wrapU: wrapClampToEdge,
-      wrapV: wrapClampToEdge,
-      label: "nvg.smpDummy",
-    )
-  )
-
-  const
-    vertAndIndex = [uint32(0), 1, 2, 0, 2, 3]
-
-  ctx.vertAndIndexDummyBuf.initBuffer(
-    BufferDesc(
-      size: sizeof(uint32) * len(vertAndIndex),
-      usage: BufferUsage(vertexBuffer: true, indexBuffer: true,
-          immutable: true),
-      label: "nvg.vertAndIndexDummyBuf",
-      data: Range(
-        addr: vertAndIndex[0].addr,
-        size: sizeof(uint32) * len(vertAndIndex)),
+  applyUniforms(
+    0,
+    Range(
+      addr: param.addr,
+      size: sizeof(param)
     )
   )
 
   let
-    data = [color(255, 255, 255, 255)]
-    dataRange = Range(addr: data[0].addr, size: sizeof(Color))
-
-  ctx.texDummy = makeImage(
-    ImageDesc(
-      type: imageType2d,
-      width: 1,
-      height: 1,
-      usage: ImageUsage(immutable: true),
-      pixelFormat: pixelFormatRgba8,
-      numMipmaps: 1,
-      label: "nvg.texDummy",
-      data: ImageData(mipLevels: [dataRange]),
-    )
-  )
-
-  ctx.texDummyView = makeView(
-    ViewDesc(
-      texture: TextureViewDesc(
-        image: ctx.texDummy
-    )
-  )
-  )
-
-  let features = queryFeatures()
-  ctx.supportDrawBaseVertex = features.drawBaseVertex
-  ctx.supportDrawBaseInstance = features.drawBaseInstance
-
-proc drawCall(ctx: SokolBackendContext, call: InstanceCall) =
-  ctx.updatePipeline(call.blend)
-
-  applyPipeline(ctx.pipeline)
-
-  type
-    VertexParam = object
-      view: Vec2
-      vertexOffset: int32
-      pad: int32
-
-  var param = default(VertexParam)
-  param.view[0] = float32(ctx.width)
-  param.view[1] = float32(ctx.height)
-  param.vertexOffset = call.vertexOffset
+    uniform = ctx.drawList.uniforms[drawCall.uniformIndex].addr
 
   applyUniforms(
-    0, Range(addr: param.addr, size: sizeof(param))
-  )
-
-  applyUniforms(
-    3,
+    1,
     Range(
-      addr: ctx.renderData.uniforms[call.uniformIndex].addr,
-      size: sizeof(UniformParam)
-    ),
+      addr: uniform,
+      size: sizeof(uniform[])
+    )
   )
 
   var bindings = default(Bindings)
-  bindings.indexBuffer = ctx.vertAndIndexDummyBuf
-  bindings.vertexBuffers[0] = ctx.vertAndIndexDummyBuf
-  bindings.vertexBuffers[1] = ctx.instanceBuf
+  bindings.vertexBuffers[0] = ctx.paths.buffer
 
   var tex = default(SokolTexture)
-  if not call.imageId.isNil:
-    tex = ctx.getTexture(call.imageId)
-
-  bindings.views[1] = ctx.texVert.view
-  bindings.samplers[2] = ctx.smpDummy
+  if not drawCall.imageId.isNil:
+    tex = ctx.getTexture(drawCall.imageId)
 
   if tex.isNil:
-    bindings.views[4] = ctx.texDummyView
-    bindings.samplers[5] = ctx.smpDummy
+    bindings.views[2] = ctx.texDummyView
+    bindings.samplers[3] = ctx.smpDummy
   else:
     if tex.dirty:
       tex.dirty = false
       tex.updateTexture()
 
-    bindings.views[4] = tex.texImageView
-    bindings.samplers[5] = tex.smp
+    bindings.views[2] = tex.texImageView
+    bindings.samplers[3] = tex.smp
 
-  bindings.views[6] = ctx.texEdge.view
-  bindings.samplers[7] = ctx.smpDummy
-
-  bindings.views[8] = ctx.texColor.view
-  bindings.samplers[9] = ctx.smpDummy
+  bindings.views[4] = ctx.edges.view
+  bindings.views[5] = ctx.transforms.view
 
   if not ctx.supportDrawBaseInstance:
-    bindings.vertexBufferOffsets[0] = 0
-    bindings.vertexBufferOffsets[1] = call.instanceOffset * int32(sizeof(InstanceParam))
+    bindings.vertexBufferOffsets[0] = drawCall.instanceOffset * int32(sizeof(PathInstanceParam))
 
   applyBindings(bindings)
 
   if not ctx.supportDrawBaseInstance:
-    draw(0, 6, call.instanceCount)
+    draw(0, 4, drawCall.instanceCount)
   else:
-    drawEx(0, 6, call.instanceCount, 0, call.instanceOffset)
+    drawEx(0, 4, drawCall.instanceCount, 0, drawCall.instanceOffset)
 
-method drawGlyphQuads(ctx: SokolBackendContext, paint: Paint, transform: Mat2d,
-    glyphQuads: openArray[GlyphQuad], compositeOperation: CompositeOperation) =
-  var
-    vertBuf: array[4, Vec4]
-    verts = newSeqOfCap[Vec4](glyphQuads.len * 4)
+proc drawGlyphCall(ctx: SokolBackendContext, drawCall: GlyphDrawCall,
+    blend: CompositeOperation) =
+  let
+    zone = zoneBegin("sokol.drawGlyphCall")
+  defer: zone.zoneEnd()
 
-    lastQuad: ptr GlyphQuad
+  ctx.updateGlyphPipeline(blend)
 
-  template flush() =
-    var
-      image = default(Image)
-      imageFlags = default(set[ImageFlags])
+  applyPipeline(ctx.glyphPipeline)
 
-    if not lastQuad.imageId.isNil:
-      let tex = ctx.getTexture(lastQuad.imageId)
-      if not tex.isNil:
-        image = tex.image
-        imageFlags = tex.imageFlags
+  type
+    VertexParam = object
+      viewSize: array[2, float32] # offset 0, std140 vec2
+      transformIndex: int32       # offset 8
+      pad: array[4, uint8]        # pad to 16 bytes
 
-    ctx.renderData.addCall(
-      vec2(float32(ctx.width), float32(ctx.height)),
-      paint,
-      image,
-      imageFlags,
-      lastQuad.isSdf,
-      lastQuad.color,
-      verts,
-      compositeOperation,
+  var param = default(VertexParam)
+  param.viewSize = ctx.size
+  param.transformIndex = drawCall.mvpIndex
+
+  applyUniforms(0,
+    Range(
+      addr: param.addr,
+      size: sizeof(param)
     )
+  )
 
-  for idx in 0 ..< glyphQuads.len:
-    let quad = glyphQuads[idx].addr
-    if not lastQuad.isNil:
-      if lastQuad.imageId != quad.imageId or lastQuad.color != quad.color:
-        flush()
-        verts.setLenUninit(0)
+  let
+    fragUniform = ctx.drawList.uniforms[drawCall.uniformIndex].addr
+  applyUniforms(6,
+    Range(
+      addr: fragUniform,
+      size: sizeof(fragUniform[])
+    )
+  )
 
-    lastQuad = quad
+  var
+    curveTex = ctx.getTexture(drawCall.curveImageId)
+    bandTex = ctx.getTexture(drawCall.bandImageId)
+  if not curveTex.isNil and curveTex.dirty:
+    curveTex.dirty = false
+    curveTex.updateTexture()
+  if not bandTex.isNil and bandTex.dirty:
+    bandTex.dirty = false
+    bandTex.updateTexture()
 
-    let
-      p1 = vec2(quad.x1, quad.y1) * transform
-      p2 = vec2(quad.x2, quad.y1) * transform
-      p3 = vec2(quad.x2, quad.y2) * transform
-      p4 = vec2(quad.x1, quad.y2) * transform
+  var bindings = default(Bindings)
+  bindings.vertexBuffers[0] = ctx.glyphs.buffer
 
-    vertBuf[0] = vec4(p1, vec2(quad.s1, quad.t1))
-    vertBuf[1] = vec4(p2, vec2(quad.s2, quad.t1))
-    vertBuf[2] = vec4(p3, vec2(quad.s2, quad.t2))
-    vertBuf[3] = vec4(p4, vec2(quad.s1, quad.t2))
+  if not ctx.supportDrawBaseInstance:
+    bindings.vertexBufferOffsets[0] = drawCall.instanceOffset *
+        int32(sizeof(GlyphInstanceParam))
 
-    verts.add(vertBuf)
+  if not curveTex.isNil:
+    bindings.views[2] = curveTex.texImageView
+    bindings.samplers[4] = curveTex.smp
+  else:
+    bindings.views[2] = ctx.texDummyView
+    bindings.samplers[4] = ctx.smpDummy
 
-  if verts.len > 0:
-    flush()
+  if not bandTex.isNil:
+    bindings.views[3] = bandTex.texImageView
+    bindings.samplers[5] = bandTex.smp
+  else:
+    bindings.views[3] = ctx.texDummyView
+    bindings.samplers[5] = ctx.smpDummy
 
-method drawContours(ctx: SokolBackendContext, paint: Paint, contours: openArray[
-    Contour], fillRule: FillRule, compositeOperation: CompositeOperation) =
+  var imageTex = ctx.getTexture(drawCall.imageId)
+  if not imageTex.isNil and imageTex.dirty:
+    imageTex.dirty = false
+    imageTex.updateTexture()
+
+  if not imageTex.isNil:
+    bindings.views[8] = imageTex.texImageView
+    bindings.samplers[9] = imageTex.smp
+  else:
+    bindings.views[8] = ctx.texDummyView
+    bindings.samplers[9] = ctx.smpDummy
+
+  bindings.views[1] = ctx.transforms.view
+  bindings.views[7] = ctx.transforms.view
+
+  applyBindings(bindings)
+
+  if not ctx.supportDrawBaseInstance:
+    draw(0, 4, drawCall.instanceCount)
+  else:
+    drawEx(0, 4, drawCall.instanceCount, 0, drawCall.instanceOffset)
+
+method drawPaths(ctx: SokolBackendContext, paint: Paint, paths: openArray[
+    DrawPath], fillRule: FillRule, compositeOperation: CompositeOperation) =
   var
     image = default(Image)
     imageFlags = default(set[ImageFlags])
@@ -789,20 +625,28 @@ method drawContours(ctx: SokolBackendContext, paint: Paint, contours: openArray[
       image = tex.image
       imageFlags = tex.imageFlags
 
-  ctx.renderData.addCall(
-    vec2(float32(ctx.width), float32(ctx.height)),
-    paint,
-    image,
-    imageFlags,
-    contours,
-    fillRule,
-    compositeOperation,
-  )
+  ctx.drawList.addPathCall(ctx.size, paint, image, imageFlags, paths, fillRule, compositeOperation)
+
+method drawGlyphs*(ctx: SokolBackendContext, paint: Paint, transform: Mat2d,
+    curveImageId, bandImageId: ImageId, glyphs: openArray[DrawGlyph],
+    compositeOperation: CompositeOperation) =
+  var
+    image = default(Image)
+    imageFlags = default(set[ImageFlags])
+
+  if not paint.imageId.isNil:
+    let tex = ctx.getTexture(paint.imageId)
+    if not tex.isNil:
+      image = tex.image
+      imageFlags = tex.imageFlags
+
+  ctx.drawList.addGlyphCall(ctx.size, paint, image, imageFlags, curveImageId,
+      bandImageId, transform, glyphs, compositeOperation)
 
 method allocImage(ctx: SokolBackendContext, imageInfo: ImageInfo,
     imageFlags: set[ImageFlags]): ImageId =
   let
-    image = ctx.renderData.createImage(imageInfo)
+    image = ctx.drawList.createImage(imageInfo)
     tex = ctx.createTexture(image, imageFlags)
   ctx.addTexture(image.imageId, tex)
   image.imageId
@@ -814,36 +658,59 @@ method getImageInfo(ctx: SokolBackendContext, imageId: ImageId): ImageInfo =
   if not tex.isNil:
     result = tex.image.imageInfo
 
-method updateImage(ctx: SokolBackendContext, imageId: ImageId, x, y, w, h,
+method writeImagePixels(ctx: SokolBackendContext, imageId: ImageId, x, y, w, h,
     strideBytes: int32, data: pointer) =
   let
     tex = ctx.getTexture(imageId)
 
   if not tex.isNil:
     tex.dirty = true
-    tex.image.updatePixels(x, y, w, h, strideBytes, data)
+    tex.image.writePixels(x, y, w, h, strideBytes, data)
 
 method deleteImage(ctx: SokolBackendContext, imageId: ImageId) =
   ctx.deleteTexture(imageId)
 
+proc uploadStorage(ctx: SokolBackendContext) =
+  let
+    zone = zoneBegin("sokol.uploadStorage")
+  defer: zone.zoneEnd()
+
+  if ctx.drawList.edges.len > 0:
+    ctx.edges.updateStorage(ctx.drawList.edges)
+
+  if ctx.drawList.paths.len > 0:
+    ctx.paths.updateStorage(ctx.drawList.paths)
+
+  if ctx.drawList.glyphs.len > 0:
+    ctx.glyphs.updateStorage(ctx.drawList.glyphs)
+
+  if ctx.drawList.transforms.len > 0:
+    ctx.transforms.updateStorage(ctx.drawList.transforms)
+
 method flush(ctx: SokolBackendContext) =
+  let
+    zone = zoneBegin("sokol.flush")
+  defer: zone.zoneEnd()
+
   ctx.initIfNeeded()
+  ctx.uploadStorage()
 
-  if ctx.renderData.verts.len > 0:
-    ctx.updateInstanceBuf()
-    ctx.texEdge.updateStorage("nvg.texEdge", ctx.renderData.edges)
-    ctx.texVert.updateStorage("nvg.texVert", ctx.renderData.verts)
-    ctx.texColor.updateStorage("nvg.texColor", ctx.renderData.colors)
-
-    for call in ctx.renderData.calls:
-      ctx.drawCall(call)
+  for drawCall in ctx.drawList.calls:
+    case drawCall.kind
+    of DrawCallPath:
+      ctx.drawPathCall(drawCall.path, drawCall.blend)
+    of DrawCallGlyph:
+      ctx.drawGlyphCall(drawCall.glyph, drawCall.blend)
 
   #
-  ctx.renderData.clear()
+  ctx.drawList.clear()
 
-proc createSokolBackendContext*(
-  width, height: int32): BackendContext =
+method resize(ctx: SokolBackendContext, w, h: int32) =
+  ctx.size[0] = float32(w)
+  ctx.size[1] = float32(h)
+
+proc createSokolBackendContext*(w, h: int32): BackendContext =
   let backendContext = SokolBackendContext()
-  backendContext.width = width
-  backendContext.height = height
+  backendContext.size[0] = float32(w)
+  backendContext.size[1] = float32(h)
   backendContext

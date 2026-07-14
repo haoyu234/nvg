@@ -1,6 +1,8 @@
 nimcache/
 nimblecache/
 htmldocs/
+debug/
+build/
 
 tests/*.exe
 tests/*.DLL

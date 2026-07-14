@@ -1,8 +1,8 @@
+import std/strformat
+
 import nvg/core
 import nvg/path
 import nvg/pieces
-
-import std/strformat
 
 proc dumpPath*(p: Path) =
   for command, data in p.commands:

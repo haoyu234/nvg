@@ -1,6 +1,8 @@
 import nvg
 
-proc demo_skew*(ctx: Context) =
+import ./app
+
+proc demo_skew*(app: App, ctx: Context) =
   let c = ctx.getTransform()
 
   ctx.beginPath()

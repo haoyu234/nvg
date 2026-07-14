@@ -1,8 +1,10 @@
-import nvg
-
 import std/math
 
-proc demo_arc*(ctx: Context) =
+import nvg
+
+import ./app
+
+proc demo_arc*(app: App, ctx: Context) =
   # https://www.cairographics.org/samples/arc/
 
   const
@@ -33,7 +35,7 @@ proc demo_arc*(ctx: Context) =
   ctx.lineTo(vec2(xc, yc))
   ctx.stroke()
 
-proc demo_curveTo*(ctx: Context) =
+proc demo_curveTo*(app: App, ctx: Context) =
   # https://www.cairographics.org/samples/curve_to/
 
   let
@@ -58,7 +60,7 @@ proc demo_curveTo*(ctx: Context) =
   ctx.lineTo(p4)
   ctx.stroke()
 
-proc demo_lineDash*(ctx: Context) =
+proc demo_lineDash*(app: App, ctx: Context) =
   # https://www.cairographics.org/samples/dash/
 
   ctx.dashArray = @[50, 10, 10, 10]
@@ -72,7 +74,7 @@ proc demo_lineDash*(ctx: Context) =
   ctx.bezierTo(vec2(51.2, 230.4), vec2(51.2, 128), vec2(128, 128))
   ctx.stroke()
 
-proc demo_lineCap*(ctx: Context) =
+proc demo_lineCap*(app: App, ctx: Context) =
   # https://www.cairographics.org/samples/set_line_cap/
 
   ctx.beginPath()
@@ -105,7 +107,7 @@ proc demo_lineCap*(ctx: Context) =
   ctx.lineTo(vec2(192, 200))
   ctx.stroke()
 
-proc demo_lineJoin*(ctx: Context) =
+proc demo_lineJoin*(app: App, ctx: Context) =
   # https://www.cairographics.org/samples/set_line_join/
 
   ctx.beginPath()

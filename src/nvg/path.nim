@@ -1,7 +1,7 @@
+import std/math
+
 import ./core
 import ./math
-
-import std/math
 
 const
   NVG_KAPPA90 = float32(4.0 * (sqrt(2.0) - 1.0) / 3.0)
@@ -59,14 +59,14 @@ proc rect*(p: var Path, xywh: Vec4) {.inline.} =
     ]
   )
 
-proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
+proc arc*(p: var Path, c: Vec2, r, a0, a1: float32, ccw: bool) =
   if r <= 0:
     return
 
   const
     pi2 = float32(PI) * 2
     pidiv2 = float32(PI) * 0.5
-    s = float32(4) / 3
+    kappaBase = float32(4) / 3
 
   var da = a1 - a0
   if not ccw:
@@ -86,7 +86,7 @@ proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
     ndivs = max(1, min(int32(abs(da) / pidiv2 + float32(0.5)), 5))
     hda = da / float32(ndivs) * 0.5
 
-  var kappa = abs(s * (1 - cos(hda)) / sin(hda))
+  var kappa = abs(kappaBase * (1 - cos(hda)) / sin(hda))
 
   if ccw:
     kappa = -kappa
@@ -103,11 +103,11 @@ proc arc*(p: var Path, cp: Vec2, r, a0, a1: float32, ccw: bool) =
 
   for i in 0 .. ndivs:
     let
-      a = a0 + da * float32(i) / float32(ndivs)
-      dx = cos(a)
-      dy = sin(a)
-      x = cp[0] + dx * r
-      y = cp[1] + dy * r
+      angle = a0 + da * float32(i) / float32(ndivs)
+      dx = cos(angle)
+      dy = sin(angle)
+      x = c[0] + dx * r
+      y = c[1] + dy * r
       tanx = -dy * r * kappa
       tany = dx * r * kappa
 
@@ -224,10 +224,10 @@ proc relQuadCurveTo*(p: var Path, cp, to: Vec2) {.inline.} =
 proc arcTo*(p: var Path, a, b: Vec2, r: float32) =
   let
     p1 = p.last
-    p32 = b - a
-    p12 = p1 - a
+    ab = b - a
+    ap = p1 - a
 
-    l12sq = lengthSq(p12)
+    l12sq = length2(ap)
 
   if p.isEmpty:
     p.moveTo(a)
@@ -235,41 +235,41 @@ proc arcTo*(p: var Path, a, b: Vec2, r: float32) =
   elif l12sq <= NVG_EPSILON:
     return
 
-  let c = cross(p32, p12)
+  let det = cross(ab, ap)
 
-  if abs(c) <= NVG_EPSILON or r == 0:
+  if abs(det) <= NVG_EPSILON or r == 0:
     p.lineTo(a)
   else:
     let
-      d0 = normalized(p12)
-      d1 = normalized(p32)
-      d = r / tan(arccos(dot(d0, d1)) * 0.5)
+      dir0 = normalized(ap)
+      dir1 = normalized(ab)
+      tanLen = r / tan(arccos(dot(dir0, dir1)) * 0.5)
 
-    if d > 10000:
+    if tanLen > 10000:
       p.lineTo(a)
       return
 
     var
-      cpx = default(float32)
-      cpy = default(float32)
-      a0 = default(float32)
-      a1 = default(float32)
+      cx = float32(0)
+      cy = float32(0)
+      a0 = float32(0)
+      a1 = float32(0)
       ccw = false
 
-    if c > 0:
-      cpx = a[0] + d0[0] * d + d0[1] * r
-      cpy = a[1] + d0[1] * d - d0[0] * r
-      a0 = arctan2(d0[0], -d0[1])
-      a1 = arctan2(-d1[0], d1[1])
+    if det > 0:
+      cx = a[0] + dir0[0] * tanLen + dir0[1] * r
+      cy = a[1] + dir0[1] * tanLen - dir0[0] * r
+      a0 = arctan2(dir0[0], -dir0[1])
+      a1 = arctan2(-dir1[0], dir1[1])
       ccw = false
     else:
-      cpx = a[0] + d0[0] * d - d0[1] * r
-      cpy = a[1] + d0[1] * d + d0[0] * r
-      a0 = arctan2(-d0[0], d0[1])
-      a1 = arctan2(d1[0], -d1[1])
+      cx = a[0] + dir0[0] * tanLen - dir0[1] * r
+      cy = a[1] + dir0[1] * tanLen + dir0[0] * r
+      a0 = arctan2(-dir0[0], dir0[1])
+      a1 = arctan2(dir1[0], -dir1[1])
       ccw = true
 
-    p.arc([cpx, cpy], r, a0, a1, ccw)
+    p.arc([cx, cy], r, a0, a1, ccw)
 
 proc closePath*(p: var Path) {.inline.} =
   p.appendCommands([
@@ -284,25 +284,25 @@ proc addPath*(p: var Path, p2: Path, matrix: Mat2d) {.inline.} =
     case cmd.command
     of Command.MOVE:
       let
-        p1 = cmd.p1 * matrix
+        p1 = matrix * cmd.p1
       p.moveTo(p1)
 
     of Command.LINE:
       let
-        p1 = cmd.p1 * matrix
+        p1 = matrix * cmd.p1
       p.lineTo(p1)
 
     of Command.CURVE:
       let
-        p1 = cmd.p1 * matrix
-        p2 = cmd.p2 * matrix
+        p1 = matrix * cmd.p1
+        p2 = matrix * cmd.p2
       p.quadCurveTo(p1, p2)
 
     of Command.BEZIER:
       let
-        p1 = cmd.p1 * matrix
-        p2 = cmd.p2 * matrix
-        p3 = cmd.p3 * matrix
+        p1 = matrix * cmd.p1
+        p2 = matrix * cmd.p2
+        p3 = matrix * cmd.p3
       p.bezierTo(p1, p2, p3)
 
     of Command.CLOSE:

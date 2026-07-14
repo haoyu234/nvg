@@ -1,6 +1,8 @@
 import nvg
 
-proc demo_tiger*(ctx: Context) =
+import ./app
+
+proc demo_tiger*(app: App, ctx: Context) =
   ctx.scale(vec2(1, -1))
   ctx.translate(vec2(0, - 510))
 
